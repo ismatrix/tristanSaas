@@ -1,0 +1,40 @@
+
+> ant-design-pro@6.0.0 dev
+> npm run start:dev
+
+
+> ant-design-pro@6.0.0 start:dev
+> cross-env UMI_ENV=dev MOCK=none max dev
+
+😄 Hello PRO
+info  - [你知道吗？] 如果想检测未使用的文件和导出，可尝试新出的 deadCode 配置项，详见 https://umijs.org/docs/api/config#deadcode
+Using openapi Plugin
+info  - Umi v4.6.35
+info  - Preparing...
+(node:92179) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+info  - MFSU eager strategy enabled
+info  - [MFSU][eager] restored cache
+[HPM] Proxy created: /api/  -> http://localhost:3000
+[HPM] Proxy rewrite rule created: "^/api" ~> ""
+event - [MFSU][eager] start build deps
+info  - [MFSU] skip buildDeps
+        ╔════════════════════════════════════════════════════╗
+        ║ App listening at:                                  ║
+        ║  >   Local: http://localhost:8000                  ║
+ready - ║  > Network: http://172.19.44.218:8000              ║
+        ║                                                    ║
+        ║ Now you can open browser with the above addresses↑ ║
+        ╚════════════════════════════════════════════════════╝
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+😄 Hello PRO
+Using openapi Plugin
+info  - [MFSU][eager] worker init, takes 376ms
+event - [Webpack] Compiled in 682 ms (536 modules)
+wait  - [Webpack] Compiling...
+event - [MFSU][eager] start build deps
+info  - [MFSU] skip buildDeps
+event - [Webpack] Compiled in 36 ms (522 modules)
+nohup: PORT=8000: No such file or directory

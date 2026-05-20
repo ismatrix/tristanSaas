@@ -1,0 +1,2824 @@
+{
+    "serviceType": [
+        {
+            "columnDesc_zh": "SWIFT",
+            "columnValue": "1",
+            "columnDesc": "SWIFT"
+        },
+        {
+            "columnDesc_zh": "带宽类",
+            "columnValue": "2",
+            "columnDesc": "Bandwidth"
+        },
+        {
+            "columnDesc_zh": "时延圈类",
+            "columnValue": "3",
+            "columnDesc": "Latency"
+        }
+    ],
+    "testFailedListValue": [
+        {
+            "columnDesc_zh": "否",
+            "columnStatus": 1,
+            "columnValue": "0",
+            "columnDesc": "No"
+        },
+        {
+            "columnDesc_zh": "是",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Yes"
+        }
+    ],
+    "arcReasonType": [
+        {
+            "columnDesc_zh": "客户要求延期",
+            "columnValue": "4",
+            "columnDesc": "The customer asked for an extension"
+        },
+        {
+            "columnDesc_zh": "客户需求不明确",
+            "columnValue": "5",
+            "columnDesc": "Unclear customer needs"
+        },
+        {
+            "columnDesc_zh": "错误入单",
+            "columnValue": "6",
+            "columnDesc": "Wrong entry"
+        },
+        {
+            "columnDesc_zh": "丢单原因",
+            "columnValue": "7",
+            "columnDesc": "Reasons for losing orders"
+        },
+        {
+            "columnDesc_zh": "重复录单",
+            "columnValue": "8",
+            "columnDesc": "Duplicate recording"
+        },
+        {
+            "columnDesc_zh": "Fail to meet sbumission deadline",
+            "columnValue": "1",
+            "columnDesc": "Fail to meet sbumission deadline"
+        },
+        {
+            "columnDesc_zh": "No resources",
+            "columnValue": "2",
+            "columnDesc": "No resources"
+        },
+        {
+            "columnDesc_zh": "Others(Specify）",
+            "columnValue": "3",
+            "columnDesc": "Others(Specify）"
+        }
+    ],
+    "milestoneMainType": [
+        {
+            "columnDesc_zh": "合同预付款",
+            "columnValue": "1",
+            "columnDesc": "Contract prepayment"
+        },
+        {
+            "columnDesc_zh": "货到付款",
+            "columnValue": "2",
+            "columnDesc": "cash on delivery"
+        },
+        {
+            "columnDesc_zh": "交付工期付款",
+            "columnValue": "3",
+            "columnDesc": "delivery period payment"
+        },
+        {
+            "columnDesc_zh": "验收后付款",
+            "columnValue": "4",
+            "columnDesc": "payment after acceptance"
+        },
+        {
+            "columnDesc_zh": "尾款",
+            "columnValue": "5",
+            "columnDesc": "final payment"
+        },
+        {
+            "columnDesc_zh": "保质期付款",
+            "columnValue": "6",
+            "columnDesc": "nursing period payment"
+        }
+    ],
+    "issueListValue": [
+        {
+            "columnDesc_zh": "客户不再有IP需求",
+            "columnStatus": 1,
+            "columnValue": "10",
+            "columnDesc": "No more lP requirements from the customer"
+        },
+        {
+            "columnDesc_zh": "商业问题",
+            "columnStatus": 1,
+            "columnValue": "20",
+            "columnDesc": "Commercial issue"
+        },
+        {
+            "columnDesc_zh": "其他",
+            "columnStatus": 1,
+            "columnValue": "30",
+            "columnDesc": "Others"
+        }
+    ],
+    "contractItemsChangeListValue": [
+        {
+            "columnDesc_zh": "是",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Yes"
+        },
+        {
+            "columnDesc_zh": "否",
+            "columnStatus": 1,
+            "columnValue": "2",
+            "columnDesc": "No"
+        }
+    ],
+    "D255": [
+        {
+            "columnDesc_zh": "D225",
+            "columnValue": "2015122106326732,2015092105564526,2014090202550924,2016092709380817,2012032300021506,2016090109085468,2016090609151214,2015123006384940,2016092709380832,2015123106392665,2014041701680291,2012103100252869,2015012803495205,2018102733646092,919022500060274,919081300188621,920081300453573,922102000701641,919041300063039,2014090202551345,2016090109089457,2012103100252826,2014090202551739,2016090109085391,2014062402017528,2013101600895461,2014090202551622,2013120201054483,2014090202551038,920113000508925,939887,2014090202551700,2013022500408181,2014010801224258,2016102709785560,920112600507659,2016090109085434,2011112400000030,2013122701173840,2011112400000031,921110900615261",
+            "columnDesc": "D225"
+        }
+    ],
+    "PROMISE_LEVEL_CNLL": [
+        {
+            "columnDesc_zh": "99.50",
+            "columnStatus": 1,
+            "columnValue": "Pop-to-Pop Unprotected",
+            "columnDesc": "99.50"
+        },
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "PoP-to-PoP Protected",
+            "columnDesc": "99.90"
+        }
+    ],
+    "CORRELATED_PRODUCT_TYPE": [
+        {
+            "columnDesc_zh": "APP开发及运维",
+            "columnValue": "1",
+            "columnDesc": "APP development and O&M"
+        },
+        {
+            "columnDesc_zh": "内容终端",
+            "columnValue": "2",
+            "columnDesc": "Content Device"
+        },
+        {
+            "columnDesc_zh": "内容版权",
+            "columnValue": "3",
+            "columnDesc": "Content License"
+        },
+        {
+            "columnDesc_zh": "视频云服务",
+            "columnValue": "4",
+            "columnDesc": "Video cloud services"
+        },
+        {
+            "columnDesc_zh": "视频基因及监测",
+            "columnValue": "5",
+            "columnDesc": "License footprint and protection"
+        },
+        {
+            "columnDesc_zh": "内容运营",
+            "columnValue": "6",
+            "columnDesc": "Content operations"
+        },
+        {
+            "columnDesc_zh": "内容频道",
+            "columnValue": "7",
+            "columnDesc": "Content Channels"
+        },
+        {
+            "columnDesc_zh": "内容出海产品",
+            "columnValue": "8",
+            "columnDesc": "Content products go global"
+        },
+        {
+            "columnDesc_zh": "其他",
+            "columnValue": "9",
+            "columnDesc": "Others"
+        }
+    ],
+    "lineType": [
+        {
+            "columnDesc_zh": "纯境外业务",
+            "columnValue": "0",
+            "columnDesc": "Pure Overseas Service"
+        },
+        {
+            "columnDesc_zh": "跨境业务",
+            "columnValue": "1",
+            "columnDesc": "Cross-border China(mainland) Service"
+        },
+        {
+            "columnDesc_zh": "穿境业务",
+            "columnValue": "2",
+            "columnDesc": "Transit China(mainland) Service"
+        },
+        {
+            "columnDesc_zh": "纯境内业务",
+            "columnValue": "3",
+            "columnDesc": "All in China"
+        },
+        {
+            "columnDesc_zh": "跨境-境外业务",
+            "columnValue": "4",
+            "columnDesc": "Cross border - Outside China"
+        },
+        {
+            "columnDesc_zh": "跨境-境内业务",
+            "columnValue": "5",
+            "columnDesc": "Cross border - Within China"
+        },
+        {
+            "columnDesc_zh": "NNI",
+            "columnValue": "6",
+            "columnDesc": "NNI"
+        },
+        {
+            "columnDesc_zh": "境内加速至境外",
+            "columnValue": "7",
+            "columnDesc": "Domestic to Global"
+        },
+        {
+            "columnDesc_zh": "境外加速回境内",
+            "columnValue": "8",
+            "columnDesc": "Global to Domestic"
+        }
+    ],
+    "notContractPreApprovalReasonListValue": [
+        {
+            "columnDesc_zh": "CMI 标准条款",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "CMI standard terms and conditions"
+        },
+        {
+            "columnDesc_zh": "条款不变 (续约/搬迁/升速/降速)",
+            "columnStatus": 1,
+            "columnValue": "2",
+            "columnDesc": "Same terms and conditions (renewal / relocation / upgrade / downgrade)"
+        },
+        {
+            "columnDesc_zh": "其他",
+            "columnStatus": 1,
+            "columnValue": "0",
+            "columnDesc": "Others"
+        }
+    ],
+    "orderApprovalStatusList": [
+        {
+            "columnDesc_zh": "待处理",
+            "columnValue": "0",
+            "columnDesc": "To be processed"
+        },
+        {
+            "columnDesc_zh": "订单无需审批",
+            "columnValue": "1",
+            "columnDesc": "No Requirement for Approval"
+        },
+        {
+            "columnDesc_zh": "审批中",
+            "columnValue": "2",
+            "columnDesc": "Approving"
+        },
+        {
+            "columnDesc_zh": "审批完成",
+            "columnValue": "3",
+            "columnDesc": "Approved"
+        }
+    ],
+    "supplierList": [
+        {
+            "columnDesc_zh": "北京轻网科技股份有限公司",
+            "columnValue": "919030400060622",
+            "columnDesc": "北京轻网科技股份有限公司"
+        },
+        {
+            "columnDesc_zh": "LightWAN Corporation Limited",
+            "columnValue": "922072900668337",
+            "columnDesc": "LightWAN Corporation Limited"
+        },
+        {
+            "columnDesc_zh": "北京肇煜宏泰信息科技有限公司",
+            "columnValue": "921032700540330",
+            "columnDesc": "北京肇煜宏泰信息科技有限公司"
+        },
+        {
+            "columnDesc_zh": "上海众传信息科技有限公司",
+            "columnValue": "921050300548381",
+            "columnDesc": "上海众传信息科技有限公司"
+        },
+        {
+            "columnDesc_zh": "富米諾國際有限公司",
+            "columnValue": "925110400823324",
+            "columnDesc": "富米諾國際有限公司"
+        }
+    ],
+    "order_type": [
+        {
+            "columnDesc_zh": "New",
+            "columnValue": "50040001",
+            "columnDesc": "New"
+        },
+        {
+            "columnDesc_zh": "Test",
+            "columnValue": "50040036",
+            "columnDesc": "Test"
+        },
+        {
+            "columnDesc_zh": "Parallel Migration",
+            "columnValue": "50040026",
+            "columnDesc": "Parallel Migration"
+        },
+        {
+            "columnDesc_zh": "Parallel Relocation",
+            "columnValue": "new_1",
+            "columnDesc": "Parallel Relocation"
+        },
+        {
+            "columnDesc_zh": "Parallel Migration+Relocation",
+            "columnValue": "50040027",
+            "columnDesc": "Parallel Migration+Relocation"
+        },
+        {
+            "columnDesc_zh": "Hot Migration",
+            "columnValue": "50040031",
+            "columnDesc": "Hot Migration"
+        },
+        {
+            "columnDesc_zh": "Hot Relocation",
+            "columnValue": "50040029",
+            "columnDesc": "Hot Relocation"
+        },
+        {
+            "columnDesc_zh": "Add New Route",
+            "columnValue": "50040021",
+            "columnDesc": "Add New Route"
+        },
+        {
+            "columnDesc_zh": "Change Route",
+            "columnValue": "50040022",
+            "columnDesc": "Change Route"
+        },
+        {
+            "columnDesc_zh": "Migration",
+            "columnValue": "50040023",
+            "columnDesc": "Migration"
+        },
+        {
+            "columnDesc_zh": "Logical Change/Re-configuration",
+            "columnValue": "50040024",
+            "columnDesc": "Logical Change/Re-configuration"
+        },
+        {
+            "columnDesc_zh": "Change Tariff",
+            "columnValue": "50040004",
+            "columnDesc": "Change Tariff"
+        },
+        {
+            "columnDesc_zh": "Change",
+            "columnValue": "50040032",
+            "columnDesc": "Change"
+        },
+        {
+            "columnDesc_zh": "Termination",
+            "columnValue": "50040018",
+            "columnDesc": "Termination"
+        },
+        {
+            "columnDesc_zh": "Reconfiguration",
+            "columnValue": "50040030",
+            "columnDesc": "Reconfiguration"
+        },
+        {
+            "columnDesc_zh": "修改成本",
+            "columnValue": "RATE_1",
+            "columnDesc": "Modify Cost"
+        },
+        {
+            "columnDesc_zh": "修改报价",
+            "columnValue": "RATE_2",
+            "columnDesc": "Modify Quotation"
+        },
+        {
+            "columnDesc_zh": "修改成本和报价",
+            "columnValue": "RATE_3",
+            "columnDesc": "Modify Cost and Quotation"
+        },
+        {
+            "columnDesc_zh": "Change Address",
+            "columnValue": "50040002",
+            "columnDesc": "Change Address"
+        },
+        {
+            "columnDesc_zh": "Add Service Region",
+            "columnValue": "50040033",
+            "columnDesc": "Add Service Region"
+        },
+        {
+            "columnDesc_zh": "Delete Service Region",
+            "columnValue": "50040034",
+            "columnDesc": "Delete Service Region"
+        },
+        {
+            "columnDesc_zh": "业务暂停",
+            "columnValue": "50040071",
+            "columnDesc": "Service Suspension"
+        },
+        {
+            "columnDesc_zh": "业务恢复",
+            "columnValue": "50040072",
+            "columnDesc": "Service Resumption"
+        },
+        {
+            "columnDesc_zh": "修改成本-Test",
+            "columnValue": "TEST_PRICE_CHANGE",
+            "columnDesc": "Modify Cost(Test order)"
+        },
+        {
+            "columnDesc_zh": "Test To New",
+            "columnValue": "TEST_RESOUCE_CHANGE",
+            "columnDesc": "Test To New"
+        },
+        {
+            "columnDesc_zh": "交付变更",
+            "columnValue": "50040073",
+            "columnDesc": "Change in delivery"
+        }
+    ],
+    "networkingMethod": [
+        {
+            "columnDesc_zh": "CloudSMS in-out",
+            "columnValue": "1",
+            "columnDesc": "CloudSMS in-out"
+        },
+        {
+            "columnDesc_zh": "CloudSMS in-SMS hub out",
+            "columnValue": "2",
+            "columnDesc": "CloudSMS in-SMS hub out"
+        },
+        {
+            "columnDesc_zh": "Others",
+            "columnValue": "0",
+            "columnDesc": "Others"
+        }
+    ],
+    "provisionResultListValue": [
+        {
+            "columnDesc_zh": "开通成功",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Success"
+        },
+        {
+            "columnDesc_zh": "开通失败",
+            "columnStatus": 1,
+            "columnValue": "2",
+            "columnDesc": "Fail"
+        }
+    ],
+    "mksPlanPopLadderPriceList": [
+        {
+            "start": "0",
+            "end": "100",
+            "feeValue": 10.25,
+            "seqIndex": 1
+        },
+        {
+            "start": "100",
+            "end": "200",
+            "feeValue": 10.02,
+            "seqIndex": 2
+        },
+        {
+            "start": "200",
+            "end": "300",
+            "feeValue": 9.79,
+            "seqIndex": 3
+        },
+        {
+            "start": "300",
+            "end": "400",
+            "feeValue": 9.57,
+            "seqIndex": 4
+        },
+        {
+            "start": "400",
+            "end": "500",
+            "feeValue": 9.34,
+            "seqIndex": 5
+        },
+        {
+            "start": "500",
+            "end": "600",
+            "feeValue": 9.11,
+            "seqIndex": 6
+        },
+        {
+            "start": "600",
+            "end": "700",
+            "feeValue": 8.88,
+            "seqIndex": 7
+        },
+        {
+            "start": "700",
+            "end": "800",
+            "feeValue": 8.66,
+            "seqIndex": 8
+        },
+        {
+            "start": "800",
+            "end": "900",
+            "feeValue": 8.34,
+            "seqIndex": 9
+        },
+        {
+            "start": "900",
+            "end": "1000",
+            "feeValue": 8.2,
+            "seqIndex": 10
+        },
+        {
+            "start": "1000",
+            "end": "2000",
+            "feeValue": 8.02,
+            "seqIndex": 11
+        },
+        {
+            "start": "2000",
+            "end": "3000",
+            "feeValue": 7.84,
+            "seqIndex": 12
+        },
+        {
+            "start": "3000",
+            "end": "4000",
+            "feeValue": 7.65,
+            "seqIndex": 13
+        },
+        {
+            "start": "4000",
+            "end": "5000",
+            "feeValue": 7.47,
+            "seqIndex": 14
+        },
+        {
+            "start": "5000",
+            "end": "10000",
+            "feeValue": 6.56,
+            "seqIndex": 15
+        }
+    ],
+    "paymentScheduleEnum": [
+        {
+            "columnDesc_zh": "客户先付CMI款，CMI后付供应商",
+            "columnDesc_en": "Customer Pays CMI First, CMI Pays Supplier Afterwards",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Customer Pays CMI First, CMI Pays Supplier Afterwards"
+        },
+        {
+            "columnDesc_zh": "CMI先付供应商，客户后付CMI",
+            "columnDesc_en": "CMI Pays Supplier First, Customer Pays CMI Afterwards",
+            "columnStatus": 1,
+            "columnValue": "2",
+            "columnDesc": "CMI Pays Supplier First, Customer Pays CMI Afterwards"
+        },
+        {
+            "columnDesc_zh": "现金流为正",
+            "columnDesc_en": "Cash Flow Is Positive",
+            "columnStatus": 1,
+            "columnValue": "3",
+            "columnDesc": "Cash Flow Is Positive"
+        }
+    ],
+    "PROMISE_CUSTOMER_SLA": [
+        {
+            "columnDesc_zh": "标准SLA",
+            "columnStatus": 1,
+            "columnValue": "0",
+            "columnDesc": "standard SLA"
+        },
+        {
+            "columnDesc_zh": "非标准SLA",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "non-standard SLA"
+        }
+    ],
+    "order_type2": [
+        {
+            "columnDesc_zh": "New",
+            "columnValue": "50040001",
+            "columnDesc": "New"
+        },
+        {
+            "columnDesc_zh": "Test",
+            "columnValue": "50040036",
+            "columnDesc": "Test"
+        },
+        {
+            "columnDesc_zh": "Parallel Migration",
+            "columnValue": "50040026",
+            "columnDesc": "Parallel Migration"
+        },
+        {
+            "columnDesc_zh": "Parallel Relocation",
+            "columnValue": "new_1",
+            "columnDesc": "Parallel Relocation"
+        },
+        {
+            "columnDesc_zh": "Parallel Migration+Relocation",
+            "columnValue": "50040027",
+            "columnDesc": "Parallel Migration+Relocation"
+        }
+    ],
+    "serviceLevel": [
+        {
+            "columnDesc_zh": "金级服务",
+            "columnValue": "1",
+            "columnDesc": "Gold"
+        },
+        {
+            "columnDesc_zh": "银级服务",
+            "columnValue": "2",
+            "columnDesc": "Silver"
+        },
+        {
+            "columnDesc_zh": "铜级服务",
+            "columnValue": "3",
+            "columnDesc": "Bronze"
+        }
+    ],
+    "bandWidthSelect": [
+        {
+            "columnDesc_zh": "2M",
+            "columnValue": "2M",
+            "columnDesc": "2M"
+        },
+        {
+            "columnDesc_zh": "4M",
+            "columnValue": "4M",
+            "columnDesc": "4M"
+        },
+        {
+            "columnDesc_zh": "6M",
+            "columnValue": "6M",
+            "columnDesc": "6M"
+        },
+        {
+            "columnDesc_zh": "8M",
+            "columnValue": "8M",
+            "columnDesc": "8M"
+        },
+        {
+            "columnDesc_zh": "10M",
+            "columnValue": "10M",
+            "columnDesc": "10M"
+        },
+        {
+            "columnDesc_zh": "20M",
+            "columnValue": "20M",
+            "columnDesc": "20M"
+        },
+        {
+            "columnDesc_zh": "30M",
+            "columnValue": "30M",
+            "columnDesc": "30M"
+        },
+        {
+            "columnDesc_zh": "40M",
+            "columnValue": "40M",
+            "columnDesc": "40M"
+        },
+        {
+            "columnDesc_zh": "50M",
+            "columnValue": "50M",
+            "columnDesc": "50M"
+        },
+        {
+            "columnDesc_zh": "60M",
+            "columnValue": "60M",
+            "columnDesc": "60M"
+        },
+        {
+            "columnDesc_zh": "70M",
+            "columnValue": "70M",
+            "columnDesc": "70M"
+        },
+        {
+            "columnDesc_zh": "80M",
+            "columnValue": "80M",
+            "columnDesc": "80M"
+        },
+        {
+            "columnDesc_zh": "90M",
+            "columnValue": "90M",
+            "columnDesc": "90M"
+        },
+        {
+            "columnDesc_zh": "100M",
+            "columnValue": "100M",
+            "columnDesc": "100M"
+        },
+        {
+            "columnDesc_zh": "200M",
+            "columnValue": "200M",
+            "columnDesc": "200M"
+        },
+        {
+            "columnDesc_zh": "300M",
+            "columnValue": "300M",
+            "columnDesc": "300M"
+        },
+        {
+            "columnDesc_zh": "400M",
+            "columnValue": "400M",
+            "columnDesc": "400M"
+        },
+        {
+            "columnDesc_zh": "500M",
+            "columnValue": "500M",
+            "columnDesc": "500M"
+        },
+        {
+            "columnDesc_zh": "600M",
+            "columnValue": "600M",
+            "columnDesc": "600M"
+        },
+        {
+            "columnDesc_zh": "700M",
+            "columnValue": "700M",
+            "columnDesc": "700M"
+        },
+        {
+            "columnDesc_zh": "800M",
+            "columnValue": "800M",
+            "columnDesc": "800M"
+        },
+        {
+            "columnDesc_zh": "900M",
+            "columnValue": "900M",
+            "columnDesc": "900M"
+        },
+        {
+            "columnDesc_zh": "1G",
+            "columnValue": "1G",
+            "columnDesc": "1G"
+        },
+        {
+            "columnDesc_zh": "2G",
+            "columnValue": "2G",
+            "columnDesc": "2G"
+        },
+        {
+            "columnDesc_zh": "3G",
+            "columnValue": "3G",
+            "columnDesc": "3G"
+        },
+        {
+            "columnDesc_zh": "4G",
+            "columnValue": "4G",
+            "columnDesc": "4G"
+        },
+        {
+            "columnDesc_zh": "5G",
+            "columnValue": "5G",
+            "columnDesc": "5G"
+        },
+        {
+            "columnDesc_zh": "10G",
+            "columnValue": "10G",
+            "columnDesc": "10G"
+        },
+        {
+            "columnDesc_zh": "40G",
+            "columnValue": "40G",
+            "columnDesc": "40G"
+        },
+        {
+            "columnDesc_zh": "100G",
+            "columnValue": "100G",
+            "columnDesc": "100G"
+        },
+        {
+            "columnDesc_zh": "其他",
+            "columnValue": "Others",
+            "columnDesc": "Others"
+        }
+    ],
+    "PROMISE_LEVEL_IEPL": [
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "End-to-end Protected",
+            "columnDesc": "99.90"
+        },
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "PoP-to-PoP Protected",
+            "columnDesc": "99.90"
+        },
+        {
+            "columnDesc_zh": "99.50",
+            "columnStatus": 1,
+            "columnValue": "Unprotected",
+            "columnDesc": "99.50"
+        }
+    ],
+    "yesOrNo": [
+        {
+            "columnDesc_zh": "是",
+            "columnValue": "1",
+            "columnDesc": "Yes"
+        },
+        {
+            "columnDesc_zh": "否",
+            "columnValue": "2",
+            "columnDesc": "No"
+        }
+    ],
+    "arcReasonTypeSub": [
+        {
+            "columnDesc_zh": "客户问题",
+            "columnValue": "1",
+            "columnDesc": "Customer issues"
+        },
+        {
+            "columnDesc_zh": "价格问题",
+            "columnValue": "2",
+            "columnDesc": "Price issue"
+        },
+        {
+            "columnDesc_zh": "资源问题",
+            "columnValue": "3",
+            "columnDesc": "Resource issues"
+        },
+        {
+            "columnDesc_zh": "产品问题",
+            "columnValue": "4",
+            "columnDesc": "Product issues"
+        },
+        {
+            "columnDesc_zh": "方案问题",
+            "columnValue": "5",
+            "columnDesc": "Programme issues"
+        },
+        {
+            "columnDesc_zh": "无足够信息判断",
+            "columnValue": "6",
+            "columnDesc": "Insufficient information to judge"
+        },
+        {
+            "columnDesc_zh": "转由其他销售单元跟进",
+            "columnValue": "7",
+            "columnDesc": "Follow up by other sales units"
+        },
+        {
+            "columnDesc_zh": "工期问题",
+            "columnValue": "8",
+            "columnDesc": "Construction period"
+        },
+        {
+            "columnDesc_zh": "项目延后",
+            "columnValue": "9",
+            "columnDesc": "Project delay"
+        }
+    ],
+    "orderOwner": [
+        {
+            "columnDesc_zh": "亚太区(已注销)",
+            "columnValue": "O8500900042602",
+            "columnDesc": "APAC Region(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "美洲区(已注销)",
+            "columnValue": "O8500900042603",
+            "columnDesc": "America Region(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "CHINA MOBILE INTERNATIONAL (BRAZIL) TECNOLOGIA DA INFORMACAO LTDA(已注销)",
+            "columnValue": "O8500900041624",
+            "columnDesc": "CHINA MOBILE INTERNATIONAL (BRAZIL) TECNOLOGIA DA INFORMACAO LTDA(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(越南)有限公司",
+            "columnValue": "O8500900041512",
+            "columnDesc": "CHINA MOBILE INTERNATIONAL (VIETNAM) COMPANY LIMITED",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际（意大利）有限公司",
+            "columnValue": "O8500900041623",
+            "columnDesc": "CHINA MOBILE INTERNATIONAL(ITALY) S.r.l.",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(柬埔寨)有限公司",
+            "columnValue": "O8500900041719",
+            "columnDesc": "CM (CAMBODIA) INFORMATION TECHNOLOGY CO., LTD.",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(肯尼亚)有限公司",
+            "columnValue": "O8500900049906",
+            "columnDesc": "CM International (Kenya) Information Technology Limited",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(中东)有限公司",
+            "columnValue": "O8500900041713",
+            "columnDesc": "CM International Middle East FZ-LLC",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际（智利）公司",
+            "columnValue": "O8500900042900",
+            "columnDesc": "CMI Chile SpA",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "CMIX(已注销)",
+            "columnValue": "O8500900042860",
+            "columnDesc": "CMIX(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "运营商业务部",
+            "columnValue": "O8500900041518",
+            "columnDesc": "Carrier Business",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "运营商业务部-移动业务合作",
+            "columnValue": "O8500900042720",
+            "columnDesc": "Carrier Business-Mobile Business Partnership",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(澳大利亚)有限公司",
+            "columnValue": "O8500900041620",
+            "columnDesc": "China Mobile International (Australia) PTY Ltd",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(巴西)有限公司",
+            "columnValue": "O8500900041617",
+            "columnDesc": "Brazil Unit",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(加拿大)有限公司(已注销)",
+            "columnValue": "O8500900041618",
+            "columnDesc": "China Mobile International (Canada) INC(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(德国)有限公司",
+            "columnValue": "O8500900041614",
+            "columnDesc": "China Mobile International (Germany) GmbH",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(馬來西亞)有限公司",
+            "columnValue": "O8500900041712",
+            "columnDesc": "China Mobile International (Malaysia) Sdn. Bhd",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(俄罗斯)有限公司",
+            "columnValue": "O8500900041715",
+            "columnDesc": "China Mobile International (Russia) A Limited Liability Company",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(新加坡)有限公司",
+            "columnValue": "O8500900041710",
+            "columnDesc": "China Mobile International (Singapore) Pte. Ltd",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(瑞士)有限公司",
+            "columnValue": "O8500900042640",
+            "columnDesc": "China Mobile International (Switzerland) Sàrl",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(泰国)有限公司",
+            "columnValue": "O8500900041711",
+            "columnDesc": "China Mobile International (Thailand) Limited",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(英国)有限公司",
+            "columnValue": "O8500900041610",
+            "columnDesc": "China Mobile International (UK) Limited",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(美国)有限公司",
+            "columnValue": "O8500900041611",
+            "columnDesc": "China Mobile International (USA) Inc",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(法国)有限公司",
+            "columnValue": "O8500900041619",
+            "columnDesc": "China Mobile International France SAS",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际有限公司印度顾问",
+            "columnValue": "O8500900049902",
+            "columnDesc": "China Mobile International India Consultancy",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(日本)有限公司",
+            "columnValue": "O8500900041613",
+            "columnDesc": "China Mobile International K.K.",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(韩国)有限公司",
+            "columnValue": "O8500900041621",
+            "columnDesc": "China Mobile International Korea Limited",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际有限公司本部",
+            "columnValue": "O8500900041510",
+            "columnDesc": "China Mobile International Limited",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际有限公司港澳单元",
+            "columnValue": "O8500900049904",
+            "columnDesc": "China Mobile International Limited Hong Kong ＆ Macau Unit",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际有限公司中国内地单元",
+            "columnValue": "O8500900041511",
+            "columnDesc": "China Mobile International Limited Mainland China Unit",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际有限公司菲律宾代表处",
+            "columnValue": "O8500900041714",
+            "columnDesc": "China Mobile International Philippines Representative Office",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际有限公司俄罗斯代表處(已注销)",
+            "columnValue": "O8500900041513",
+            "columnDesc": "China Mobile International Russia Representative Office(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国移动国际（沙特）有限公司",
+            "columnValue": "O8500900042700",
+            "columnDesc": "China Mobile International Saudi Limited",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(南非)有限公司",
+            "columnValue": "O8500900049905",
+            "columnDesc": "China Mobile International South Africa Pty Ltd",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际有限公司台湾顾问",
+            "columnValue": "O8500900049901",
+            "columnDesc": "China Mobile International Taiwan Consultancy",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动国际（巴拿马）有限公司",
+            "columnValue": "O8500900041622",
+            "columnDesc": "China Mobile International(Panama) S.A.",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国移动美国科技有限公司(已注销)",
+            "columnValue": "O8500900041612",
+            "columnDesc": "China Mobile Technology (USA) Inc(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "公司事务部(已注销)",
+            "columnValue": "O8500900042863",
+            "columnDesc": "Corporate Affairs(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "客户服务部(已注销)",
+            "columnValue": "O8500900042862",
+            "columnDesc": "Customer Service(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "DICT(已注销)",
+            "columnValue": "O8500900042840",
+            "columnDesc": "DICT(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "交付服務部",
+            "columnValue": "O8500900041516",
+            "columnDesc": "Delivery and Service",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "企业业务部",
+            "columnValue": "O8500900041519",
+            "columnDesc": "Enterprise Admin",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "企业销售团队(已注销)",
+            "columnValue": "O8500900041515",
+            "columnDesc": "Enterprise Business(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "欧亚专区(已注销)",
+            "columnValue": "O8500900042606",
+            "columnDesc": "Euro-Asia Region(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "欧洲区(已注销)",
+            "columnValue": "O8500900042604",
+            "columnDesc": "Europe Region(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "大中华区(已注销)",
+            "columnValue": "O8500900042601",
+            "columnDesc": "Greater China Region(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "总部直属单元",
+            "columnValue": "O8500900049900",
+            "columnDesc": "Headquarters Directly Affiliated Unit",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "哈萨克斯坦代表处",
+            "columnValue": "O8500900041716",
+            "columnDesc": "Kazakhstan Representative Office",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-运营商及移动业务拓展团队",
+            "columnValue": "O8500900042827",
+            "columnDesc": "Mainland China Business Development Center-Carrier Business ＆ Mobile Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-华东区域团队",
+            "columnValue": "O8500900042820",
+            "columnDesc": "Mainland China Business Development Center-East China Regional Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-金融交通行业拓展团队",
+            "columnValue": "O8500900042824",
+            "columnDesc": "Mainland China Business Development Center-Financial ＆ Transportation Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-政商行业拓展团队",
+            "columnValue": "O8500900042825",
+            "columnDesc": "Mainland China Business Development Center-Government ＆ Retailing Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-工业能源行业拓展团队",
+            "columnValue": "O8500900042823",
+            "columnDesc": "Mainland China Business Development Center-Industrial Energy Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-互联网拓展团队",
+            "columnValue": "O8500900042826",
+            "columnDesc": "Mainland China Business Development Center-Internet Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-华北区域团队",
+            "columnValue": "O8500900042800",
+            "columnDesc": "Mainland China Business Development Center-North China Regional Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-华南区域团队",
+            "columnValue": "O8500900042821",
+            "columnDesc": "Mainland China Business Development Center-South China Regional Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地业务发展中心-西南区域团队",
+            "columnValue": "O8500900042822",
+            "columnDesc": "Mainland China Business Development Center-Southwest China Regional Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-能源行业团队",
+            "columnValue": "O8500900042542",
+            "columnDesc": "Mainland China Unit - Energy Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-金融行业团队",
+            "columnValue": "O8500900042544",
+            "columnDesc": "Mainland China Unit - Financial Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-互联网行业团队",
+            "columnValue": "O8500900042540",
+            "columnDesc": "Mainland China Unit - Internet Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-大客户拓展团队",
+            "columnValue": "O8500900042501",
+            "columnDesc": "Mainland China Unit - Key Account Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-制造行业1团队",
+            "columnValue": "O8500900042620",
+            "columnDesc": "Mainland China Unit - Manufacturing Industry 1 Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-制造行业2团队",
+            "columnValue": "O8500900042621",
+            "columnDesc": "Mainland China Unit - Manufacturing Industry 2 Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-运营商团队",
+            "columnValue": "O8500900042541",
+            "columnDesc": "Mainland China Unit - Operators Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-区域拓展团队",
+            "columnValue": "O8500900042500",
+            "columnDesc": "Mainland China Unit - Regional Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-交通物流行业团队",
+            "columnValue": "O8500900042660",
+            "columnDesc": "Mainland China Unit - Transportation＆Logistics Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-车联网行业团队",
+            "columnValue": "O8500900042680",
+            "columnDesc": "Mainland China Unit - V2X Business Development Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-党政军（教育媒体）行业团队",
+            "columnValue": "O8500900042543",
+            "columnDesc": "Mainland China Unit - government  (educational media) industry Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-建筑行业团队",
+            "columnValue": "O8500900042623",
+            "columnDesc": "Mainland China Unit-Construction Industry Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-医疗商贸行业团队",
+            "columnValue": "O8500900042622",
+            "columnDesc": "Mainland China Unit-Medical Business Industry Team",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-内地团队1华南区域团队(已注销)",
+            "columnValue": "O8500900041522",
+            "columnDesc": "Mainland Group 1 Regional Development (South China)(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-内地团队2大客户团队1(已注销)",
+            "columnValue": "O8500900041525",
+            "columnDesc": "Mainland Group 2 Key Account Development 1(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-内地团队2大客户团队2(已注销)",
+            "columnValue": "O8500900041524",
+            "columnDesc": "Mainland Group 2 Key Account Development 2(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-内地团队2华东区域团队1(已注销)",
+            "columnValue": "O8500900041527",
+            "columnDesc": "Mainland Group 2 Regional Development (East China) 1(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-内地团队2华东区域团队2(已注销)",
+            "columnValue": "O8500900041526",
+            "columnDesc": "Mainland Group 2 Regional Development (East China) 2(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-内地团队1华北央企大客户团队(已注销)",
+            "columnValue": "O8500900041523",
+            "columnDesc": "Mainland Group1 Key Account Development (North China)(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国内地单元-内地团队1华北区域团队(已注销)",
+            "columnValue": "O8500900041521",
+            "columnDesc": "Mainland Group1 Regional Development (North China)(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "市场部(已注销)",
+            "columnValue": "O8500900042865",
+            "columnDesc": "Market(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "墨西哥单元",
+            "columnValue": "O8500900042520",
+            "columnDesc": "Mexico Unit",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "中东与非洲区(已注销)",
+            "columnValue": "O8500900042605",
+            "columnDesc": "Middle East and Africa Region(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "移动业务部(已注销)",
+            "columnValue": "O8500900042880",
+            "columnDesc": "Mobile Business(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "网络部(已注销)",
+            "columnValue": "O8500900042864",
+            "columnDesc": "Network(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "中国移动国际(印尼)有限公司",
+            "columnValue": "O8500900049903",
+            "columnDesc": "PT. Indonesia China Mobile",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "运营商合作",
+            "columnValue": "O8500900041517",
+            "columnDesc": "Partner Relations",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "计划建设部(已注销)",
+            "columnValue": "O8500900042861",
+            "columnDesc": "Planning & Development(Deregistered)",
+            "status": "0"
+        },
+        {
+            "columnDesc_zh": "产品管理部",
+            "columnValue": "O8500900042560",
+            "columnDesc": "Product Management",
+            "status": "1"
+        },
+        {
+            "columnDesc_zh": "南部非洲区",
+            "columnValue": "O8500900042740",
+            "columnDesc": "Southern Africa Region",
+            "status": "1"
+        }
+    ],
+    "changeInfoTypeListValue": [
+        {
+            "columnDesc_zh": "信息变更",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Modify"
+        },
+        {
+            "columnDesc_zh": "同合同变更",
+            "columnStatus": 1,
+            "columnValue": "2",
+            "columnDesc": "The Same Contract Modify"
+        }
+    ],
+    "addedServiceListValue": [
+        {
+            "columnDesc_zh": "不涉及",
+            "columnStatus": 1,
+            "columnValue": "0",
+            "columnDesc": "Not Involved"
+        },
+        {
+            "columnDesc_zh": "标准版",
+            "columnStatus": 1,
+            "columnValue": "6000101020",
+            "columnDesc": "Standard Edition"
+        },
+        {
+            "columnDesc_zh": "高级版",
+            "columnStatus": 1,
+            "columnValue": "6000101021",
+            "columnDesc": "Premium Edition"
+        }
+    ],
+    "PROMISE_LEVEL_VPN": [
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "On-net",
+            "columnDesc": "99.90"
+        },
+        {
+            "columnDesc_zh": "0",
+            "columnStatus": 1,
+            "columnValue": "Off-net",
+            "columnDesc": "0"
+        }
+    ],
+    "status": [
+        {
+            "columnDesc_zh": "录入产品",
+            "columnValue": "0",
+            "columnDesc": "Create Enquiry"
+        },
+        {
+            "columnDesc_zh": "方案制定",
+            "columnValue": "1",
+            "columnDesc": "Solution Consultation"
+        },
+        {
+            "columnDesc_zh": "资源勘查",
+            "columnValue": "2",
+            "columnDesc": "Resource Check"
+        },
+        {
+            "columnDesc_zh": "方案审阅",
+            "columnValue": "3",
+            "columnDesc": "Review Solution"
+        },
+        {
+            "columnDesc_zh": "报价",
+            "columnValue": "4",
+            "columnDesc": "Quotation"
+        },
+        {
+            "columnDesc_zh": "审阅报价",
+            "columnValue": "5",
+            "columnDesc": "Review Quotation"
+        },
+        {
+            "columnDesc_zh": "意向单结果确认",
+            "columnValue": "6",
+            "columnDesc": "Confirm Enquiry"
+        },
+        {
+            "columnDesc_zh": "方案确认",
+            "columnValue": "7",
+            "columnDesc": "Confirm Solution"
+        },
+        {
+            "columnDesc_zh": "成本录入",
+            "columnValue": "8",
+            "columnDesc": "Input Cost"
+        },
+        {
+            "columnDesc_zh": "确认资源",
+            "columnValue": "9",
+            "columnDesc": "Confirm Resource"
+        },
+        {
+            "columnDesc_zh": "转订单",
+            "columnValue": "10",
+            "columnDesc": "Generate Order"
+        },
+        {
+            "columnDesc_zh": "指定交付PM",
+            "columnValue": "12",
+            "columnDesc": "Assign Delivery PM"
+        },
+        {
+            "columnDesc_zh": "指定交付完成时间",
+            "columnValue": "13",
+            "columnDesc": "Fill in Work Order"
+        },
+        {
+            "columnDesc_zh": "任务填报",
+            "columnValue": "14",
+            "columnDesc": "Fill Assignment"
+        },
+        {
+            "columnDesc_zh": "全程报竣",
+            "columnValue": "141",
+            "columnDesc": "Fill Completion"
+        },
+        {
+            "columnDesc_zh": "电路交付",
+            "columnValue": "142",
+            "columnDesc": "Handover Verification"
+        },
+        {
+            "columnDesc_zh": "起租",
+            "columnValue": "15",
+            "columnDesc": "Set BSD Date"
+        },
+        {
+            "columnDesc_zh": "已起租",
+            "columnValue": "16",
+            "columnDesc": "Bill Started"
+        },
+        {
+            "columnDesc_zh": "录入退租单",
+            "columnValue": "17",
+            "columnDesc": "Create Termination Order"
+        },
+        {
+            "columnDesc_zh": "退租",
+            "columnValue": "18",
+            "columnDesc": "Set BSD Date"
+        },
+        {
+            "columnDesc_zh": "资费变更申请",
+            "columnValue": "19",
+            "columnDesc": "Change Tariff Apply"
+        },
+        {
+            "columnDesc_zh": "已退租",
+            "columnValue": "20",
+            "columnDesc": "Terminated"
+        },
+        {
+            "columnDesc_zh": "归档",
+            "columnValue": "40",
+            "columnDesc": "Archive"
+        },
+        {
+            "columnDesc_zh": "挂起",
+            "columnValue": "60",
+            "columnDesc": "Pending"
+        },
+        {
+            "columnDesc_zh": "链路开通",
+            "columnValue": "22",
+            "columnDesc": "Interconnection"
+        },
+        {
+            "columnDesc_zh": "A2P电路交付",
+            "columnValue": "23",
+            "columnDesc": "A2P Handover Verification"
+        },
+        {
+            "columnDesc_zh": "特价审批",
+            "columnValue": "24",
+            "columnDesc": "Special Offer Approval"
+        },
+        {
+            "columnDesc_zh": "网络开通",
+            "columnValue": "25",
+            "columnDesc": "Provisioning"
+        },
+        {
+            "columnDesc_zh": "投标",
+            "columnValue": "26",
+            "columnDesc": "Negotiation"
+        },
+        {
+            "columnDesc_zh": "合同",
+            "columnValue": "27",
+            "columnDesc": "Contract"
+        },
+        {
+            "columnDesc_zh": "交付",
+            "columnValue": "28",
+            "columnDesc": "Delivery"
+        },
+        {
+            "columnDesc_zh": "投产",
+            "columnValue": "29",
+            "columnDesc": "Go into operation"
+        },
+        {
+            "columnDesc_zh": "退网",
+            "columnValue": "30",
+            "columnDesc": "Exit"
+        },
+        {
+            "columnDesc_zh": "转订单",
+            "columnValue": "31",
+            "columnDesc": "Generate Order"
+        },
+        {
+            "columnDesc_zh": "交维",
+            "columnValue": "32",
+            "columnDesc": "Handover"
+        },
+        {
+            "columnDesc_zh": "暂停",
+            "columnValue": "45",
+            "columnDesc": "Suspension"
+        },
+        {
+            "columnDesc_zh": "已暂停",
+            "columnValue": "46",
+            "columnDesc": "Suspended"
+        },
+        {
+            "columnDesc_zh": "生成暂停单",
+            "columnValue": "47",
+            "columnDesc": "Create Suspension Order"
+        },
+        {
+            "columnDesc_zh": "方案&报价",
+            "columnValue": "34",
+            "columnDesc": "Input Solution & Price"
+        },
+        {
+            "columnDesc_zh": "产品审核",
+            "columnValue": "35",
+            "columnDesc": "Product Manager Review"
+        },
+        {
+            "columnDesc_zh": "OA审批/合同管理",
+            "columnValue": "54",
+            "columnDesc": "OA Submission"
+        },
+        {
+            "columnDesc_zh": "链路开通-平台部",
+            "columnValue": "222",
+            "columnDesc": "Interconnection- Platform"
+        },
+        {
+            "columnDesc_zh": "链路开通-网络部",
+            "columnValue": "221",
+            "columnDesc": "Interconnection- Network"
+        },
+        {
+            "columnDesc_zh": "自动报价",
+            "columnValue": "55",
+            "columnDesc": "Cost Automation"
+        },
+        {
+            "columnDesc_zh": "报价交互",
+            "columnValue": "56",
+            "columnDesc": "Cost Automation Configuration"
+        },
+        {
+            "columnDesc_zh": "发起",
+            "columnValue": "50",
+            "columnDesc": "Draft"
+        },
+        {
+            "columnDesc_zh": "MO成本录入",
+            "columnValue": "92",
+            "columnDesc": "MO Cost Input"
+        },
+        {
+            "columnDesc_zh": "询价结果",
+            "columnValue": "61",
+            "columnDesc": "RFQ Result"
+        },
+        {
+            "columnDesc_zh": "PO拟制",
+            "columnValue": "62",
+            "columnDesc": "PO Supplement"
+        },
+        {
+            "columnDesc_zh": "方案完善",
+            "columnValue": "51",
+            "columnDesc": "Solution Refinement"
+        },
+        {
+            "columnDesc_zh": "方案完善_VP审批",
+            "columnValue": "71",
+            "columnDesc": "Solution Refinement_VP Approval"
+        },
+        {
+            "columnDesc_zh": "投标结果",
+            "columnValue": "53",
+            "columnDesc": "Tender Results"
+        },
+        {
+            "columnDesc_zh": "合同发起",
+            "columnValue": "57",
+            "columnDesc": "Contract Draft"
+        },
+        {
+            "columnDesc_zh": "DM审批",
+            "columnValue": "74",
+            "columnDesc": "DM Approval"
+        },
+        {
+            "columnDesc_zh": "法务部专员会签",
+            "columnValue": "64",
+            "columnDesc": "Co-sign by Legal Division"
+        },
+        {
+            "columnDesc_zh": "财务部专员会签",
+            "columnValue": "65",
+            "columnDesc": " Co-sign by Finance Division"
+        },
+        {
+            "columnDesc_zh": "销售DM审批",
+            "columnValue": "105",
+            "columnDesc": "Team Lead Approval"
+        },
+        {
+            "columnDesc_zh": "单元主管审批",
+            "columnValue": "106",
+            "columnDesc": "Unit Head Approval"
+        },
+        {
+            "columnDesc_zh": "EB副主管审批",
+            "columnValue": "107",
+            "columnDesc": "EB Assistant General Manager Approval "
+        },
+        {
+            "columnDesc_zh": "EB主管审批",
+            "columnValue": "108",
+            "columnDesc": "EB General Manager Approval"
+        },
+        {
+            "columnDesc_zh": "CB副主管审批",
+            "columnValue": "109",
+            "columnDesc": "CB Assistant General Manager Approval"
+        },
+        {
+            "columnDesc_zh": "CB主管审批",
+            "columnValue": "110",
+            "columnDesc": "CB General Manager Approval"
+        },
+        {
+            "columnDesc_zh": "企业部/运营商部专员会签",
+            "columnValue": "111",
+            "columnDesc": "Enterprise Business Division Specialist  Co-sign"
+        },
+        {
+            "columnDesc_zh": "大区业务DM审批",
+            "columnValue": "112",
+            "columnDesc": "Regional Market Coordination Manager Approval"
+        },
+        {
+            "columnDesc_zh": "大区主管审批",
+            "columnValue": "113",
+            "columnDesc": "Regional Manager Approval"
+        },
+        {
+            "columnDesc_zh": "企业/运营商部EB专员审批",
+            "columnValue": "114",
+            "columnDesc": "Enterprise Business Division Specialist Approval"
+        },
+        {
+            "columnDesc_zh": "计划建设部",
+            "columnValue": "104",
+            "columnDesc": "Planning & Development"
+        },
+        {
+            "columnDesc_zh": "采购部会签",
+            "columnValue": "75",
+            "columnDesc": "Procurement Co-sign"
+        },
+        {
+            "columnDesc_zh": "法务专员会签",
+            "columnValue": "76",
+            "columnDesc": "Legal&Regulatory Co-sign"
+        },
+        {
+            "columnDesc_zh": "财务专员会签",
+            "columnValue": "77",
+            "columnDesc": "Settlement Team Co-sign"
+        },
+        {
+            "columnDesc_zh": "大区专员会签",
+            "columnValue": "78",
+            "columnDesc": "District Commissioner's Co-sign"
+        },
+        {
+            "columnDesc_zh": "EB/CB专员会签",
+            "columnValue": "79",
+            "columnDesc": "EB/CB Commissioner's Co-sign"
+        },
+        {
+            "columnDesc_zh": "方案及商务中心负责人会签",
+            "columnValue": "80",
+            "columnDesc": "08 Solution&Commercial Co-sign"
+        },
+        {
+            "columnDesc_zh": "DM确认",
+            "columnValue": "81",
+            "columnDesc": "DM Confirm"
+        },
+        {
+            "columnDesc_zh": "GM/CountryHead审批",
+            "columnValue": "82",
+            "columnDesc": "GM / CountryHead Approval"
+        },
+        {
+            "columnDesc_zh": "海外运营人员审批",
+            "columnValue": "83",
+            "columnDesc": "Overseas Operation Approval"
+        },
+        {
+            "columnDesc_zh": "海外运营总经理审批",
+            "columnValue": "84",
+            "columnDesc": "Overseas GM Approval"
+        },
+        {
+            "columnDesc_zh": "EB主管/EB副主管审批",
+            "columnValue": "85",
+            "columnDesc": "EB GM Approval"
+        },
+        {
+            "columnDesc_zh": "CB主管/CB副主管审批",
+            "columnValue": "96",
+            "columnDesc": "CB GM Approval"
+        },
+        {
+            "columnDesc_zh": "VP审批",
+            "columnValue": "86",
+            "columnDesc": "VP Approval"
+        },
+        {
+            "columnDesc_zh": "签署设置",
+            "columnValue": "88",
+            "columnDesc": "Set Signature"
+        },
+        {
+            "columnDesc_zh": "签署人审批",
+            "columnValue": "89",
+            "columnDesc": "he Signatory Approval"
+        },
+        {
+            "columnDesc_zh": "签署确认/合同归档",
+            "columnValue": "90",
+            "columnDesc": "Contract archiving"
+        },
+        {
+            "columnDesc_zh": "企业部专员审批",
+            "columnValue": "115",
+            "columnDesc": "Enterprise Business Division Specialist Approval"
+        },
+        {
+            "columnDesc_zh": "出海能力专员审批",
+            "columnValue": "116",
+            "columnDesc": "出海能力专员审批"
+        },
+        {
+            "columnDesc_zh": "投标失败",
+            "columnValue": "91",
+            "columnDesc": "Tender Lost"
+        },
+        {
+            "columnDesc_zh": "CountryHead审批",
+            "columnValue": "93",
+            "columnDesc": "CountryHead Approval"
+        },
+        {
+            "columnDesc_zh": "EB-ID/CB-PR负责人会签",
+            "columnValue": "94",
+            "columnDesc": "EB-ID / CB-PR Co-sign"
+        },
+        {
+            "columnDesc_zh": "退租合同发起",
+            "columnValue": "95",
+            "columnDesc": "Draft"
+        },
+        {
+            "columnDesc_zh": "合同归档",
+            "columnValue": "97",
+            "columnDesc": "Contract archiving"
+        },
+        {
+            "columnDesc_zh": "预算组会签",
+            "columnValue": "98",
+            "columnDesc": "Budget Co-sign"
+        },
+        {
+            "columnDesc_zh": "方案完善_参会人会签",
+            "columnValue": "102",
+            "columnDesc": "Solution Refinement_Participant Countersign"
+        },
+        {
+            "columnDesc_zh": "交付稽核",
+            "columnValue": "103",
+            "columnDesc": "Delivery Audit"
+        }
+    ],
+    "projectPhaseEnum": [
+        {
+            "columnDesc_zh": "商机阶段",
+            "columnDesc_en": "Opportunity Stage",
+            "columnStatus": 1,
+            "columnValue": "opportunity",
+            "columnDesc": "Opportunity Stage"
+        },
+        {
+            "columnDesc_zh": "预立项阶段",
+            "columnDesc_en": "Pre-Project Approval Stage",
+            "columnStatus": 1,
+            "columnValue": "preProject",
+            "columnDesc": "Pre-Project Approval Stage"
+        },
+        {
+            "columnDesc_zh": "待投标",
+            "columnDesc_en": "Pendding Bidding Stage",
+            "columnStatus": 1,
+            "columnValue": "waitBid",
+            "columnDesc": "Pendding Bidding Stage"
+        },
+        {
+            "columnDesc_zh": "投标阶段",
+            "columnDesc_en": "Bidding Stage",
+            "columnStatus": 1,
+            "columnValue": "bid",
+            "columnDesc": "Bidding Stage"
+        },
+        {
+            "columnDesc_zh": "待立项",
+            "columnDesc_en": "Pending Project Approval",
+            "columnStatus": 1,
+            "columnValue": "waitProjectApproval",
+            "columnDesc": "Pending Project Approval"
+        },
+        {
+            "columnDesc_zh": "投标立项阶段",
+            "columnDesc_en": "Project Approval Stage",
+            "columnStatus": 1,
+            "columnValue": "projectApproval",
+            "columnDesc": "Project Approval Stage"
+        },
+        {
+            "columnDesc_zh": "待发起意向单",
+            "columnDesc_en": "Pending Enquiry Order Initiation",
+            "columnStatus": 1,
+            "columnValue": "waitHandlelist",
+            "columnDesc": "Pending Enquiry Order Initiation"
+        },
+        {
+            "columnDesc_zh": "录单阶段",
+            "columnDesc_en": "Order Entry Stage",
+            "columnStatus": 1,
+            "columnValue": "handlelist",
+            "columnDesc": "Order Entry Stage"
+        },
+        {
+            "columnDesc_zh": "待OA审批",
+            "columnDesc_en": "Pending OA Approval",
+            "columnStatus": 1,
+            "columnValue": "waitContractApproval",
+            "columnDesc": "Pending OA Approval"
+        },
+        {
+            "columnDesc_zh": "合同阶段",
+            "columnDesc_en": "Contract Stage",
+            "columnStatus": 1,
+            "columnValue": "contract",
+            "columnDesc": "Contract Stage"
+        },
+        {
+            "columnDesc_zh": "交付阶段",
+            "columnDesc_en": "Delivery Stage",
+            "columnStatus": 1,
+            "columnValue": "delivery",
+            "columnDesc": "Delivery Stage"
+        },
+        {
+            "columnDesc_zh": "交付稽核阶段",
+            "columnDesc_en": "Delivery Audit Stage",
+            "columnStatus": 1,
+            "columnValue": "deliveryAudit",
+            "columnDesc": "Delivery Audit Stage"
+        },
+        {
+            "columnDesc_zh": "起租阶段",
+            "columnDesc_en": "BSD Stage",
+            "columnStatus": 1,
+            "columnValue": "lease",
+            "columnDesc": "BSD Stage"
+        }
+    ],
+    "cancelResultListValue": [
+        {
+            "columnDesc_zh": "注销成功",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Success"
+        }
+    ],
+    "handle_list_status": [
+        {
+            "columnDesc_zh": "售前",
+            "columnValue": "0",
+            "columnDesc": "Pre-Sale"
+        },
+        {
+            "columnDesc_zh": "售中",
+            "columnValue": "1",
+            "columnDesc": "In-Sale"
+        },
+        {
+            "columnDesc_zh": "售后",
+            "columnValue": "2",
+            "columnDesc": "After-Sale"
+        },
+        {
+            "columnDesc_zh": "归档",
+            "columnValue": "3",
+            "columnDesc": "Archived"
+        }
+    ],
+    "terminateReasonListValue": [
+        {
+            "columnDesc_zh": "服务质量问题",
+            "subs": [
+                {
+                    "columnDesc_zh": "网络性能不达标",
+                    "detailed_reason": "For instance,Metrics such as packet loss and latency fail to meet SLA commitments",
+                    "detailed_reason_zh": "例如：吞吐量、丢包等性能指标无法达到 sla 承诺",
+                    "columnValue": "0",
+                    "columnDesc": "Network performance below standard"
+                },
+                {
+                    "columnDesc_zh": "故障处理效率低",
+                    "detailed_reason": "For instance,Fault handling response time fails to meet SLA requirements",
+                    "detailed_reason_zh": "例如：故障处理响应未达到 SLA 要求",
+                    "columnValue": "1",
+                    "columnDesc": "Low fault handling efficiency"
+                },
+                {
+                    "columnDesc_zh": "业务可用率不达标",
+                    "detailed_reason": "For instance,Business interruptions prevent SLA compliance",
+                    "detailed_reason_zh": "例如：业务频繁中断，无法达到 SLA 要求",
+                    "columnValue": "2",
+                    "columnDesc": "Poor business availability"
+                }
+            ],
+            "columnValue": "0",
+            "columnDesc": "Service Quality Issues"
+        },
+        {
+            "columnDesc_zh": "成本因素",
+            "subs": [
+                {
+                    "columnDesc_zh": "费用高于预期或竞品",
+                    "detailed_reason": "For instance,Pricing is higher than competitors",
+                    "detailed_reason_zh": "例如：价格高于竞对",
+                    "columnValue": "0",
+                    "columnDesc": "Costs exceed budget/competition"
+                }
+            ],
+            "columnValue": "1",
+            "columnDesc": "Cost Factors"
+        },
+        {
+            "columnDesc_zh": "新技术新架构影响",
+            "subs": [
+                {
+                    "columnDesc_zh": "被新技术替代",
+                    "detailed_reason": "For instance,Customers switch to newer technical solutions (e.g., SD-WAN, 5G private network, cloud dedicated line)",
+                    "detailed_reason_zh": "例如：客户转向更先进的技术方案（如 SD-WAN、5G 专网、云专线）",
+                    "columnValue": "0",
+                    "columnDesc": "Replaced by new technologies"
+                }
+            ],
+            "columnValue": "2",
+            "columnDesc": "Impact of New Technologies"
+        },
+        {
+            "columnDesc_zh": "产品技术竞争力不足",
+            "subs": [
+                {
+                    "columnDesc_zh": "技术能力局限",
+                    "detailed_reason": "For instance,Unable to meet customer requirements for new technology",
+                    "detailed_reason_zh": "例如：无法支持客户新增技术要求",
+                    "columnValue": "0",
+                    "columnDesc": "Technology lagging"
+                }
+            ],
+            "columnValue": "3",
+            "columnDesc": "Insufficient Product Competitiveness"
+        },
+        {
+            "columnDesc_zh": "客户原因",
+            "subs": [
+                {
+                    "columnDesc_zh": "企业成本管控",
+                    "detailed_reason": "For instance,Customers reduce communication costs due to internal budget cuts",
+                    "detailed_reason_zh": "例如：客户自身业务收缩，需削减通信成本。",
+                    "columnValue": "0",
+                    "columnDesc": "Enterprise cost control"
+                },
+                {
+                    "columnDesc_zh": "客户自身业务调整",
+                    "detailed_reason": "For instance,Customer’s business downsizing, relocation, or withdrawal leading to reduced demand",
+                    "detailed_reason_zh": "例如：客户业务调整、收缩、搬迁，业务线裁撤导致，客户不需要了",
+                    "columnValue": "1",
+                    "columnDesc": "Customer business adjustment"
+                }
+            ],
+            "columnValue": "4",
+            "columnDesc": "Customer Factors"
+        },
+        {
+            "columnDesc_zh": "其他",
+            "subs": [
+                {
+                    "columnDesc_zh": "其他",
+                    "detailed_reason": "To be filled in",
+                    "detailed_reason_zh": "需补充",
+                    "columnValue": "0",
+                    "columnDesc": "Others"
+                }
+            ],
+            "columnValue": "5",
+            "columnDesc": "Others"
+        }
+    ],
+    "ictsTerminationBpmNode": [
+        {
+            "columnDesc_zh": "录入退租单",
+            "columnValue": "01",
+            "columnDesc": "17"
+        },
+        {
+            "columnDesc_zh": "退租合同发起",
+            "columnValue": "0201",
+            "columnDesc": "95"
+        },
+        {
+            "columnDesc_zh": "DM审批",
+            "columnValue": "0202",
+            "columnDesc": "74"
+        },
+        {
+            "columnDesc_zh": "CountryHead审批",
+            "columnValue": "0203",
+            "columnDesc": "93"
+        },
+        {
+            "columnDesc_zh": "大区专员会签",
+            "columnValue": "0204",
+            "columnDesc": "78"
+        },
+        {
+            "columnDesc_zh": "法务专员会签",
+            "columnValue": "0205",
+            "columnDesc": "76"
+        },
+        {
+            "columnDesc_zh": "财务专员会签",
+            "columnValue": "0206",
+            "columnDesc": "77"
+        },
+        {
+            "columnDesc_zh": "EB-ID/CB-PR负责人会签",
+            "columnValue": "0207",
+            "columnDesc": "94"
+        },
+        {
+            "columnDesc_zh": "EB主管/EB副主管审批",
+            "columnValue": "0208",
+            "columnDesc": "85"
+        },
+        {
+            "columnDesc_zh": "CB主管/CB副主管审批",
+            "columnValue": "0214",
+            "columnDesc": "96"
+        },
+        {
+            "columnDesc_zh": "VP审批",
+            "columnValue": "0209",
+            "columnDesc": "86"
+        },
+        {
+            "columnDesc_zh": "签署设置",
+            "columnValue": "0210",
+            "columnDesc": "88"
+        },
+        {
+            "columnDesc_zh": "签署人审批",
+            "columnValue": "0211",
+            "columnDesc": "89"
+        },
+        {
+            "columnDesc_zh": "签署确认/合同归档",
+            "columnValue": "0212",
+            "columnDesc": "90"
+        },
+        {
+            "columnDesc_zh": "合同归档",
+            "columnValue": "0213",
+            "columnDesc": "97"
+        },
+        {
+            "columnDesc_zh": "退网",
+            "columnValue": "03",
+            "columnDesc": "30"
+        },
+        {
+            "columnDesc_zh": "已退租",
+            "columnValue": "04",
+            "columnDesc": "20"
+        }
+    ],
+    "PROMISE_LEVEL_EVPN": [
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "PoP-to-PoP Protected",
+            "columnDesc": "99.90"
+        }
+    ],
+    "esopFlagsListValue": [
+        {
+            "columnDesc_zh": "否",
+            "columnStatus": 1,
+            "columnValue": "0",
+            "columnDesc": "NO"
+        },
+        {
+            "columnDesc_zh": "是",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "YES"
+        }
+    ],
+    "stopReason": [
+        {
+            "columnDesc_zh": "客户侧原因",
+            "subs": [
+                {
+                    "columnDesc_zh": "客户需求取消/暂停/延期",
+                    "columnValue": "1010",
+                    "columnDesc": "Demand cancelled/suspended/postponed"
+                },
+                {
+                    "columnDesc_zh": "客户/终端客户对服务供应商有偏好",
+                    "columnValue": "1020",
+                    "columnDesc": "Customers/end customers have preferences for service providers"
+                },
+                {
+                    "columnDesc_zh": "客户采取其它方案",
+                    "columnValue": "1030",
+                    "columnDesc": "Adopt other solutions"
+                }
+            ],
+            "columnValue": "10",
+            "columnDesc": "Customer Reasons"
+        },
+        {
+            "columnDesc_zh": "CMI原因",
+            "subs": [
+                {
+                    "columnDesc_zh": "产品/方案不符合客户要求",
+                    "columnValue": "2010",
+                    "columnDesc": "Product/solution does not meet customer's requirements"
+                },
+                {
+                    "columnDesc_zh": "支撑服务能力不足",
+                    "columnValue": "2020",
+                    "columnDesc": "Lack of support capacity"
+                },
+                {
+                    "columnDesc_zh": "价格不符合客户预期",
+                    "columnValue": "2030",
+                    "columnDesc": "Price not up to expectations"
+                }
+            ],
+            "columnValue": "20",
+            "columnDesc": "CMI Reasons"
+        },
+        {
+            "columnDesc_zh": "其它",
+            "subs": [
+                {
+                    "columnDesc_zh": "合规原因",
+                    "columnValue": "3010",
+                    "columnDesc": "Compliance reasons"
+                },
+                {
+                    "columnDesc_zh": "政策法规原因",
+                    "columnValue": "3020",
+                    "columnDesc": "Due to policy/regulations"
+                },
+                {
+                    "columnDesc_zh": "商务条款无法达成一致",
+                    "columnValue": "3030",
+                    "columnDesc": "Not agreeing on business terms"
+                }
+            ],
+            "columnValue": "30",
+            "columnDesc": "Other Reasons"
+        }
+    ],
+    "FINANCE_LEGAL_COMMENT_STATUS": [
+        {
+            "columnDesc_zh": "已阅/同意",
+            "columnValue": "1",
+            "columnDesc": "Viewed/Agree"
+        },
+        {
+            "columnDesc_zh": "不同意",
+            "columnValue": "0",
+            "columnDesc": "Disagree"
+        }
+    ],
+    "changeReasonListListValue": [
+        {
+            "columnDesc_zh": "仅合同条款信息变更",
+            "columnStatus": 1,
+            "columnValue": "3",
+            "columnDesc": "Changes To Contract Terms Information Only"
+        },
+        {
+            "columnDesc_zh": "方案/采购信息变更",
+            "columnStatus": 1,
+            "columnValue": "4",
+            "columnDesc": "Changes To Programme/Procurement Information"
+        }
+    ],
+    "PROMISE_LEVEL_IPLC": [
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "End-to-end Protected",
+            "columnDesc": "99.90"
+        },
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "PoP-to-PoP Protected",
+            "columnDesc": "99.90"
+        },
+        {
+            "columnDesc_zh": "99.50",
+            "columnStatus": 1,
+            "columnValue": "Unprotected",
+            "columnDesc": "99.50"
+        }
+    ],
+    "PROMISE_LEVEL_IPT": [
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "On-net",
+            "columnDesc": "99.90"
+        },
+        {
+            "columnDesc_zh": "0",
+            "columnStatus": 1,
+            "columnValue": "Off-net",
+            "columnDesc": "0"
+        }
+    ],
+    "orderLaterListValue": [
+        {
+            "columnDesc_zh": "否",
+            "columnStatus": 1,
+            "columnValue": "0",
+            "columnDesc": "No"
+        },
+        {
+            "columnDesc_zh": "是",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Yes"
+        }
+    ],
+    "bpmNode": [
+        {
+            "columnDesc_zh": "50",
+            "columnValue": "01",
+            "columnDesc": "50"
+        },
+        {
+            "columnDesc_zh": "1",
+            "columnValue": "02",
+            "columnDesc": "1"
+        },
+        {
+            "columnDesc_zh": "92",
+            "columnValue": "03",
+            "columnDesc": "92"
+        },
+        {
+            "columnDesc_zh": "61",
+            "columnValue": "04",
+            "columnDesc": "61"
+        },
+        {
+            "columnDesc_zh": "62",
+            "columnValue": "05",
+            "columnDesc": "62"
+        },
+        {
+            "columnDesc_zh": "51",
+            "columnValue": "0601",
+            "columnDesc": "51"
+        },
+        {
+            "columnDesc_zh": "102",
+            "columnValue": "0611",
+            "columnDesc": "102"
+        },
+        {
+            "columnDesc_zh": "71",
+            "columnValue": "0610",
+            "columnDesc": "71"
+        },
+        {
+            "columnDesc_zh": "53",
+            "columnValue": "07",
+            "columnDesc": "53"
+        },
+        {
+            "columnDesc_zh": "57",
+            "columnValue": "0801",
+            "columnDesc": "57"
+        },
+        {
+            "columnDesc_zh": "74",
+            "columnValue": "0803",
+            "columnDesc": "74"
+        },
+        {
+            "columnDesc_zh": "75",
+            "columnValue": "0804",
+            "columnDesc": "75"
+        },
+        {
+            "columnDesc_zh": "76",
+            "columnValue": "0805",
+            "columnDesc": "76"
+        },
+        {
+            "columnDesc_zh": "77",
+            "columnValue": "0806",
+            "columnDesc": "77"
+        },
+        {
+            "columnDesc_zh": "78",
+            "columnValue": "0807",
+            "columnDesc": "78"
+        },
+        {
+            "columnDesc_zh": "79",
+            "columnValue": "0808",
+            "columnDesc": "79"
+        },
+        {
+            "columnDesc_zh": "80",
+            "columnValue": "0809",
+            "columnDesc": "80"
+        },
+        {
+            "columnDesc_zh": "81",
+            "columnValue": "0810",
+            "columnDesc": "81"
+        },
+        {
+            "columnDesc_zh": "82",
+            "columnValue": "0811",
+            "columnDesc": "82"
+        },
+        {
+            "columnDesc_zh": "83",
+            "columnValue": "0812",
+            "columnDesc": "83"
+        },
+        {
+            "columnDesc_zh": "84",
+            "columnValue": "0813",
+            "columnDesc": "84"
+        },
+        {
+            "columnDesc_zh": "85",
+            "columnValue": "0814",
+            "columnDesc": "85"
+        },
+        {
+            "columnDesc_zh": "96",
+            "columnValue": "0817",
+            "columnDesc": "96"
+        },
+        {
+            "columnDesc_zh": "86",
+            "columnValue": "0815",
+            "columnDesc": "86"
+        },
+        {
+            "columnDesc_zh": "88",
+            "columnValue": "09",
+            "columnDesc": "88"
+        },
+        {
+            "columnDesc_zh": "89",
+            "columnValue": "10",
+            "columnDesc": "89"
+        },
+        {
+            "columnDesc_zh": "90",
+            "columnValue": "11",
+            "columnDesc": "90"
+        },
+        {
+            "columnDesc_zh": "28",
+            "columnValue": "12",
+            "columnDesc": "28"
+        },
+        {
+            "columnDesc_zh": "104",
+            "columnValue": "16",
+            "columnDesc": "104"
+        },
+        {
+            "columnDesc_zh": "29",
+            "columnValue": "13",
+            "columnDesc": "29"
+        },
+        {
+            "columnDesc_zh": "16",
+            "columnValue": "14",
+            "columnDesc": "16"
+        },
+        {
+            "columnDesc_zh": "40",
+            "columnValue": "00",
+            "columnDesc": "40"
+        },
+        {
+            "columnDesc_zh": "91",
+            "columnValue": "15",
+            "columnDesc": "91"
+        },
+        {
+            "columnDesc_zh": "98",
+            "columnValue": "0818",
+            "columnDesc": "98"
+        },
+        {
+            "columnDesc_zh": "114",
+            "columnValue": "19",
+            "columnDesc": "114"
+        }
+    ],
+    "milestoneType": [
+        {
+            "columnDesc_zh": "固定里程碑",
+            "columnValue": "1",
+            "columnDesc": "Fixed milestone"
+        },
+        {
+            "columnDesc_zh": "灵活里程碑",
+            "columnValue": "2",
+            "columnDesc": "Dynamic milestone"
+        }
+    ],
+    "sceneLabelListValue": [
+        {
+            "columnDesc_zh": "全球一体智能组网，自有+深度合作SD-WAN",
+            "columnDesc_en": "Global integrated intelligent networking, self-owned + deep cooperation SD-WAN",
+            "columnStatus": 1,
+            "columnValue": "31",
+            "columnDesc": "Global integrated intelligent networking, self-owned + deep cooperation SD-WAN"
+        },
+        {
+            "columnDesc_zh": "电商互联网全球内容分发",
+            "columnDesc_en": "E-commerce and internet global content distribution",
+            "columnStatus": 1,
+            "columnValue": "32",
+            "columnDesc": "E-commerce and internet global content distribution"
+        },
+        {
+            "columnDesc_zh": "云融服务",
+            "columnDesc_en": "Cloud integration services",
+            "columnStatus": 1,
+            "columnValue": "33",
+            "columnDesc": "Cloud integration services"
+        },
+        {
+            "columnDesc_zh": "中资出海融合包",
+            "columnDesc_en": "Integrated package for Chinese enterprises going global",
+            "columnStatus": 1,
+            "columnValue": "34",
+            "columnDesc": "Integrated package for Chinese enterprises going global"
+        },
+        {
+            "columnDesc_zh": "车企无忧出海",
+            "columnDesc_en": "Worry-free overseas expansion for automotive enterprises",
+            "columnStatus": 1,
+            "columnValue": "35",
+            "columnDesc": "Worry-free overseas expansion for automotive enterprises"
+        },
+        {
+            "columnDesc_zh": "5G+企业数智化",
+            "columnDesc_en": "5G + enterprise digital intelligence",
+            "columnStatus": 1,
+            "columnValue": "36",
+            "columnDesc": "5G + enterprise digital intelligence"
+        },
+        {
+            "columnDesc_zh": "数智领先工厂园区",
+            "columnDesc_en": "Leading digital intelligence factory",
+            "columnStatus": 1,
+            "columnValue": "37",
+            "columnDesc": "Leading digital intelligence factory"
+        },
+        {
+            "columnDesc_zh": "IDC融合服务",
+            "columnDesc_en": "IDC integrated services",
+            "columnStatus": 1,
+            "columnValue": "38",
+            "columnDesc": "IDC integrated services"
+        },
+        {
+            "columnDesc_zh": "不适用",
+            "columnDesc_en": "N/A",
+            "columnStatus": 1,
+            "columnValue": "39",
+            "columnDesc": "N/A"
+        }
+    ],
+    "dictHighRiskProject": [
+        {
+            "columnDesc_zh": "交付里程碑提醒",
+            "columnDesc_en": "Delivery Reminder",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Delivery Reminder"
+        },
+        {
+            "columnDesc_zh": "收款里程碑提醒",
+            "columnDesc_en": "Receipt Reminder",
+            "columnStatus": 1,
+            "columnValue": "2",
+            "columnDesc": "Receipt Reminder"
+        },
+        {
+            "columnDesc_zh": "交付完成但未完成出账",
+            "columnDesc_en": "Delivered – No Bill",
+            "columnStatus": 1,
+            "columnValue": "3",
+            "columnDesc": "Delivered – No Bill"
+        },
+        {
+            "columnDesc_zh": "长期未起租",
+            "columnDesc_en": "Not Leased – Long Term",
+            "columnStatus": 1,
+            "columnValue": "4",
+            "columnDesc": "Not Leased – Long Term"
+        },
+        {
+            "columnDesc_zh": "超时未完成ICT交付稽核",
+            "columnDesc_en": "ICT Audit Timeout",
+            "columnStatus": 1,
+            "columnValue": "5",
+            "columnDesc": "ICT Audit Timeout"
+        },
+        {
+            "columnDesc_zh": "超时未完成项目后评估",
+            "columnDesc_en": "Timeout – Evaluation Incomplete",
+            "columnStatus": 1,
+            "columnValue": "6",
+            "columnDesc": "Timeout – Evaluation Incomplete"
+        }
+    ],
+    "cdnPlatformListValue": [
+        {
+            "columnDesc_zh": "Cloudflare",
+            "columnStatus": 1,
+            "columnValue": "1",
+            "columnDesc": "Cloudflare"
+        },
+        {
+            "columnDesc_zh": "EdgeNext",
+            "columnStatus": 1,
+            "columnValue": "4",
+            "columnDesc": "EdgeNext"
+        },
+        {
+            "columnDesc_zh": "网宿科技",
+            "columnStatus": 1,
+            "columnValue": "2",
+            "columnDesc": "网宿科技"
+        },
+        {
+            "columnDesc_zh": "Mlytics",
+            "columnStatus": 1,
+            "columnValue": "3",
+            "columnDesc": "Mlytics"
+        }
+    ],
+    "OTHERS": [
+        {
+            "columnDesc_zh": "非标准SLA",
+            "columnStatus": 1,
+            "columnValue": "Others",
+            "columnDesc": "non-standard SLA"
+        }
+    ],
+    "handle_type": [
+        {
+            "columnDesc_zh": "新增",
+            "columnValue": "1",
+            "columnDesc": "New"
+        },
+        {
+            "columnDesc_zh": "资费变更",
+            "columnValue": "2",
+            "columnDesc": "Change Tariff"
+        },
+        {
+            "columnDesc_zh": "资源变更",
+            "columnValue": "3",
+            "columnDesc": "Change Resource"
+        },
+        {
+            "columnDesc_zh": "退租",
+            "columnValue": "4",
+            "columnDesc": "Termination"
+        },
+        {
+            "columnDesc_zh": "信息变更",
+            "columnValue": "5",
+            "columnDesc": "Change Info"
+        }
+    ],
+    "bandWidthUnit": [
+        {
+            "columnDesc_zh": "K",
+            "columnValue": "1",
+            "columnDesc": "K"
+        },
+        {
+            "columnDesc_zh": "M",
+            "columnValue": "2",
+            "columnDesc": "M"
+        },
+        {
+            "columnDesc_zh": "G",
+            "columnValue": "3",
+            "columnDesc": "G"
+        },
+        {
+            "columnDesc_zh": "T",
+            "columnValue": "4",
+            "columnDesc": "T"
+        }
+    ],
+    "PROMISE_LEVEL_HKLL": [
+        {
+            "columnDesc_zh": "99.50",
+            "columnStatus": 1,
+            "columnValue": "Unprotected",
+            "columnDesc": "99.50"
+        },
+        {
+            "columnDesc_zh": "99.90",
+            "columnStatus": 1,
+            "columnValue": "Protected",
+            "columnDesc": "99.90"
+        }
+    ],
+    "operationTypeList": [
+        {
+            "columnDesc_zh": "起租",
+            "columnValue": "1",
+            "columnDesc": "Started BSD"
+        },
+        {
+            "columnDesc_zh": "退租",
+            "columnValue": "2",
+            "columnDesc": "Terminate"
+        }
+    ]
+}

@@ -1,0 +1,75 @@
+﻿PID,GID,globalUltimateDuns,nameEn,nameCn,source,sourceType,industryCode,industryGroupCode,customerType,updateAt,globalUltimateFamilyTreeMembersCount,customLeval,abbr
+302002030800020806,G00000000000000012,544940385,"China UnionPay Co., Ltd.",中国银联股份有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,2026-05-11 11:38,287,s1,UnionPay
+301988032105600316,G00000000000000014,654077502,"Ping An Insurance (Group) Company of China, Ltd.",中国平安保险（集团）股份有限公司,集团139清单,1-价值贡献导向清单,Finance,证券保险（5）,中资出海,2026-05-11 15:17,398,s1,PingAn
+301982091500035411,G00000000000000010,653708479,China CITIC Group Corporation Limited,中国中信集团有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,2026-05-11 15:05,597,s1,CITIC
+112024093000071030,G00000000000000016,544920770,China Life Insurance (Group) Company,中国人寿保险（集团）公司,集团139清单,1-价值贡献导向清单,Finance,证券保险（5）,中资出海,未同步,0,s1,ChinaLife
+302025011006130344,G00000000000000015,654510387,People's Insurance Company (Group) of China Limited,中国人民保险集团股份有限公司,集团139清单,1-价值贡献导向清单,Finance,证券保险（5）,中资出海,2026-05-11 15:20,857,s1,PICC
+301998012200206105,G00000000000000017,420920381,China Chengtong Holdings Group Limited,中国诚通控股集团有限公司,集团139清单,1-价值贡献导向清单,Finance,证券保险（5）,中资出海,2026-05-11 15:22,408,s1,CCT
+301995100400131431,G00000000000000018,527724684,"China Post Group Co., Ltd.",中国邮政集团有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,未同步,0,s1,ChinaPost
+302025072722434465,G00000000000000019,516741880,"China Changan Automobile Group Co., Ltd.",中国长安汽车集团有限公司,集团139清单,1-价值贡献导向清单,Automotive,交通行业（16）,中资出海,2026-05-11 15:28,394,s1,CCAG
+302013031400090464,G00000000000000020,421309942,China Railway Group Limited,中国国家铁路集团有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,2026-05-11 15:29,979,s1,ChinaRailway
+301987040900131225,G00000000000000021,529665481,"China Southern Airlines Group Co., Ltd.",中国南方航空集团有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,2026-05-11 15:29,660,s1,CSAH
+302005120800095430,G00000000000000002,,China Communications Construction Company Limited,中国交通建设集团有限公司,集团139清单,1-价值贡献导向清单,Engineering and Construction,住建行业（7）,中资出海,未同步,-,s1,CCCC
+201995021005590334,G00000000000000023,654510015,BYD Company Limited,比亚迪股份有限公司,集团139清单,1-价值贡献导向清单,Automotive,交通行业（16）,中资出海,2026-05-11 15:29,475,s1,BYD
+302016020500020085,G00000000000000024,544392544,"COSCO Shipping Holdings Co., Ltd.",中国远洋海运集团有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,2026-05-11 15:29,556,s1,COSCO
+301953071500077547,G00000000000000022,,"China First Automobile Works Group Co., Ltd.",中国第一汽车集团有限公司,集团139清单,1-价值贡献导向清单,Automotive,交通行业（16）,中资出海,未同步,-,s1,FAW
+301986080900146033,G00000000000000025,544648801,"China Eastern Airlines Group Co., Ltd.",中国东方航空集团有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,2026-05-11 15:31,262,s1,CEAH
+302008081500079668,G00000000000000028,545398935,"SF Holding Co., Ltd.",深圳顺丰泰森控股（集团）有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,2026-05-11 16:06,165,s1,SF
+302013011705893567,G00000000000000029,527891418,ZTO Express (Cayman) Inc.,中通快递股份有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,2026-05-11 15:32,582,s1,ZTO
+302021042200032523,G00000000000000027,616548971,"China Satellite Network Group Co., Ltd.",中国卫星网络集团有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,交通行业（16）,中资出海,2026-05-11 15:31,18,s1,CSCN
+302003032400061930,G00000000000000026,545268208,"Zhejiang Geely Holding Group Co., Ltd.",浙江吉利控股集团有限公司,集团139清单,1-价值贡献导向清单,Automotive,交通行业（16）,中资出海,2026-05-11 15:32,688,s1,Geely
+302004091700027004,G00000000000000007,654504299,China Construction Bank Corporation,中国建设银行股份有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,未同步,0,s1,CCB
+301983103100027123,G00000000000000009,653708438,Bank of China Limited,中国银行股份有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,未同步,0,s1,BOC
+301992122200083286,G00000000000000030,544851660,"YTO Express Co., Ltd.",圆通速递股份有限公司,集团139清单,1-价值贡献导向清单,Transportation and Logistics,交通行业（16）,中资出海,未同步,0,s1,YTO
+301986121800424332,G00000000000000008,653713891,Agricultural Bank of China Limited,中国农业银行股份有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,未同步,0,s1,ABC
+302011092800083463,G00000000000000004,421297147,"China Energy Engineering Group Co., Ltd.",中国能源建设集团有限公司,集团139清单,1-价值贡献导向清单,Engineering and Construction,住建行业（7）,中资出海,未同步,0,s1,CEEC
+301987033006939543,G00000000000000011,654510585,"Bank of Communications Co., Ltd.",交通银行股份有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,未同步,0,s1,BOCOM
+301985112206939440,G00000000000000006,653710657,Industrial and Commercial Bank of China Limited,中国工商银行股份有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,未同步,0,s1,ICBC
+301983032400092988,G00000000000000001,653714618,China State Construction Engineering Corporation,中国建筑集团有限公司,集团139清单,1-价值贡献导向清单,Engineering and Construction,住建行业（7）,中资出海,2026-05-11 15:34,678,s1,CSCEC
+301984042100213977,G00000000000000005,528191342,"China National Chemical Engineering Co., Ltd.",中国化学工程集团有限公司,集团139清单,1-价值贡献导向清单,Engineering and Construction,住建行业（7）,中资出海,未同步,0,s1,CNCEC
+301987033100095674,G00000000000000013,653715839,"China Merchants Bank Co., Ltd.",招商银行股份有限公司,集团139清单,1-价值贡献导向清单,Finance,银行行业（10）,中资出海,未同步,0,s1,CMB
+301990082800278085,G00000000000000003,654519800,China Railway Construction Corporation Limited,中国铁道建筑集团有限公司,集团139清单,1-价值贡献导向清单,Engineering and Construction,住建行业（7）,中资出海,未同步,0,s1,CRCC
+201996040500086274,G00000000000000031,527054568,"Yunda Holding Co., Ltd.",韵达控股股份有限公司,集团139清单,2-雄安疏解清单,Transportation and Logistics,交通行业（16）,中资出海,未同步,0,s1,YUNDA
+302004061800096005,G00000000000000033,544903503,"China Southern Power Grid Co., Ltd.",中国南方电网有限责任公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,CSG
+301983091400204157,G00000000000000035,654661636,China Petrochemical Corporation,中国石油化工集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,Sinopec
+302025011006149580,G00000000000000034,653713339,China National Petroleum Corporation,中国石油天然气集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,CNPC
+302003051300207903,G00000000000000032,544928435,State Grid Corporation of China,国家电网有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,SGCC
+202024091400128480,G00000000000000037,545234341,State Power Investment Corporation Limited,国家电力投资集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,SPIC
+301989033100036018,G00000000000000038,544871965,"China Huaneng Group Co., Ltd.",中国华能集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,CHNG
+301995102300071760,G00000000000000036,544629942,China Energy Investment Corporation Limited,国家能源投资集团有限责任公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,CHNEnergy
+301993091800034718,G00000000000000040,,China Three Gorges Corporation,中国长江三峡集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,-,s1,CTG
+202024093000017685,G00000000000000039,544902661,China Datang Corporation Ltd.,中国大唐集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,CDT
+302001022100150488,G00000000000000042,544840788,Aluminum Corporation of China Limited,中国铝业集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,Chinalco
+302003040100093602,G00000000000000041,544956311,China Huadian Corporation Ltd.,中国华电集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,CHD
+302021050600033537,G00000000000000044,699489765,Sinochem Holdings Corporation Ltd.,中国中化控股有限责任公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,Sinochem
+201982120905830617,G00000000000000043,654530880,China Minmetals Corporation,中国五矿集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,Minmetals
+302022071900069484,G00000000000000045,845486632,"China Rare Earth Group Co., Ltd.",中国矿产资源集团有限公司,集团139清单,1-价值贡献导向清单,Energy,能源行业（14）,中资出海,未同步,0,s1,CMRG
+302002022500071768,G00000000000000046,,China Electronics Technology Group Corporation,中国电子科技集团有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,制造行业（10）,中资出海,未同步,-,s1,CETC
+302019110800020679,G00000000000000047,,China State Shipbuilding Corporation Limited,中国船舶集团有限公司,集团139清单,1-价值贡献导向清单,Industrial Manufacturing,制造行业（10）,中资出海,未同步,-,s1,CSSC
+302007032600089626,G00000000000000049,864402453,Alibaba Group Holding Limited,阿里巴巴（中国）有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Alibaba
+301994031506815596,G00000000000000048,420050304,CHINT Group Corporation,正泰集团股份有限公司,集团139清单,1-价值贡献导向清单,Industrial Manufacturing,制造行业（10）,中资出海,未同步,0,s1,CHINT
+101998111105555770,G00000000000000050,544835283,Tencent Holdings Limited,深圳市腾讯计算机系统有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Tencent
+302016050400096411,G00000000000000051,544582626,ByteDance Ltd.,抖音有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Douyin
+202011032505843465,G00000000000000055,421363413,"Beijing Kingsoft Cloud Network Technology Co., Ltd.",北京金山云网络技术有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Kingsoft
+302020092500123198,G00000000000000057,721858346,China Broadcasting Network Corporation Limited,中国广电网络股份有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,CBN
+302003031400206214,G00000000000000052,,"Huawei Investment & Holding Co., Ltd.",华为投资控股有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,-,s1,Huawei
+302010030300082924,G00000000000000056,421271154,Xiaomi Corporation,小米科技有限责任公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Xiaomi
+302000012605538569,G00000000000000060,548050511,"Wangsu Science and Technology Co., Ltd.",网宿科技股份有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Wangsu
+302015032000111405,G00000000000000061,420644923,"Beijing Kuaishou Technology Co., Ltd.",北京快手科技有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Kuaishou
+302000101900089964,G00000000000000058,526043754,"Ant Group Co., Ltd.",蚂蚁科技集团股份有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,AntGroup
+302001060500274829,G00000000000000053,528181015,"Beijing Baidu Netcom Science and Technology Co., Ltd.",北京百度网讯科技有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Baidu
+301997062400091403,G00000000000000063,544656606,"Guangzhou NetEase Computer System Co., Ltd.",广州网易计算机系统有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业二部（6）,中资出海,未同步,0,s1,NetEase
+102007041000013334,G00000000000000062,544523516,"Beijing San Kuai Technology Co., Ltd.",北京三快科技有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业二部（6）,中资出海,未同步,0,s1,Meituan
+302007042000095729,G00000000000000054,815553395,"Beijing Jingdong Century Trading Co., Ltd.",北京京东世纪贸易有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,JD
+302006052600082937,G00000000000000059,547876680,"Hunan Happy Sunshine Interactive Entertainment Media Co., Ltd./Mango Net Co., Ltd.",湖南快乐阳光互动娱乐传媒有限公司/芒果网有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业一部（13）,中资出海,未同步,0,s1,Mango
+302014010900002785,G00000000000000066,544332001,"Shanghai Xmory Information Technology Co., Ltd.",上海寻梦信息技术有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业二部（6）,中资出海,未同步,0,s1,PDD
+302013050600080740,G00000000000000065,815557247,"Beijing Didi Infinity Technology Development Co., Ltd.",北京嘀嘀无限科技发展有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业二部（6）,中资出海,未同步,0,s1,DiDi
+301987010300213868,G00000000000000067,547744282,China Tourism Group,中国旅游集团,集团139清单,1-价值贡献导向清单,Retail Chain and Public Services,农业文宣行业（11）,中资出海,未同步,0,s1,CTG
+301999123000015603,G00000000000000064,,"iFlytek Co., Ltd.",科大讯飞股份有限公司,集团139清单,1-价值贡献导向清单,Technology and Internet ,互联网行业二部（6）,中资出海,未同步,-,s1,iFLYTEK
+301984022700048954,G00000000000000068,544697675,"China Forestry Group Co., Ltd.",中国林业集团有限公司,集团139清单,1-价值贡献导向清单,Retail Chain and Public Services,农业文宣行业（11）,中资出海,未同步,0,s1,CFGC
+301985062500093713,G00000000000000071,654291343,"China Agricultural Development Group Co., Ltd.",中国农业发展集团有限公司,集团139清单,2-雄安疏解清单,Retail Chain and Public Services,农业文宣行业（11）,中资出海,未同步,0,s1,CNADG
+302024102900069747,G00000000000000072,653869396,"China Resources (Holdings) Co., Ltd./China Resources Co., Ltd.",中国华润有限公司/华润股份有限公司,集团139清单,1-价值贡献导向清单,Retail Chain and Public Services,连锁商业（13）,中资出海,未同步,0,s1,CRC
+301991041300105844,G00000000000000073,544900814,"Jinjiang International (Group) Co., Ltd.",锦江国际（集团）有限公司,集团139清单,1-价值贡献导向清单,Retail Chain and Public Services,连锁商业（13）,中资出海,未同步,0,s1,JinJiang
+302025011006129803,G00000000000000069,653726794,Xinhua News Agency,新华通讯社,集团139清单,1-价值贡献导向清单,Retail Chain and Public Services,农业文宣行业（11）,中资出海,未同步,0,s1,Xinhua
+302025011006180419,G00000000000000070,529229549,People's Daily,人民日报社,集团139清单,1-价值贡献导向清单,Retail Chain and Public Services,农业文宣行业（11）,中资出海,未同步,0,s1,PeoplesDaily
+302012081600143233,G00000000000000074,864410444,Huazhu Hotels Group Ltd.,华住酒店管理有限公司,集团139清单,1-价值贡献导向清单,Retail Chain and Public Services,连锁商业（13）,中资出海,未同步,0,s1,HWorld

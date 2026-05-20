@@ -1,0 +1,10 @@
+module.exports.authService = require('./auth.service');
+module.exports.emailService = require('./email.service');
+module.exports.tokenService = require('./token.service');
+module.exports.userService = require('./user.service');
+module.exports.orderService = require('./order.service');
+module.exports.orderDetailService = require('./orderDetail.service');
+module.exports.cmiBranchService = require('./cmiBranch.service');
+module.exports.ibossCustomerService = require('./ibossCustomer.service');
+module.exports.contractService = require('./contract.service');
+module.exports.contractDetailService = require('./contractDetail.service');

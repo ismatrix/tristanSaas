@@ -1,0 +1,32 @@
+{
+  "apps": [
+    {
+      "name": "backend-api",
+      "script": "npm",
+      "args": "run dev",
+      "cwd": "/Users/tristan/Workspaces/github/node-express-boilerplate",
+      "exec_mode": "fork",
+      "instances": 1,
+      "autorestart": true,
+      "watch": false,
+      "time": true,
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "react-frontend",
+      "script": "npm",
+      "args": "run dev",
+      "cwd": "/Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend",
+      "exec_mode": "fork",
+      "instances": 1,
+      "autorestart": true,
+      "watch": false,
+      "time": true,
+      "env": {
+        "PORT": "8000"
+      }
+    }
+  ]
+}

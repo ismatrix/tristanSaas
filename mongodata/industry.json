@@ -1,0 +1,202 @@
+[
+    {
+        "industry_code": "CMI00001",
+        "industry_name": "交通物流运输",
+        "industry_name_en": "Transportation and Logistics",
+        "source": "CMI",
+        "parent_industry_code": "CMI00001",
+        "define": "包括公路运输、铁路运输、水路运输、航空运输、仓储、快递、物流服务等"
+    },
+    {
+        "industry_code": "CMI00002",
+        "industry_name": "科技互联网",
+        "industry_name_en": "Technology and Internet",
+        "source": "CMI",
+        "parent_industry_code": "CMI00002",
+        "define": "包括互联网服务、软件开发、信息技术服务、通信设备、电子产品等"
+    },
+    {
+        "industry_code": "CMI00003",
+        "industry_name": "工业制造",
+        "industry_name_en": "Industrial Manufacturing",
+        "source": "CMI",
+        "parent_industry_code": "CMI00003",
+        "define": "包括机械设备、电子设备、金属制品、塑料制品、橡胶制品等"
+    },
+    {
+        "industry_code": "CMI00004",
+        "industry_name": "能源",
+        "industry_name_en": "Energy",
+        "source": "CMI",
+        "parent_industry_code": "CMI00004",
+        "define": "包括石油、天然气、煤炭、电力、新能源等"
+    },
+    {
+        "industry_code": "CMI00005",
+        "industry_name": "金融",
+        "industry_name_en": "Finance",
+        "source": "CMI",
+        "parent_industry_code": "CMI00005",
+        "define": "包括银行、保险、证券、基金、信托、金融科技等"
+    },
+    {
+        "industry_code": "CMI00006",
+        "industry_name": "工程建设",
+        "industry_name_en": "Engineering and Construction",
+        "source": "CMI",
+        "parent_industry_code": "CMI00006",
+        "define": "包括建筑工程、土木工程、工程咨询、工程设计、工程监理等"
+    },
+    {
+        "industry_code": "CMI00007",
+        "industry_name": "酒店、餐饮及公共服务",
+        "industry_name_en": "Hospitality, Catering and Public Services",
+        "source": "CMI",
+        "parent_industry_code": "CMI00007",
+        "define": "包括酒店、餐饮、旅游、公共服务等"
+    },
+    {
+        "industry_code": "CMI00008",
+        "industry_name": "车企",
+        "industry_name_en": "Automotive",
+        "source": "CMI",
+        "parent_industry_code": "CMI00008",
+        "define": "包括汽车制造、汽车销售、汽车维修、汽车租赁等"
+    },
+    {
+        "industry_code": "CMI00009",
+        "industry_name": "运营商",
+        "industry_name_en": "Carrier",
+        "source": "CMI",
+        "parent_industry_code": "CMI00009",
+        "define": "包括电信运营商、移动运营商、网络运营商等"
+    },
+    {
+        "industry_code": "CMI00010",
+        "industry_name": "其他",
+        "industry_name_en": "Others",
+        "source": "CMI",
+        "parent_industry_code": "CMI00010",
+        "define": "包括其他未分类的行业"
+    },
+    {
+        "industry_code": "CM000001",
+        "industry_name": "交通行业",
+        "industry_name_en": "Transportation",
+        "source": "CM",
+        "parent_industry_code": "CMI00001",
+        "define": "包括公路运输、铁路运输、水路运输、航空运输、仓储、快递、物流服务等"
+    },
+    {
+        "industry_code": "CM000002",
+        "industry_name": "教育行业",
+        "industry_name_en": "Education",
+        "source": "CM",
+        "parent_industry_code": "CMI00007",
+        "define": "包括教育、培训、教育科技等"
+    },
+    {
+        "industry_code": "CM000003",
+        "industry_name": "医卫行业",
+        "industry_name_en": "Medical and Health",
+        "source": "CM",
+        "parent_industry_code": "CMI00007",
+        "define": "包括医疗、卫生、健康等"
+    },
+    {
+        "industry_code": "CM000004",
+        "industry_name": "融合创新行业",
+        "industry_name_en": "Integrated Innovation",
+        "source": "CM",
+        "parent_industry_code": "CMI00010",
+        "define": "包括融合创新行业"
+    },
+    {
+        "industry_code": "CM000005",
+        "industry_name": "重要客户服务一部",
+        "industry_name_en": "Important Customer Service Department 1",
+        "source": "CM",
+        "parent_industry_code": "CMI00010",
+        "define": "包括重要客户服务一部"
+    },
+    {
+        "industry_code": "CM000006",
+        "industry_name": "重要客户服务二部",
+        "industry_name_en": "Important Customer Service Department 2",
+        "source": "CM",
+        "parent_industry_code": "CMI00010",
+        "define": "包括重要客户服务二部"
+    },
+    {
+        "industry_code": "CM000007",
+        "industry_name": "住建行业",
+        "industry_name_en": "Housing and Construction",
+        "source": "CM",
+        "parent_industry_code": "CMI00006",
+        "define": "住建行业"
+    },
+    {
+        "industry_code": "CM000008",
+        "industry_name": "银行行业",
+        "industry_name_en": "Banking",
+        "source": "CM",
+        "parent_industry_code": "CMI00005",
+        "define": "包括银行行业"
+    },
+    {
+        "industry_code": "CM000009",
+        "industry_name": "证券保险行业",
+        "industry_name_en": "Securities and Insurance",
+        "source": "CM",
+        "parent_industry_code": "CMI00005",
+        "define": "包括证券保险行业"
+    },
+    {
+        "industry_code": "CM000010",
+        "industry_name": "互联网行业一部",
+        "industry_name_en": "Internet Industry Department 1",
+        "source": "CM",
+        "parent_industry_code": "CMI00002",
+        "define": "包括互联网行业一部"
+    },
+    {
+        "industry_code": "CM000011",
+        "industry_name": "互联网行业二部",
+        "industry_name_en": "Internet Industry Department 2",
+        "source": "CM",
+        "parent_industry_code": "CMI00002",
+        "define": "包括互联网行业二部"
+    },
+    {
+        "industry_code": "CM000012",
+        "industry_name": "农业文宣行业",
+        "industry_name_en": "Agriculture and Culture Industry",
+        "source": "CM",
+        "parent_industry_code": "CMI00007",
+        "define": "包括农业文宣行业"
+    },
+    {
+        "industry_code": "CM000013",
+        "industry_name": "连锁商业",
+        "industry_name_en": "Chain Business",
+        "source": "CM",
+        "parent_industry_code": "CMI00007",
+        "define": "包括连锁商业"
+    },
+    {
+        "industry_code": "CM000014",
+        "industry_name": "能源行业",
+        "industry_name_en": "Energy Industry",
+        "source": "CM",
+        "parent_industry_code": "CMI00004",
+        "define": "包括能源行业"
+    },
+    {
+        "industry_code": "CM000015",
+        "industry_name": "制造行业",
+        "industry_name_en": "Manufacturing Industry",
+        "source": "CM",
+        "parent_industry_code": "CMI00003",
+        "define": "包括制造行业"
+    }
+]
