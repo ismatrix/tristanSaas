@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { request } from '@umijs/max';
-import { Pagination, Spin, message, Button } from 'antd';
+import { Pagination, Spin, message, Button, Input } from 'antd';
 import { ExportOutlined } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -8,6 +8,8 @@ import { AllEnterpriseModule } from 'ag-grid-enterprise';
 
 // 注册 Module 防止 #272 错误
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
+
+const { Search } = Input;
 
 const IBossCustomers: React.FC = () => {
   const gridRef = useRef<AgGridReact>(null);
@@ -19,6 +21,25 @@ const IBossCustomers: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(100);
   const [exporting, setExporting] = useState<boolean>(false);
+  const [globalSearch, setGlobalSearch] = useState<string>('');
+
+  // 生成全表模糊过滤条件
+  const getQueryFilter = (keyword: string) => {
+    if (!keyword) return {};
+    const rx = { $regex: keyword, $options: 'i' };
+    return {
+      $or: [
+        { custId: rx },
+        { custCode: rx },
+        { enterpriseName: rx },
+        { registerAreaName: rx },
+        { custIndustryName: rx },
+        { customerTypeName: rx },
+        { createOperName: rx },
+        { createTime: rx }
+      ]
+    };
+  };
 
   // 导出全量数据
   const handleExportJson = async () => {
@@ -26,7 +47,12 @@ const IBossCustomers: React.FC = () => {
     try {
       const result = await request('/api/v1/iboss-customers', {
         method: 'GET',
-        params: { page: 1, limit: 1000000, sortBy: 'createdAt:desc' },
+        params: {
+          query: JSON.stringify(getQueryFilter(globalSearch)),
+          page: 1,
+          limit: 1000000,
+          sortBy: 'createdAt:desc'
+        },
       });
       const records = result.results || [];
       if (records.length === 0) {
@@ -60,12 +86,18 @@ const IBossCustomers: React.FC = () => {
   };
 
   // Fetch logic
-  const fetchCustomers = useCallback(async (page: number, limit: number) => {
+  const fetchCustomers = useCallback(async (page: number, limit: number, searchWord: string) => {
     setLoading(true);
     try {
+      const queryParams = {
+        query: JSON.stringify(getQueryFilter(searchWord)),
+        page,
+        limit,
+        sortBy: 'createdAt:desc'
+      };
       const result = await request('/api/v1/iboss-customers', {
         method: 'GET',
-        params: { page, limit, sortBy: 'createdAt:desc' },
+        params: queryParams,
       });
       setRowData(result.results || []);
       setTotal(result.totalResults || 0);
@@ -78,12 +110,17 @@ const IBossCustomers: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchCustomers(currentPage, pageSize);
-  }, [fetchCustomers, currentPage, pageSize]);
+    fetchCustomers(currentPage, pageSize, globalSearch);
+  }, [fetchCustomers, currentPage, pageSize, globalSearch]);
 
   const onPaginationChange = (page: number, pageSize: number) => {
     setCurrentPage(page);
     setPageSize(pageSize);
+  };
+
+  const onSearch = (value: string) => {
+    setCurrentPage(1); // 重新搜索时返回第一页
+    setGlobalSearch(value);
   };
 
   // 列定义
@@ -146,14 +183,23 @@ const IBossCustomers: React.FC = () => {
       
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>iBOSS 客户管理</h2>
-        <Button 
-          type="primary" 
-          icon={<ExportOutlined />} 
-          loading={exporting}
-          onClick={handleExportJson}
-        >
-          导出JSON
-        </Button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <Search 
+            placeholder="全字段关键字过滤搜索..." 
+            onSearch={onSearch} 
+            enterButton 
+            allowClear
+            style={{ width: 350 }}
+          />
+          <Button 
+            type="primary" 
+            icon={<ExportOutlined />} 
+            loading={exporting}
+            onClick={handleExportJson}
+          >
+            导出JSON
+          </Button>
+        </div>
       </div>
 
       <div style={{ flex: 1, position: 'relative' }}>

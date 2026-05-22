@@ -304,6 +304,7 @@ export const layout: RunTimeLayoutConfig = ({
  * @doc https://umijs.org/docs/max/request#配置
  */
 export const request: RequestConfig = {
-  baseURL: isDev ? '' : 'https://proapi.azurewebsites.net',
+  // 生产环境与开发环境均使用同源相对路径，防止跨域问题
+  baseURL: '',
   ...errorConfig,
 };

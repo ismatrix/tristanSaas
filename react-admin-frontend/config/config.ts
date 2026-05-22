@@ -26,6 +26,9 @@ export default defineConfig({
 
   publicPath: PUBLIC_PATH,
   favicons: ['/logo.svg'],
+  jsMinifierOptions: {
+    target: ['chrome80', 'es2020'],
+  },
 
   /**
    * @name 兼容性设置

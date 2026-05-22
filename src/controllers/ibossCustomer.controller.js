@@ -9,7 +9,16 @@ const syncCustomers = catchAsync(async (req, res) => {
 });
 
 const getCustomers = catchAsync(async (req, res) => {
-  const filter = pick(req.query, ['enterpriseName', 'custId']);
+  let filter = {};
+  if (req.query.query) {
+    try {
+      filter = JSON.parse(req.query.query);
+    } catch (e) {
+      filter = {};
+    }
+  } else {
+    filter = pick(req.query, ['enterpriseName', 'custId']);
+  }
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
   const result = await ibossCustomerService.queryCustomers(filter, options);
   res.send(result);
