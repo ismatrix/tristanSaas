@@ -4,6 +4,9 @@
 # 确保脚本遇到错误时立即退出
 set -e
 
+# 补全非交互式环境下的环境变量 PATH（确保能找到 pm2 命令）
+export PATH=$PATH:/home/tristan/.npm-global/bin
+
 echo "=== 开始自动部署更新 ==="
 
 # 1. 拉取 GitHub 最新代码并强制覆盖本地
