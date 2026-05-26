@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { request, history } from '@umijs/max';
+import { request, history, useModel } from '@umijs/max';
 import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip } from 'antd';
 import { SaveOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ApartmentOutlined, DownloadOutlined, ExportOutlined } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
@@ -14,6 +14,8 @@ ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
  * 支持：编辑字段值、增加列、删除列、修改字段名、统一保存
  */
 const KeyCustomerList: React.FC = () => {
+  const { initialState } = useModel('@@initialState');
+  const isTristan = initialState?.currentUser?.email === 'tristan@tristan.wang';
   const gridRef = useRef<AgGridReact>(null);
 
   // --- 数据状态 ---
@@ -61,11 +63,14 @@ const KeyCustomerList: React.FC = () => {
     try {
       // 从 localStorage 获取 JWT Token（和请求拦截器一致）
       const token = localStorage.getItem('token') || '';
-      const params = new URLSearchParams({
-        globalUltimateDuns,
-        collectionName,
-        ...(keycustomerId => keycustomerId ? { keycustomerId } : {})(_id),
-      });
+      const queryObj: Record<string, string> = {
+        globalUltimateDuns: String(globalUltimateDuns || ''),
+        collectionName: String(collectionName || ''),
+      };
+      if (_id) {
+        queryObj.keycustomerId = String(_id);
+      }
+      const params = new URLSearchParams(queryObj);
 
       const response = await fetch(`/api/v1/dnb/family-tree/sync-stream?${params}`, {
         method: 'GET',
@@ -180,33 +185,91 @@ const KeyCustomerList: React.FC = () => {
     const targets = records.filter((r: any) => r.abbr && r.globalUltimateDuns);
     if (targets.length === 0) return;
 
-    // 并行查询每行对应集合的 count 和 最新 _syncedAt
+    // 并行查询每行对应集合的 count 和 最新 _syncedAt，以及境外分支数
     const results = await Promise.allSettled(
       targets.map(async (record: any) => {
         const collName = `DNBFamilyTree-${record.abbr}-${record.globalUltimateDuns}`;
+        const webCollName = `DNBWebFamilyTree-${record.abbr}-${record.globalUltimateDuns}`;
+        let ftCount = 0;
+        let ftLastSync = null;
+        let webFtCount = 0;
+        let ftOverseasCount = 0;
+        let webFtOverseasCount = 0;
+
         try {
           const res = await request(`/api/v1/wildcards/${collName}`, {
             method: 'GET',
             // limit=1 排序最新，totalResults 即总数
             params: { options: JSON.stringify({ limit: 1, sort: { _syncedAt: -1 } }) },
           });
-          return {
-            _id: String(record._id),
-            _ftCount: res?.totalResults ?? 0,
-            _ftLastSync: res?.results?.[0]?._syncedAt ?? null,
-          };
-        } catch {
-          // 集合不存在时不报错
-          return { _id: String(record._id), _ftCount: 0, _ftLastSync: null };
+          ftCount = res?.totalResults ?? 0;
+          ftLastSync = res?.results?.[0]?._syncedAt ?? null;
+        } catch (e) {
+          // 集合不存在
         }
+
+        try {
+          const res = await request(`/api/v1/wildcards/${webCollName}`, {
+            method: 'GET',
+            params: { options: JSON.stringify({ limit: 1 }) },
+          });
+          webFtCount = res?.totalResults ?? 0;
+        } catch (e) {
+          // 集合不存在
+        }
+
+        try {
+          const res = await request(`/api/v1/wildcards/${collName}`, {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({
+                "primaryAddress.addressCountry.name": { "$ne": "China", "$nin": [null, ""] }
+              }),
+              options: JSON.stringify({ limit: 1 }),
+            },
+          });
+          ftOverseasCount = res?.totalResults ?? 0;
+        } catch (e) {
+          // 集合不存在
+        }
+
+        try {
+          const res = await request(`/api/v1/wildcards/${webCollName}`, {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({
+                "fields.company_addresses_countryId_country_name": { "$ne": "China", "$nin": [null, ""] }
+              }),
+              options: JSON.stringify({ limit: 1 }),
+            },
+          });
+          webFtOverseasCount = res?.totalResults ?? 0;
+        } catch (e) {
+          // 集合不存在
+        }
+
+        return {
+          _id: String(record._id),
+          _ftCount: ftCount,
+          _ftLastSync: ftLastSync,
+          _webFtCount: webFtCount,
+          _ftOverseasCount: ftOverseasCount,
+          _webFtOverseasCount: webFtOverseasCount,
+        };
       })
     );
 
     // 构建统计 Map
-    const statsMap = new Map<string, { _ftCount: number; _ftLastSync: any }>();
+    const statsMap = new Map<string, { _ftCount: number; _ftLastSync: any; _webFtCount: number; _ftOverseasCount: number; _webFtOverseasCount: number }>();
     results.forEach((r) => {
       if (r.status === 'fulfilled' && r.value) {
-        statsMap.set(r.value._id, { _ftCount: r.value._ftCount, _ftLastSync: r.value._ftLastSync });
+        statsMap.set(r.value._id, {
+          _ftCount: r.value._ftCount,
+          _ftLastSync: r.value._ftLastSync,
+          _webFtCount: r.value._webFtCount,
+          _ftOverseasCount: r.value._ftOverseasCount,
+          _webFtOverseasCount: r.value._webFtOverseasCount,
+        });
       }
     });
 
@@ -214,7 +277,14 @@ const KeyCustomerList: React.FC = () => {
     statsMap.forEach((stats, rowId) => {
       const rowNode = gridRef.current?.api?.getRowNode(rowId);
       if (rowNode) {
-        rowNode.setData({ ...rowNode.data, _ftCount: stats._ftCount, _ftLastSync: stats._ftLastSync });
+        rowNode.setData({
+          ...rowNode.data,
+          _ftCount: stats._ftCount,
+          _ftLastSync: stats._ftLastSync,
+          _webFtCount: stats._webFtCount,
+          _ftOverseasCount: stats._ftOverseasCount,
+          _webFtOverseasCount: stats._webFtOverseasCount,
+        });
       }
     });
     // 对于没有家族树集合的行，将其统计字段清零
@@ -225,8 +295,8 @@ const KeyCustomerList: React.FC = () => {
       // 有 abbr+globalUltimateDuns 但不在 statsMap（请求失败并被过滤）的行，已在上面覆盖过
       // 没有 abbr 或 globalUltimateDuns 的行，如果还尚是 '__loading__' 则设为 null
       if (!targetIds.has(rowId) &&
-          (node.data._ftCount === '__loading__' || node.data._ftLastSync === '__loading__')) {
-        node.setData({ ...node.data, _ftCount: null, _ftLastSync: null });
+          (node.data._ftCount === '__loading__' || node.data._ftLastSync === '__loading__' || node.data._webFtCount === '__loading__' || node.data._ftOverseasCount === '__loading__' || node.data._webFtOverseasCount === '__loading__')) {
+        node.setData({ ...node.data, _ftCount: null, _ftLastSync: null, _webFtCount: null, _ftOverseasCount: null, _webFtOverseasCount: null });
       }
     });
   }, []);
@@ -234,14 +304,14 @@ const KeyCustomerList: React.FC = () => {
   // --- 默认列配置（基于 keycustomer 表结构） ---
   const baseColumns = useMemo(() => [
     { headerName: '#', valueGetter: "node.rowIndex + 1", width: 60, minWidth: 40, pinned: 'left', filter: false, sortable: false, editable: false, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true },
-    { headerName: "PID", field: "PID", width: 200, editable: true },
-    { headerName: "GID", field: "GID", width: 200, editable: true, hide: true },
+    { headerName: "PID", field: "PID", width: 200, editable: isTristan },
+    { headerName: "GID", field: "GID", width: 200, editable: isTristan, hide: true },
     {
       // globalUltimateDuns 列：列名显示为 GU，渲染为可点击链接
       headerName: "GU",
       field: "globalUltimateDuns",
       width: 200,
-      editable: true,
+      editable: isTristan,
       cellRenderer: (params: any) => {
         const val = params.value;
         if (!val) return '';
@@ -259,44 +329,34 @@ const KeyCustomerList: React.FC = () => {
         );
       },
     },
-    { headerName: "公司英文名", field: "nameEn", width: 280, editable: true },
-    { headerName: "公司中文名", field: "nameCn", width: 250, editable: true },
-    { headerName: "缩写", field: "abbr", width: 150, editable: true },
-    { headerName: "来源", field: "source", width: 160, editable: true, hide: true },
-    { headerName: "来源类型", field: "sourceType", width: 200, editable: true, hide: true },
-    { headerName: "行业编码", field: "industryCode", width: 140, editable: true },
-    { headerName: "集团行业", field: "industryGroupCode", width: 160, editable: true, hide: true },
     {
-      // 家族树总成员数（来自 DNB API，同步家族树后自动写入）
-      headerName: "家族成员数",
-      field: "globalUltimateFamilyTreeMembersCount",
-      width: 140,
-      editable: false,
-      filter: true,
-      sortable: true,
-      type: 'numericColumn',
-      valueFormatter: (p: any) => {
-        if (p.value == null || p.value === '') return '-';
-        return Number(p.value).toLocaleString();
+      headerName: "公司英文名",
+      field: "nameEn",
+      width: 450,
+      editable: isTristan,
+      cellRenderer: (params: any) => {
+        const val = params.value;
+        if (!val) return '';
+        const nameCn = encodeURIComponent(params.data?.nameCn || '');
+        const abbr = encodeURIComponent(params.data?.abbr || '');
+        const duns = params.data?.globalUltimateDuns || '';
+        return (
+          <span
+            style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => history.push(`/DNBWebFamilyTree/${duns}?nameCn=${nameCn}&abbr=${abbr}`)}
+            title={`查看 WEB 家族树: ${params.data?.nameCn || val}`}
+          >
+            {val}
+          </span>
+        );
       },
     },
-    { headerName: "客户类型", field: "customerType", width: 120, editable: true },
-    { headerName: "更新时间", field: "updateAt", width: 150, editable: true, hide: true },
-    { headerName: "customLevel", field: "customLeval", width: 150, editable: true, hide: true },
-    // 家族树统计列（异步加载，初始显示「查询中...」）
-    {
-      headerName: "家族树最后同步",
-      field: "_ftLastSync",
-      width: 150,
-      editable: false,
-      filter: false,
-      sortable: true,
-      valueFormatter: (p: any) => {
-        if (p.value === '__loading__') return '查询中...';
-        if (!p.value) return '未同步';
-        return new Date(p.value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-      },
-    },
+    { headerName: "公司中文名", field: "nameCn", width: 350, editable: isTristan },
+    { headerName: "缩写", field: "abbr", width: 150, editable: isTristan },
+    { headerName: "来源", field: "source", width: 160, editable: isTristan, hide: true },
+    { headerName: "来源类型", field: "sourceType", width: 200, editable: isTristan, hide: true },
+    { headerName: "行业编码", field: "industryCode", width: 140, editable: isTristan },
+    { headerName: "集团行业", field: "industryGroupCode", width: 160, editable: isTristan, hide: true },
     {
       headerName: "家族表行数",
       field: "_ftCount",
@@ -311,7 +371,101 @@ const KeyCustomerList: React.FC = () => {
         return String(p.value);
       },
     },
-  ], []);
+    {
+      headerName: "境外分支数",
+      field: "_ftOverseasCount",
+      width: 100,
+      editable: false,
+      filter: true,
+      sortable: true,
+      type: 'numericColumn',
+      valueFormatter: (p: any) => {
+        if (p.value === '__loading__') return '查询中...';
+        if (p.value == null) return '-';
+        return String(p.value);
+      },
+      cellRenderer: (params: any) => {
+        const val = params.value;
+        if (val === '__loading__') return '查询中...';
+        if (val == null || val === '') return '-';
+        const nameCn = encodeURIComponent(params.data?.nameCn || '');
+        const abbr = encodeURIComponent(params.data?.abbr || '');
+        const duns = params.data?.globalUltimateDuns || '';
+        return (
+          <span
+            style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => history.push(`/diffDNBFamilyTree/${duns}?nameCn=${nameCn}&abbr=${abbr}`)}
+            title={`对比境外分支机构: ${params.data?.nameCn || duns}`}
+          >
+            {val}
+          </span>
+        );
+      },
+    },
+    {
+      // Web家族表行数（来自数据库 DNBWebFamilyTree-* 集合统计）
+      headerName: "Web家族表行数",
+      field: "_webFtCount",
+      width: 140,
+      editable: false,
+      filter: true,
+      sortable: true,
+      type: 'numericColumn',
+      valueFormatter: (p: any) => {
+        if (p.value === '__loading__') return '查询中...';
+        if (p.value == null || p.value === '') return '-';
+        return Number(p.value).toLocaleString();
+      },
+    },
+    {
+      headerName: "Web境外分支数",
+      field: "_webFtOverseasCount",
+      width: 130,
+      editable: false,
+      filter: true,
+      sortable: true,
+      type: 'numericColumn',
+      valueFormatter: (p: any) => {
+        if (p.value === '__loading__') return '查询中...';
+        if (p.value == null) return '-';
+        return String(p.value);
+      },
+      cellRenderer: (params: any) => {
+        const val = params.value;
+        if (val === '__loading__') return '查询中...';
+        if (val == null || val === '') return '-';
+        const nameCn = encodeURIComponent(params.data?.nameCn || '');
+        const abbr = encodeURIComponent(params.data?.abbr || '');
+        const duns = params.data?.globalUltimateDuns || '';
+        return (
+          <span
+            style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => history.push(`/diffDNBFamilyTree/${duns}?nameCn=${nameCn}&abbr=${abbr}`)}
+            title={`对比境外分支机构: ${params.data?.nameCn || duns}`}
+          >
+            {val}
+          </span>
+        );
+      },
+    },
+    { headerName: "客户类型", field: "customerType", width: 120, editable: isTristan },
+    { headerName: "更新时间", field: "updateAt", width: 150, editable: isTristan, hide: true },
+    { headerName: "customLevel", field: "customLeval", width: 150, editable: isTristan, hide: true },
+    // 家族树统计列（异步加载，初始显示「查询中...」）
+    {
+      headerName: "家族树最后同步",
+      field: "_ftLastSync",
+      width: 150,
+      editable: false,
+      filter: false,
+      sortable: true,
+      valueFormatter: (p: any) => {
+        if (p.value === '__loading__') return '查询中...';
+        if (!p.value) return '未同步';
+        return new Date(p.value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      },
+    },
+  ], [isTristan]);
 
   // 「更新家族树」操作列（固定钉右）
   const actionColumn = useMemo(() => ({
@@ -346,14 +500,20 @@ const KeyCustomerList: React.FC = () => {
           ghost
           icon={<ApartmentOutlined />}
           loading={isLoading}
-          disabled={!hasDuns || isLoading}
-          onClick={() => handleSyncFamilyTree(params.data)}
+          disabled={!hasDuns || isLoading || !isTristan}
+          onClick={() => {
+            if (!isTristan) {
+              message.error('无权操作');
+              return;
+            }
+            handleSyncFamilyTree(params.data);
+          }}
         >
           {btnText}
         </Button>
       );
     },
-  }), [familyTreeLoadingIds, familyTreeProgress, handleSyncFamilyTree]);
+  }), [familyTreeLoadingIds, familyTreeProgress, handleSyncFamilyTree, isTristan]);
 
   // 「导出JSON」操作列（固定钉右，紧接在更新家族树列之后）
   const exportColumn = useMemo(() => ({
@@ -365,6 +525,7 @@ const KeyCustomerList: React.FC = () => {
     filter: false,
     sortable: false,
     pinned: 'right' as const,
+    hide: true, // 默认隐藏该列
     suppressHeaderMenuButton: true,
     suppressHeaderFilterButton: true,
     cellRenderer: (params: any) => {
@@ -381,7 +542,7 @@ const KeyCustomerList: React.FC = () => {
           disabled={!hasData}
           onClick={() => handleExportFtRow(params.data)}
         >
-          {isExporting ? '导出中...' : 'Export DNB'}
+          {isExporting ? 'Exporting...' : 'Export'}
         </Button>
       );
     },
@@ -410,6 +571,10 @@ const KeyCustomerList: React.FC = () => {
       // 排除内部统计字段（已在 baseColumns 中定义）
       allKeys.delete('_ftCount');
       allKeys.delete('_ftLastSync');
+      allKeys.delete('_webFtCount');
+      allKeys.delete('_ftOverseasCount');
+      allKeys.delete('_webFtOverseasCount');
+      allKeys.delete('globalUltimateFamilyTreeMembersCount');
 
       setDynamicColDefs((prev) => {
         // 排除操作列和导出列，始终钉在最后
@@ -421,14 +586,21 @@ const KeyCustomerList: React.FC = () => {
             headerName: key,
             field: key,
             width: 160,
-            editable: true,
+            editable: isTristan,
           }));
         // 操作列和导出列始终钉在最后
         return [...nonActionCols, ...newCols, actionColumn, exportColumn];
       });
 
       // 先展示「查询中」占位符号
-      const recordsWithPlaceholder = records.map((r: any) => ({ ...r, _ftCount: '__loading__', _ftLastSync: '__loading__' }));
+      const recordsWithPlaceholder = records.map((r: any) => ({
+        ...r,
+        _ftCount: '__loading__',
+        _ftLastSync: '__loading__',
+        _webFtCount: '__loading__',
+        _ftOverseasCount: '__loading__',
+        _webFtOverseasCount: '__loading__',
+      }));
       setRowData(recordsWithPlaceholder);
       setDirtyIds(new Set()); // 重置脏标记
 
@@ -550,11 +722,11 @@ const KeyCustomerList: React.FC = () => {
   }, [renameColForm, renameTarget]);
 
   // --- 右键上下文菜单：支持删除列和重命名列 ---
-  const getContextMenuItems = useCallback((params: any) => {
+  const getContextMenuItems = useCallback((params: any): any => {
     const field = params.column?.getColDef()?.field;
     const defaultItems = ['copy', 'copyWithHeaders', 'paste', 'separator', 'export'];
 
-    if (!field) return defaultItems;
+    if (!field || !isTristan) return defaultItems;
 
     return [
       ...defaultItems,
@@ -578,7 +750,7 @@ const KeyCustomerList: React.FC = () => {
         },
       },
     ];
-  }, [handleDeleteColumn, renameColForm]);
+  }, [handleDeleteColumn, renameColForm, isTristan]);
 
   // --- 默认列属性 ---
   const defaultColDef = useMemo(() => ({
@@ -657,6 +829,7 @@ const KeyCustomerList: React.FC = () => {
           <Button
             icon={<PlusOutlined />}
             onClick={() => setAddColVisible(true)}
+            disabled={!isTristan}
           >
             添加列
           </Button>
@@ -671,8 +844,8 @@ const KeyCustomerList: React.FC = () => {
             icon={<SaveOutlined />}
             onClick={handleSaveAll}
             loading={saving}
-            disabled={!hasDirty}
-            style={hasDirty ? { background: '#ff4d4f', borderColor: '#ff4d4f' } : {}}
+            disabled={!hasDirty || !isTristan}
+            style={hasDirty && isTristan ? { background: '#ff4d4f', borderColor: '#ff4d4f' } : {}}
           >
             保存变更 {hasDirty ? `(${dirtyIds.size})` : ''}
           </Button>
@@ -705,6 +878,9 @@ const KeyCustomerList: React.FC = () => {
             const count = params.data?._ftCount;
             if (typeof count === 'number' && count > 0) return 'row-ft-synced';
             return '';
+          }}
+          onFirstDataRendered={(params: any) => {
+            params.api.autoSizeColumns(['nameEn', 'nameCn']);
           }}
           sideBar={{ toolPanels: ['columns', 'filters'], defaultToolPanel: '' }}
           statusBar={{

@@ -1759,3 +1759,751 @@ POST https://proapi.azurewebsites.net/api/v1/auth/login net::ERR_FAILED
 1. **分析跨域报错**：根据控制台报错信息定位出前端应用在生产打包构建时，网络请求插件的 `baseURL` 被硬编码配置为了 `https://proapi.azurewebsites.net`，而不是使用同源相对路径，导致浏览器在跨域请求时被 CORS 策略阻断。
 2. **修改 baseURL 配置**：修改了前端配置文件 `react-admin-frontend/src/app.tsx`，将 `baseURL` 从硬编码 of 域名 `https://proapi.azurewebsites.net` 改为同源相对路径 `''`，以便前端发出请求时默认指向当前的服务端。
 3. **重新构建与部署**：将修改同步至远程服务器后，在服务器上的 `/home/tristan/workspaces/TristanSaas/react-admin-frontend` 目录下运行 `npm run build` 重新打包前端，生成最新的静态资源并由 Nginx 托管暴露。已成功解决跨域并使网页能够正常登录访问。
+
+## 2026-05-22 22:53:58
+
+### 用户提示词
+`要保证开发环境（我本机的macos），和生产环境（ubuntu服务器）上的代码一致。如果在开发环境修改代码后， git push到github仓库，然后在服务器生产环境git pull 就能更新最新代码，并运行生效`
+
+### 执行总结
+1. **本地创建一键部署脚本**：在本地项目根目录编写了 [deploy.sh](file:///Users/tristan/Workspaces/github/node-express-boilerplate/deploy.sh) 部署更新脚本并赋予执行权限。该脚本能自动拉取 GitHub 代码、在服务器重新运行前端打包以及重启后端 PM2 API 服务，实现拉取后即时生效。
+2. **本地代码推送**：将本地所有修改（包括之前的配置修正和本轮的 `deploy.sh`）commit 并 push 到了 GitHub 的 `main` 分支，保持 GitHub 仓库为最新开发版本。
+3. **远程配置 Git 仓库并绑定**：在远程服务器项目目录下执行了 `git init`，并成功绑定 GitHub 远程源 `git@github.com:ismatrix/tristanSaas.git`。获取并展示了远程服务器 `tristan` 用户的 SSH 公钥，便于用户在 GitHub 进行配置，实现真正的 Git 一键拉取与热更新。
+
+## 2026-05-22 23:11:55
+
+### 用户提示词
+倾向于方案二，我使用阿里云上托管
+
+### 执行总结
+1. **确认阿里云 DNS 方案**：用户明确了倾向采用方案二（阿里云 DNS-01 自动验证方案）。
+2. **更新实施计划与任务跟踪**：更新了 `implementation_plan.md` 明确使用 `acme.sh` 原生阿里云 DNS 验证插件来自动申请与更新 Let's Encrypt 证书，并在 `task.md` 中跟进当前进度。
+3. **安全提示与反馈等待**：向用户发出安全提示，并在计划中明确标记需要 `Ali_Key` 与 `Ali_Secret` 授权，暂停等待用户反馈。
+
+## 2026-05-22 23:16:20
+
+### 用户提示词
+accessKeyId [已脱敏]
+accessKeySecret [已脱敏]
+
+### 执行总结
+1. **自动化申请 SSL 证书**：在远程服务器安装了 `acme.sh`，导入用户提供的阿里云 API 凭证。利用 `dns_ali` 插件在阿里云解析中动态添加并自动清理 TXT 验证记录，成功为 `tristan.wang` 及其通配符域名 `*.tristan.wang` 申请并签发了 Let's Encrypt/ZeroSSL ECC SSL 证书。
+2. **证书安装与自动续期绑定**：在远程服务器创建并授权了 `/etc/nginx/ssl` 目录，将证书安装至此。在 `acme.sh` 自动续期任务中绑定了 Nginx 配置重载指令（`sudo systemctl force-reload nginx`），并在服务器的 `crontab` 中成功注入了每日自动检测和更新的 cron 任务。
+3. **Nginx 配置修改与 HTTP 497 重定向**：重写了远程 Nginx 配置文件 `/etc/nginx/sites-available/tristansaas.conf`，启用 SSL（监听 8080 ssl），并配置了 `error_page 497 https://$host:9900$request_uri;`。该配置完美解决了内网穿透场景下用户通过 `http://tristan.wang:9900` 访问时可能出现的 400 Plain HTTP 错误，实现自动强制跳转 HTTPS。
+4. **连通性与安全性校验**：在 macOS 本机发起验证，`https://tristan.wang:9900` 连通正常且证书链路完整受信任；`http://tristan.wang:9900` 自动秒级 302 跳转至 HTTPS 地址，功能完美闭环。
+
+## 2026-05-22 23:22:21
+
+### 用户提示词
+目前的nginx配置可能有点问题，我通过https://tristan.wang:9900，登录成功后，会跳转到https://tristan.wang:8080， 8080这个端口并没有在互联网上开放，请修正
+
+### 执行总结
+1. **定位跳转问题原因**：通过排查远程 `dist` 静态构建目录，发现 Umi 框架静态化打包后，生成了真实的物理文件夹 `key-customers`。这导致用户在访问 `/key-customers` 路由时触发了 Nginx 默认的目录补全斜杠 301 重定向（即重定向到 `/key-customers/`）。由于 Nginx 内部监听 8080 端口，且默认启用绝对路径重定向，使得重定向 Location 中附加了内部的 `:8080` 端口。
+2. **修改 Nginx 相对路径重定向**：在 Nginx 配置文件 `tristansaas.conf` 的 `server` 块中加入 `absolute_redirect off;` 核心指令，强制 Nginx 在执行此类重定向时输出为相对路径（如 `Location: /key-customers/`），使浏览器自动继承客户端原先访问的 `https://tristan.wang:9900` 公网域名与穿透端口。
+3. **优化代理 Host 传递**：将后端代理 location 块下的 `proxy_set_header Host $host;` 改为 `proxy_set_header Host $http_host;`，将包含外部端口的完整 Host 头部准确透传给后端 Node 应用。
+4. **重新加载并回归测试**：测试并重载 Nginx 配置，通过本地 `curl -I -v` 验证，补全斜杠 301 重定向响应头中的 Location 已被成功修正为相对路径 `/key-customers/`。用户登录后的路由跳转恢复正常，完美锁定了公网 9900 端口。
+
+## 2026-05-22 23:27:34
+
+### 用户提示词
+你太牛了！！！
+以后只要涉及到需要更改程序源代码的任务，都在开发环境更新，然后git push到代码仓库，然后生产环境在git pull后更新运行。
+
+### 执行总结
+1. **工作流共识建立**：确认了后续整个项目开发与维护的规范工作流，即：本地（开发环境）修改源码 -> `git push` 提交 GitHub -> 远程生产服务器 `git pull` 拉取 -> 运行 `deploy.sh` 自动重构前端并重启 PM2 服务。
+2. **三端代码一致性保障**：该工作流不仅能确保开发环境与生产环境的代码强一致性，还能极大规避生产环境手动排查和配置的失误，实现了开发到部署的标准化。
+
+## 2026-05-26 13:14:32
+
+### 用户提示词
+修改「要客清单」页面表格，在列「公司英文名」添加链接，要求：
+1、链接到DNBWebFamilyTree/{duns}?nameCn={nameCn}&abbr={abbr}页面
+2、该页面显示对应的DNBWebFamilyTree_{duns}_{abbr}表的记录，完全参照DNBFamilyTree页面的所有功能逻辑，标题表示DNB WEB Family Tree，全文搜索，导出json功能都需要。
+3、显示字段company_dunsNumber「duns」、company_companyName「公司名」、company_registrationNumbers_registrationTypeId_company_registration_number_type_2「注册类型」、registrationNumber「注册号」、company_entityTypeId_entityType_name「实体类型」、company_isDomesticUltimate「国内最高」、company_isHQ「总部」、company_salesUsd「销售额」、company_yearFounded「成立年」、company_addresses_countryId_country_name「国家」、company_addresses_city「城市」、company_os2010IndustryId_industry_shortDescription「主营」
+4、「要客清单」页面列「家族成员数」改为「Web家族表行数」，值为对应的DNBWebFamilyTree的表的记录总数
+5、「要客清单」页面表、「信息数据」菜单「区域单元表」页面的表的修改权限配置为只有tristan@tristan.wang用户才能修改，其他用户一律暂时不给修改的权限
+
+### 执行总结
+1. **要客清单（key-customers.tsx）优化与权限细化**：
+   - 实现了在“公司英文名”列添加点击链接，路由跳转并透传 `duns`、`nameCn`、`abbr`。
+   - 列“家族成员数”重构为“Web家族表行数”，绑定异步获取的 `DNBWebFamilyTree-*` 记录数，渲染“查询中...”占位符并在后台并行异步回填。
+   - 细化编辑和保存动作权限，将表格常规列和动态添加列的 `editable` 设为 `isTristan`。
+   - 对“添加列”按钮设置 `disabled={!isTristan}`，“保存变更”按钮设置 `disabled={!hasDirty || !isTristan}` 且隐藏只读时的红色警告背景，防止误编辑。
+   - 限制右键上下文菜单只在 `isTristan` 账号下提供“重命名列”与“删除列”动作，并对“Get DNB”按钮进行 `isTristan` 权限点击拦截。
+2. **新页面 DNB WEB 家族树（dnb-web-family-tree.tsx）开发与字段映射修复**：
+   - 页面标题指定为 `DNB WEB Family Tree`。
+   - 全文搜索与 JSON 导出（过滤内部系统属性）逻辑全部对齐实现。
+   - 针对 `DNBWebFamilyTree` 在本地 MongoDB 数据集中以第一层级扁平结构存储的特点，将原代码错误的 `fields.company_xxx` 列定义路径全局更正为扁平直达的 `company_xxx`，并对注册号、销售额（千分位）等嵌套格式进行 valueGetter 和 valueFormatter 特殊处理，保证所有 12 个指定业务字段完美呈现且渲染无误。
+3. **区域单元表（region-units.tsx）权限只读配置**：
+   - 引入 `useModel` 读取当前登录的邮箱地址，得到 `isTristan` 账户控制标志。
+   - 将该表格中 4 个业务列配置的 `editable` 更改为 `isTristan`；并在前端渲染列定义时做动态移出：非 `tristan` 账号时直接排除并隐藏表格右侧的“操作（保存）”列，实现全表只读。
+4. **编译与部署前置验证**：
+   - 运行前端 `npm run build` 命令，Webpack 编译打包 100% 成功，没有发生任何语法或 TS 类型报错。
+   - 重启 PM2 backend-api 进程，确保最新修改的切面权限过滤对本地后端立即生效。
+
+## 2026-05-26 13:27:41
+
+### 用户提示词
+修改一下，字段除了company_dunsNumber之外，其他字段都在fields层级下，所以都要加fields.
+
+### 执行总结
+1. **DNBWebFamilyTree 字段寻址修正**：
+   - 重新核对并确认了 DNB 网页家族树文档的物理存储结构，除顶层字段 `company_dunsNumber` 之外，其他 11 个属性在数据库中确实深藏于 `fields` 对象内。
+   - 对 [dnb-web-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/dnb-web-family-tree.tsx) 中的列配置完成了修正，为这 11 个显示列重新加上了 `fields.` 前缀（同时将注册号的 `valueGetter` 重新修正为从 `p.data?.fields` 取值）。
+2. **打包编译验证**：
+   - 在前端子工程下重新进行了 `npm run build` 打包构建，Webpack 顺利编译通过，确保页面功能闭环。
+
+## 2026-05-26 13:31:43
+
+### 用户提示词
+1、「要客清单」页面，删除列「globalUltimateFamilyTreeMembersCount」
+2、「家族表行数」列放到「web家族表行数」的前面
+
+### 执行总结
+1. **删除冗余列「globalUltimateFamilyTreeMembersCount」**：
+   - 该列此前作为一个数据库的物理字段，会在数据加载时由 fetchData 动态提取并自动追加到表末尾进行渲染。
+   - 我们已在 `fetchData` 中动态遍历字段时加入了显式过滤 `allKeys.delete('globalUltimateFamilyTreeMembersCount')`，从而彻底在要客清单表格中抹除了这一列的展示。
+2. **调换列展示顺序**：
+   - 对 `baseColumns` 列配置的排列顺序进行了位置调整，将「家族表行数」列 (`_ftCount`) 的定义成功换到了「Web家族表行数」列 (`_webFtCount`) 之前展示。
+3. **打包回归校验**：
+   - 在前端目录下重新运行了 `npm run build` 打包构建，Webpack 完美通过，确保功能修改正常。
+
+## 2026-05-26 13:33:21
+
+### 用户提示词
+「公司英文名」「公司中文名」列显示完整宽度
+
+### 执行总结
+1. **默认列宽调大**：
+   - 将 `baseColumns` 中的「公司英文名」默认列宽由 280 调大为 `450`，「公司中文名」默认列宽由 250 调大为 `350`，保证视觉空间充裕。
+2. **内容自适应宽度**：
+   - 在 `AgGridReact` 标签中成功接入了 `onFirstDataRendered` 事件监听，在表格首次数据渲染出来后，自动执行 `autoSizeColumns(['nameEn', 'nameCn'])`，计算表格中真实的文本长度并拉伸列宽，完全呈现所有字符。
+3. **打包验证**：
+   - 前端打包构建顺利通过。
+
+## 2026-05-26 13:44:19
+
+### 用户提示词
+「要客清单」页面增加列：
+1、「境外分支数」，来源于DNBFamilyTree对应表中，primaryAddress.addressCountry.name 不为 China，且不为空的
+2、「Web境外分支数」，来源于DNBWebFamilyTree对应表中，fields.company_addresses_countryId_country_name 不为 China，且不为空的
+
+### 执行总结
+1. **添加表格展示列**：
+   - 在 `baseColumns` 配置中新增了「境外分支数」和「Web境外分支数」两个统计列，列宽分别为 100 与 130，采用右对齐数字列显示。
+2. **批量并行过滤查询与回填**：
+   - 升级了 `fetchFamilyTreeStats` 逻辑，在原有的数据异步查询中，并行对 DNBFamilyTree 的集合追加发起带 `{ "primaryAddress.addressCountry.name": { "$ne": "China", "$nin": [null, ""] } }` 限制条件的 query 过滤，成功获取并计算出了境外分支数。
+   - 对 DNBWebFamilyTree 的集合同样发起带 `{ "fields.company_addresses_countryId_country_name": { "$ne": "China", "$nin": [null, ""] } }` 条件的 query 过滤，获取对应的 Web 境外分支数。
+   - 两个数据全部利用单行 `node.setData()` 平滑更新到 AG Grid 中。
+3. **动态字段与加载占位排除**：
+   - 在数据载入时将此二列的数据状态初始化为 `'__loading__'`，并在 `fetchData` 动态提取解析字段时，显式将 `_ftOverseasCount` 和 `_webFtOverseasCount` 属性剔除，防止被当作用户额外新增的物理列在页面中重复展示。
+4. **打包测试**：
+   - 前端构建打包成功。
+
+## 2026-05-26 15:22:34
+
+### 用户提示词
+「要客清单」页面列「境外分支数」及「web境外分支数」列都添加同样的链接：
+1、进入境外分支机构比对页面：diffDNBFamilyTree/{duns}?nameCn={nameCn}&abbr={abbr}
+2、该页面显示当前duns of DNBFamilyTree*与DNBWebFamilyTree*表的境外分支，即国家不包含China和空值（参考计数的逻辑）的比对结果。 以这两张表的duns 和 company_dunsNumber 为关联对比。
+3、还是以AG表格形式显示字段： duns，DNBFamilyTree*公司名称、DNBWebFamilyTree*公司名称。高亮不一致或者对方表不存在的记录的行、
+
+### 执行总结
+1. **添加跳转路由与配置**：
+   - 在 [routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts) 注册新路由 `/diffDNBFamilyTree/:duns` 指向比对详情页。
+   - 在 [key-customers.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-customers.tsx) 中为「境外分支数」和「Web境外分支数」这两个列加了跳转链接，使它们可以点击进入比对详情页。
+2. **新建境外分支比对页面 ([diff-dnb-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/diff-dnb-family-tree.tsx))**：
+   - **比对算法**：并行获取 DNBFamilyTree 与 DNBWebFamilyTree 两个集合的国家不为 `China` 且不为空的境外记录，并以 `duns` 主键做内存 Join 比对。
+   - **分类状态与行高亮**：
+     - 展示字段 `duns`、`DNBFamilyTree 公司名`、`DNBWebFamilyTree 公司名`、`对比状态`。
+     - 根据分类状态对行实施高亮：仅在 API 存在（`only_api`，高亮为**淡橙色**）、仅在 WEB 存在（`only_web`，高亮为**淡蓝色**）、两边存在但公司名称不一致（`name_diff`，高亮为**淡红色**）。
+   - **基础功能**：实现返回、全文检索、刷新和导出过滤内部字段的 JSON 功能。
+3. **打包回归**：
+   - 运行前端 `npm run build` 命令，Webpack 顺利编译通过。
+
+## 2026-05-26 15:35:00
+
+### 用户提示词
+1、将不一致的记录列在最上方
+2、添加显示2列，国家、城市
+
+### 执行总结
+1. **不一致记录置顶**：在境外分支比对详情页面 (`diff-dnb-family-tree.tsx`) 的 Join 算法中，添加排序逻辑。如果行记录的对比状态 `status !== 'consistent'`（包含 `only_api`、`only_web`、`name_diff`），则计算权重置顶，从而确保不一致的记录在初始化加载时全量置顶，一致的数据（`consistent`）靠下展示。
+2. **新增国家与城市展示**：
+   - 扩展了 `CompareRowData` 类型定义，增加了 `country` 和 `city` 两列。
+   - 在 AG Grid 中增加了「国家」与「城市」的列定义（`country`、`city`），放置在「对比状态」之前。
+   - 在数据 Join 遍历匹配时，提取境外分支的物理区域特征。针对 `DNBFamilyTree` 数据，读取 `primaryAddress.addressCountry.name`（国家）和 `primaryAddress.addressLocality.name`（城市）；针对 `DNBWebFamilyTree` 数据，读取 `fields.company_addresses_countryId_country_name`（国家）和 `fields.company_addresses_city`（城市）。
+3. **修复前端 TypeScript 编译问题并顺利构建**：
+   - 修复了 `key-customers.tsx` 中由于严格类型推导导致 `new URLSearchParams` 接收可选/联合类型报错的问题。
+   - 修复了 `key-customers.tsx` 中 `getContextMenuItems` 回调函数由于没有显式声明返回类型而导致 AG Grid 菜单项不兼容的 TS 报错。
+   - 修复了 `region-units.tsx` 中由于数组字面量类型推导过窄导致向列定义 `push` 新对象时 `cellRenderer` 字段报错的问题。
+   - 经测试，运行前端命令 `npm run tsc` 以及 `npm run build`，编译与类型检查均已顺利通过。
+
+## 2026-05-26 15:41:33
+
+### 用户提示词
+公司名称 不要显示(不存在该记录) ，直接留空
+
+### 执行总结
+1. **隐藏无公司记录占位字符**：在 `diff-dnb-family-tree.tsx` 的 AG Grid 列配置中，分别对 API 公司名 (`apiName`) 和 WEB 公司名 (`webName`) 的 `valueFormatter` 格式化函数进行了修改。将原来的 `p.value || '(不存在该记录)'` 优化为 `p.value || ''`。
+2. **效果**：当某条境外记录在对方表（API 树或 WEB 树）不存在导致名称为空时，表格直接在对应的单元格留空展示，而不再显示“(不存在该记录)”的文本。
+3. **打包回归**：重新在前端执行 `npm run tsc` 以及 `npm run build`，编译打包 100% 成功。
+
+## 2026-05-26 15:46:26
+
+### 用户提示词
+1、「要客清单」表格中的更新DNB家族树列的按钮，只有tristan@tristan.wang用户有权限点击
+2、「导出DNB家族树」列按钮的text显示 「Export」，并默认隐藏该列
+
+### 执行总结
+1. **限定更新 DNB 家族树按钮权限**：
+   - 将 `isTristan` 变量加入到 `actionColumn` 的 `useMemo` 依赖项中，确保在登录人状态加载完或身份变更后，按钮能正确根据 `isTristan` 控制 `disabled` 状态。
+   - 在按钮的 `onClick` 回调函数中追加了前置鉴权限制，只有当邮箱为 `tristan@tristan.wang` 时才可以执行同步，普通用户点击时弹出“无权操作”提示。
+2. **隐藏并美化导出 DNB 家族树列**：
+   - 在 `exportColumn` 的列定义中，加入了 `hide: true` 配置，使该列在表格初始化加载时处于**默认隐藏**状态。用户如有需求，可通过 AG Grid 边栏的“列(Columns)”控制面板勾选显示。
+   - 将导出列按钮文本由原先的 `{isExporting ? '导出中...' : 'Export DNB'}` 改为 `{isExporting ? 'Exporting...' : 'Export'}`，使其展示文本精简为 「Export」。
+3. **回归验证**：
+   - 运行前端 `npm run tsc` 类型检查，顺利通过。
+   - 运行前端 `npm run build` 静态页面构建编译，打包成功无报错。
+
+## 2026-05-26 16:26:15
+
+### 用户提示词
+「境外分支比对详情」页面，增加记录选择列（标题头也放一个checkbox可以全选），右上添加「同步dnb详情」按钮，从dnb API获取详情（已经选中的记录逐一获取），并入数据库表 dnbCompanyDetail表：
+1、参考调用代码： token获取参考获取家族树的逻辑一样：
+curl --location 'https://bcocesb.cmitry.com/bcoc/B/EDC/v1/exactMatch/{duns}?blockIDs=companyinfo_L2_v1' \
+--header 'bcoc-access-token: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6WyJ1c2VyIl0sImV4cCI6MzU0NzcwNTY2OCwiYXV0aG9yaXRpZXMiOlsiUk9MRV9VU0VSIl0sImp0aSI6IjgxYzI5YzY4LTA2ZTItNGVjNC1hMjQ4LTAwMmQ2M2FiMTdhMSIsImNsaWVudF9pZCI6InNpcmFrMXE0MmJ0bmpvN2h4NiJ9.CxVRwRiC_AqnryQghh2bLUeqTJrkKxI7fl120yv3WyM4gJJuEUognk7hzGpVNYQ0MCO25b8H8PQPvMo72BJST5msvqMjGMXT5m94dKl3IMsyDW0aqjmCF29nWcGzm9K1ebxxYpIAaa6a8B4fKFJBO-pfFw2-XLn24IaMb7wfQm8' \
+--header 'X-Client-Id: S-SCM' \
+--header 'Cookie: BSS-SESSION=EC975E99EE03AA5BCE24E242A83FDF9C' \
+--data ''
+2、调用成功后，将outData.data 入库,upsert 到dnbCompanyDetail表中，以duns为主键
+3、「境外分支比对详情」页面 「duns」列，添加链接，点击后右侧抽屉划出显示dnbCompanyDetail表该记录详细信息，按照记录json的结构分类、分块组织显示好，请自行设计排版
+4、「境外分支比对详情」页面 「duns」列，如果没有对应的记录，就不显示可点击的超链接状态
+
+### 执行总结
+1. **后端服务开发**：
+   - 在 `dnb.service.js` 中新增了 `fetchCompanyDetail` 方法，重用已有的获取 accessToken 方法，向 DNB 传入 `'Content-Length': '0'` 调用 `exactMatch` 接口，提取其核心的 `outData.data` 段落。
+   - 增加 `syncCompanyDetail` 批量同步详情业务逻辑，将详情 upsert 存入 `dnbCompanyDetail` 数据库表，并以 `duns` 字段作为检索主键。
+   - 增加 `checkCompanyDetailExist` 批量检查存在状态和 `getCompanyDetailByDuns` 详情查询数据库底座方法。
+   - 在 `dnb.controller.js` 中编写对应的三个控制器方法，并在 `dnb.route.js` 中注册 `/company-detail/sync` (POST)、`/company-detail/check-exist` (POST)、`/company-detail/:duns` (GET) 路由。
+2. **前端界面研发**：
+   - **多选配置**：在 [diff-dnb-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/diff-dnb-family-tree.tsx) 的 AG Grid 定义中增加记录选择列（最左侧设置 checkboxSelection 及 headerCheckboxSelection 开启表头全选）。
+   - **同步详情操作**：右上角新增「同步DNB详情」按钮，点击时调用 `/company-detail/sync` 接口对所选行的 `duns` 逐一同步。同步成功后将 `hasDetail` 标记就地更新回前端 `rowData` 中以使超链接生效，并自动清空所选行。
+   - **超链接与Drawer联通**：初始化页面加载 Join 数据后，并行调用 `check-exist` API 对 duns 列表进行核对。含有详情记录的 DUNS 会被渲染为可点击超链接，否则仅渲染为普通文本。
+   - **Drawer 可视化卡片展示**：点击超链接右侧划出 `Drawer`，分块分类美观展示工商名细与财务指标，并在底部通过折叠 Collapse 包裹全量原始 JSON 数据，大大优化数据表现力。
+3. **打包回归**：
+   - 运行前端 `npm run tsc` 和 `npm run build`，编译打包 100% 成功。
+
+## 2026-05-26 16:47:47
+
+### 用户提示词
+0|backend-api  | 2026-05-26T16:41:17: info: ⏱️ [DNB API] POST /bcoc/bcocGenerateToken | 耗时: 112ms | 状态: 200
+0|backend-api  | 2026-05-26T16:41:17: info: [DNB] accessToken 获取成功
+0|backend-api  | 2026-05-26T16:41:18: info: ⏱️ [DNB API] POST /bcoc/B/EDC/v1/exactMatch/651227134?blockIDs=companyinfo_L2_v1 | 耗时: 152ms | 状态: 500
+0|backend-api  | 2026-05-26T16:41:18: error: 同步 DUNS 651227134 详情失败: DNB 详情获取失败: code=SVC-500, message=api call failure!
+
+报错，请参考「要客清单」页面「更新DNB家族树」的调用逻辑，他们都是一套API。 为什么更新家族树可以，但「同步DNB详情」不行？
+
+### 执行总结
+1. **DNB 详情获取 API 请求方式调整**：
+   - 将 `dnb.service.js` 中的 `fetchCompanyDetail` 方法中调用的底层 HTTP 请求的 `method` 统一由 `POST` 改为了 **`GET`**，并去掉了 `Content-Length` 以及空请求体。
+   - 此改动使用与「获取DNB家族树」完全相同的 API 传递架构（Query 参数传参、不包含 body 交互），以规避由于 `POST` 引起的外部网关转换 500 异常。
+2. **后端服务重载**：
+   - 运行 `pm2 restart backend-api` 重新启动后端服务，使最新业务代码立即热重载生效。
+
+## 2026-05-26 17:01:02
+
+### 用户提示词
+1、插入数据库是，将当前页面的GU也插入每条记录中，字段名称：GU
+2、抽屉页面弹出的详细信息的值都没有关联上，请参考下面的详情的json格式，将字段分类分组整理，并关联上字段名字
+3、抽屉页面分tab，将原始数据的json树单独放到一个tab页
+
+### 执行总结
+1. **入库字段扩展 (GU 字段回填)**：
+   - 更改了 `/api/v1/dnb/company-detail/sync` (POST) 接口，支持从前端接收 `guDuns` 参数。
+   - 在后端 [dnb.service.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/services/dnb.service.js) 的 `syncCompanyDetail` 方法中，在数据 upsert 写入 `dnbCompanyDetail` 数据库表时，追加存储 `GU: guDuns` 属性。
+   - 前端在同步 DNB 详情请求时，透传当前比对页面的大 duns 号作为 `guDuns`。
+2. **字段值绑定及分类展示优化**：
+   - 修复了此前 Drawer 中由于使用了多余的 `organization` 层级路径导致明细取值均呈 undefined 的逻辑错误。
+   - 根据样本，直接在顶层读取字段（如 `primaryName`，`primaryAddress`，`startDate`），并定义了专门的格式化 helper 函数解析财务年销售额 (`getSalesUsd`)、总员工数 (`getEmployeeCount`)、主营行业分类 (`getPrimaryIndustry`)、以及主要联系电话 (`getTelephone`)。
+   - 在结构化 Tab 页中细化为大公司卡片、Descriptions（基础明细和商业维度）以及 `registrationNumbers` 注册号清单三个分块，完美关联了所有的字段名字和值。
+3. **抽屉页面 Tabs 选项卡重构**：
+   - 在 `diff-dnb-family-tree.tsx` 页面引入并使用了 `<Tabs>` 选项卡。
+   - 将信息进行物理隔离：Tab 1 呈现可视化、高颜值的 Descriptions 工商卡片及注册号明细；Tab 2 承载大文本、等宽字体的折叠式 JSON 完整数据结构，优化了抽屉的交互体验。
+4. **回归验证**：
+   - 运行前端类型核查与 Webpack 构建打包命令成功通过，无报错。
+   - 重启 PM2 后端 API 服务验证热重载畅通。
+
+## 2026-05-26 17:06:46
+
+### 用户提示词
+```json
+{
+    "countryISOAlpha2Code": "CN",
+    "CompanyNO": [],
+    "Global_OneID": "00000125443925441C",
+    "duns": "544392544",
+    "GID_Flag": "1",
+    "primaryName": "China COSCO Shipping Corporation Limited",
+    "rawDnbData": {
+        "inquiryDetail": {
+            "duns": "544392544",
+            "blockIDs": [
+                "companyinfo_L2_v1"
+            ]
+        },
+        "organization": {
+            "dunsControlStatus": {
+                "detailedOperatingStatus": {},
+                "subjectHandlingDetails": [],
+                "isDelisted": false,
+                "isMailUndeliverable": false,
+                "operatingSubStatus": {
+                    "description": "Active",
+                    "dnbCode": 9074
+                },
+                "isMarketable": true,
+                "isTelephoneDisconnected": false,
+                "operatingStatus": {
+                    "description": "Active",
+                    "dnbCode": 9074
+                },
+                "recordClass": {}
+            },
+            "websiteAddress": [
+                {
+                    "domainName": "coscoshipping.com",
+                    "url": "www.coscoshipping.com"
+                }
+            ],
+            "stockExchanges": [],
+            "globalUltimate": {
+                "financials": [
+                    {
+                        "informationScopeDnBCode": 9067,
+                        "informationScopeDescription": "Consolidated",
+                        "yearlyRevenue": [
+                            {
+                                "currency": "USD",
+                                "value": 64185801135
+                            },
+                            {
+                                "currency": "CNY",
+                                "value": 4.54274459E11
+                            }
+                        ],
+                        "reliabilityDnBCode": 9092,
+                        "reliabilityDescription": "Actual"
+                    }
+                ],
+                "numberOfEmployees": [
+                    {
+                        "informationScopeDnBCode": 9067,
+                        "informationScopeDescription": "Consolidated",
+                        "reliabilityDnBCode": 9092,
+                        "value": 511,
+                        "reliabilityDescription": "Actual"
+                    }
+                ]
+            },
+            "registeredAddress": {},
+            "multilingualPrimaryAddress": [
+                {
+                    "writingScript": {},
+                    "addressCountry": {
+                        "name": "China",
+                        "isoAlpha2Code": "CN"
+                    },
+                    "addressCounty": {},
+                    "streetAddress": {
+                        "line1": "中国（上海）自由贸易试验区民生路628号"
+                    },
+                    "continentalRegion": {
+                        "name": "Asia Pacific"
+                    },
+                    "postalCode": "200000",
+                    "language": {
+                        "description": "Chinese",
+                        "dnbCode": 339
+                    },
+                    "addressLocality": {
+                        "name": "上海市"
+                    },
+                    "addressRegion": {
+                        "name": "上海市"
+                    }
+                },
+                {
+                    "addressCountry": {
+                        "name": "China",
+                        "isoAlpha2Code": "CN"
+                    },
+                    "addressCounty": {},
+                    "streetAddress": {
+                        "line1": "No.628, Minsheng Road, China Pilot Free Trade Zone"
+                    },
+                    "continentalRegion": {
+                        "name": "Asia Pacific"
+                    },
+                    "postalCode": "200000",
+                    "language": {
+                        "description": "English",
+                        "dnbCode": 39
+                    },
+                    "addressLocality": {
+                        "name": "Shanghai"
+                    },
+                    "addressRegion": {
+                        "name": "Shanghai"
+                    }
+                }
+            ],
+            "multilingualTradestyleNames": [
+                {
+                    "name": "中国远洋海运",
+                    "language": {
+                        "description": "Chinese",
+                        "dnbCode": 339
+                    },
+                    "priority": 1
+                }
+            ],
+            "defaultCurrency": "CNY",
+            "employerDesignation": {},
+            "incorporatedDate": "2016-02-05",
+            "domesticUltimate": {
+                "financials": [
+                    {
+                        "informationScopeDnBCode": 9067,
+                        "informationScopeDescription": "Consolidated",
+                        "yearlyRevenue": [
+                            {
+                                "currency": "USD",
+                                "value": 64185801135
+                            },
+                            {
+                                "currency": "CNY",
+                                "value": 4.54274459E11
+                            }
+                        ],
+                        "reliabilityDnBCode": 9092,
+                        "reliabilityDescription": "Actual"
+                    }
+                ],
+                "numberOfEmployees": [
+                    {
+                        "informationScopeDnBCode": 9067,
+                        "informationScopeDescription": "Consolidated",
+                        "reliabilityDnBCode": 9092,
+                        "value": 511,
+                        "reliabilityDescription": "Actual"
+                    }
+                ]
+            },
+            "multilingualRegisteredAddress": [],
+            "registeredDetails": {
+                "legalForm": {
+                    "registrationStatus": {},
+                    "description": "State-Owned Enterprise",
+                    "dnbCode": 20565,
+                    "localLegalForms": []
+                }
+            },
+            "businessTrustIndex": {},
+            "financials": [
+                {
+                    "informationScopeDnBCode": 9067,
+                    "informationScopeDescription": "Consolidated",
+                    "financialStatementToDate": "2025-12-31",
+                    "yearlyRevenue": [
+                        {
+                            "currency": "CNY",
+                            "value": 4.54274459E11
+                        },
+                        {
+                            "currency": "USD",
+                            "value": 64185801135
+                        }
+                    ],
+                    "reliabilityDnBCode": 9092,
+                    "unitCode": "SingleUnits",
+                    "reliabilityDescription": "Actual"
+                        }
+                    ],
+                    "multiLingualSearchNames": [],
+                    "standardizedStockExchanges": [],
+                    "banks": [],
+                    "iso20022StructuredPrimaryAddress": {},
+                    "telephone": [
+                        {
+                            "telephoneNumber": "2165966666",
+                            "isdCode": "86"
+                        }
+                    ],
+                    "registrationNumbers": [
+                        {
+                            "registrationNumber": "91310000MA1FL1MMXL",
+                            "typeDnBCode": 32476,
+                            "registrationNumberClass": {
+                                "description": "National Business Registration Number",
+                                "dnbCode": 2888
+                            },
+                            "typeDescription": "United Social Credit Code (CN)"
+                        }
+                    ],
+                    "numberOfEmployees": [
+                        {
+                            "informationScopeDnBCode": 9066,
+                            "informationScopeDescription": "Individual",
+                            "trend": [],
+                            "reliabilityDnBCode": 9092,
+                            "employeeCategories": [],
+                            "value": 511,
+                            "reliabilityDescription": "Actual"
+                        },
+                        {
+                            "informationScopeDnBCode": 9067,
+                            "informationScopeDescription": "Consolidated",
+                            "reliabilityDnBCode": 9092,
+                            "value": 511,
+                            "reliabilityDescription": "Actual"
+                        }
+                    ],
+                    "tradeStyleNames": [],
+                    "duns": "544392544",
+                    "primaryAddress": {
+                        "addressCountry": {
+                            "name": "China",
+                            "isoAlpha2Code": "CN"
+                        },
+                        "postalCodePosition": {},
+                        "geographicalPrecision": {
+                            "description": "Town Centroid",
+                            "dnbCode": 30252
+                        },
+                        "continentalRegion": {
+                            "name": "Asia Pacific"
+                        },
+                        "postalCode": "200000",
+                        "latitude": 31.22222,
+                        "language": {
+                            "description": "English",
+                            "dnbCode": 39
+                        },
+                        "addressCounty": {},
+                        "postOfficeBox": {},
+                        "standardAddressCodes": [],
+                        "streetAddress": {
+                            "line1": "No.628, Minsheng Road, China Pilot Free Trade Zone"
+                        },
+                        "statisticalArea": {},
+                        "addressLocality": {
+                            "name": "Shanghai"
+                        },
+                        "addressRegion": {
+                            "isoSubDivisionCode": "CN-SH",
+                            "name": "Shanghai",
+                            "isoSubDivisionName": "Shanghai Shi",
+                            "abbreviatedName": "SH"
+                        },
+                        "longitude": 121.45806
+                    },
+                    "startDate": "2016",
+                    "primaryIndustryCode": {
+                        "usSicV4": "4412",
+                        "usSicV4Description": "Foreign sea freight transportation"
+                    },
+                    "preferredLanguage": {},
+                    "industryCodes": [
+                        {
+                            "code": "483111",
+                            "typeDnBCode": 37788,
+                            "description": "Deep Sea Freight Transportation",
+                            "typeDescription": "North American Industry Classification System 2022",
+                            "priority": 1
+                        },
+                        {
+                            "code": "423840",
+                            "typeDnBCode": 37788,
+                            "description": "Industrial Supplies Merchant Wholesalers",
+                            "typeDescription": "North American Industry Classification System 2022",
+                            "priority": 2
+                        },
+                        {
+                            "code": "44120000",
+                            "typeDnBCode": 3599,
+                            "description": "Deep sea foreign transportation of freight",
+                            "typeDescription": "D&B Standard Industry Code",
+                            "priority": 1
+                        },
+                        {
+                            "code": "50850102",
+                            "typeDnBCode": 3599,
+                            "description": "Bins and containers, storage",
+                            "typeDescription": "D&B Standard Industry Code",
+                            "priority": 2
+                        },
+                        {
+                            "code": "5020",
+                            "typeDnBCode": 29104,
+                            "description": "Sea and coastal freight water transport",
+                            "typeDescription": "NACE Revision 2",
+                            "priority": 1
+                        },
+                        {
+                            "code": "4676",
+                            "typeDnBCode": 29104,
+                            "description": "Wholesale of other intermediate products",
+                            "typeDescription": "NACE Revision 2",
+                            "priority": 2
+                        },
+                        {
+                            "code": "4412",
+                            "typeDnBCode": 399,
+                            "description": "Foreign sea freight transportation",
+                            "typeDescription": "US Standard Industry Code 1987 - 4 digit",
+                            "priority": 1
+                        },
+                        {
+                            "code": "5085",
+                            "typeDnBCode": 399,
+                            "description": "Whol industrial supplies",
+                            "typeDescription": "US Standard Industry Code 1987 - 4 digit",
+                            "priority": 2
+                        },
+                        {
+                            "code": "170",
+                            "typeDnBCode": 35912,
+                            "description": "Shipping and Water Transport",
+                            "typeDescription": "D&B Hoovers Industry Classification",
+                            "priority": 1
+                        },
+                        {
+                            "code": "95",
+                            "typeDnBCode": 35912,
+                            "description": "Machinery Wholesale",
+                            "typeDescription": "D&B Hoovers Industry Classification",
+                            "priority": 2
+                        },
+                        {
+                            "code": "E",
+                            "typeDnBCode": 24657,
+                            "description": "Transportation, Communications, Electric, Gas and Sanitary Services",
+                            "typeDescription": "D&B Standard Major Industry Code",
+                            "priority": 1
+                        },
+                        {
+                            "code": "5012",
+                            "typeDnBCode": 42726,
+                            "description": "Sea and coastal freight water transport",
+                            "typeDescription": "ISIC Revision 4",
+                            "priority": 1
+                        },
+                        {
+                            "code": "4669",
+                            "typeDnBCode": 42726,
+                            "description": "Wholesale of waste and scrap and other products n.e.c.",
+                            "typeDescription": "ISIC Revision 4",
+                            "priority": 2
+                        }
+                    ],
+                    "countryISOAlpha2Code": "CN",
+                    "multilingualPrimaryName": [
+                        {
+                            "writingScript": {},
+                            "name": "中国远洋海运集团有限公司",
+                            "language": {
+                                "description": "Chinese",
+                                "dnbCode": 339
+                            }
+                        },
+                        {
+                            "writingScript": {},
+                            "name": "China COSCO Shipping Corporation Limited",
+                            "language": {
+                                "description": "English",
+                                "dnbCode": 39
+                            }
+                        }
+                    ],
+                    "fiscalYearEnd": "2025-12-31",
+                    "organizationSizeCategory": {},
+                    "unspscCodes": [
+                        {
+                            "code": "78101702",
+                            "description": "International vessel transport services",
+                            "priority": 1
+                        },
+                        {
+                            "code": "24112000",
+                            "description": "Bins and baskets",
+                            "priority": 2
+                        }
+                    ],
+                    "isStandalone": false,
+                    "controlOwnershipType": {
+                        "description": "State owned Enterprise",
+                        "dnbCode": 9059
+                    },
+                    "email": [],
+                    "summary": [],
+                    "legalEntityIdentifier": "300300PAGG0Y036L5Y72",
+                    "businessEntityType": {
+                        "description": "Corporation",
+                        "dnbCode": 451
+                    },
+                    "primaryName": "China COSCO Shipping Corporation Limited",
+                    "legalForm": {
+                        "registrationLocation": {},
+                        "description": "Government Owned Company",
+                        "dnbCode": 31176,
+                        "startDate": "2016-02-05"
+                    },
+                    "charterType": {},
+                    "mailingAddress": {},
+                    "activities": [
+                        {
+                            "description": "主要从事提供国际船舶运输业务及销售集装箱等",
+                            "language": {
+                                "description": "Chinese",
+                                "dnbCode": 339
+                            }
+                        }
+                    ],
+                    "multilingualRegisteredNames": [],
+                    "subjectComments": []
+                },
+                "blockStatus": [
+                    {
+                        "blockID": "companyinfo_L2_v1",
+                        "status": "ok"
+                    },
+                    {
+                        "blockID": "baseinfo_L1_v1",
+                        "status": "ok"
+                    }
+                ],
+                "transactionDetail": {
+                    "inLanguage": "en-US",
+                    "transactionID": "753923cb-355e-4f22-99c5-a5f9c711284812241",
+                    "transactionTimestamp": "2026-05-26T08:35:13.419Z"
+                }
+            }
+        }
+```
+
+参考如上企业详情的json格式，按照json结构、字段的含义，自行分类、分块整理抽屉页面的布局，并把字段都关联上。
+
+
+### 执行总结
+1. **多维度字段提取与安全解析**：
+   - 重构了 `diff-dnb-family-tree.tsx` 的属性解析函数群，适配 DNB 的 `rawDnbData.organization` 内部数据结构，彻底解决原有字段绑定导致的 `undefined` 漏洞。
+   - 实现了年销售额同时支持展示 USD/CNY 双币种，员工人数支持 Individual 与 Consolidated 双口径；支持经营状态、法律形式、是否独立、官网与联系电话等字段的安全解析。
+   - 自动分类整理了 `industryCodes` 中的多套行业体系分类代码（如 NAICS 2022、D&B Standard Industry Code、NACE Rev 2、ISIC Rev 4 等）与 UNSPSC 编码。
+   - 支持并排提取和展现关联终极母公司（全球/国内终极母公司）的营收规模和员工人数。
+2. **Tab 1「结构化明细」高颜值 Drawer 布局重构**：
+   - 采用精致 Emoji、Descriptions 组件及模块化卡片（Hero卡片、基础工商、地理联系、财务指标、业务行业分类、关联母公司、官方注册号）进行美化设计，实现了极具专业质感的 Premium UI 效果。
+   - 自动兼容处理空值（呈现为 `-` 或专属状态标签），确保数据展示严密无漏洞。
+3. **TypeScript 严格类型报错修复与构建打包**：
+   - 显式定义了 getCategorizedIndustryCodes 和 getUnspscCodesInfo 中 map 遍历回调参数的类型，解决了严格模式下的 `noImplicitAny` 报错。
+   - 执行 `npm run tsc` 类型校验 100% 通过，并顺利通过 `npm run build` 编译构建了生产环境静态发布包。

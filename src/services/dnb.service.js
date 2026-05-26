@@ -305,10 +305,121 @@ const syncFamilyTreeWithProgress = async (globalUltimateDuns, collectionName, ke
   };
 };
 
+/**
+ * 从 DNB BCOC 平台通过 exactMatch 接口拉取公司详情
+ * @param {string} accessToken
+ * @param {string} duns
+ * @returns {Promise<object>} outData.data 详情数据
+ */
+const fetchCompanyDetail = async (accessToken, duns) => {
+  const { baseUrl, cookie } = config.dnb;
+  const url = new URL(`${baseUrl}/bcoc/B/EDC/v1/exactMatch/${duns}`);
+  url.searchParams.set('blockIDs', 'companyinfo_L2_v1');
+
+  const options = {
+    hostname: url.hostname,
+    port: url.port || (url.protocol === 'https:' ? 443 : 80),
+    path: url.pathname + url.search,
+    method: 'GET',
+    headers: {
+      'bcoc-access-token': accessToken,
+      'X-Client-Id': 'S-SCM',
+      'Cookie': cookie || '',
+    },
+    rejectUnauthorized: false,
+  };
+
+  const { statusCode, data } = await httpRequest(options);
+
+  if (statusCode !== 200 || data?.code !== 'SVC-200') {
+    throw new Error(`DNB 详情获取失败: code=${data?.code}, message=${data?.message || '未知错误'}`);
+  }
+
+  const outData = data?.outData?.data;
+  if (!outData) {
+    throw new Error(`DNB 详情响应结构异常：未包含 outData.data`);
+  }
+
+  return outData;
+};
+
+/**
+ * 批量同步 DUNS 列表的公司详情，并入 dnbCompanyDetail 表
+ * @param {Array<string>} dunsList
+ * @param {string|null} guDuns - 当前页面的大 DUNS 号 (GU)
+ * @returns {Promise<{success: Array<string>, failed: Array<{duns: string, error: string}>}>}
+ */
+const syncCompanyDetail = async (dunsList, guDuns) => {
+  const accessToken = await getToken();
+  const results = {
+    success: [],
+    failed: [],
+  };
+
+  const dnbCompanyDetailCol = mongoose.connection.db.collection('dnbCompanyDetail');
+
+  for (const duns of dunsList) {
+    const trimmedDuns = String(duns || '').trim();
+    if (!trimmedDuns) continue;
+    try {
+      const detailData = await fetchCompanyDetail(accessToken, trimmedDuns);
+      await dnbCompanyDetailCol.updateOne(
+        { duns: trimmedDuns },
+        { 
+          $set: { 
+            ...detailData, 
+            duns: trimmedDuns, 
+            GU: guDuns || null,
+            _syncedAt: new Date() 
+          } 
+        },
+        { upsert: true }
+      );
+      results.success.push(trimmedDuns);
+    } catch (err) {
+      logger.error(`同步 DUNS ${trimmedDuns} 详情失败: ${err.message}`);
+      results.failed.push({ duns: trimmedDuns, error: err.message });
+    }
+  }
+
+  return results;
+};
+
+/**
+ * 批量检查 DUNS 列表在数据库 dnbCompanyDetail 表中是否存在
+ * @param {Array<string>} dunsList
+ * @returns {Promise<Array<string>>} 已存在的 DUNS 数组
+ */
+const checkCompanyDetailExist = async (dunsList) => {
+  const cleanDunsList = dunsList.map(d => String(d || '').trim()).filter(Boolean);
+  if (cleanDunsList.length === 0) return [];
+
+  const dnbCompanyDetailCol = mongoose.connection.db.collection('dnbCompanyDetail');
+  const cursor = await dnbCompanyDetailCol.find({ duns: { $in: cleanDunsList } }, { projection: { duns: 1, _id: 0 } });
+  const existingDocs = await cursor.toArray();
+  return existingDocs.map(doc => doc.duns);
+};
+
+/**
+ * 查询单个 DUNS 的公司详情明细
+ * @param {string} duns
+ * @returns {Promise<object|null>} 公司详情文档
+ */
+const getCompanyDetailByDuns = async (duns) => {
+  const trimmedDuns = String(duns || '').trim();
+  if (!trimmedDuns) return null;
+
+  const dnbCompanyDetailCol = mongoose.connection.db.collection('dnbCompanyDetail');
+  return dnbCompanyDetailCol.findOne({ duns: trimmedDuns }, { projection: { _id: 0 } });
+};
+
 module.exports = {
   getToken,
   fetchFamilyTree,
   upsertFamilyTree,
   syncFamilyTree,
   syncFamilyTreeWithProgress,
+  syncCompanyDetail,
+  checkCompanyDetailExist,
+  getCompanyDetailByDuns,
 };

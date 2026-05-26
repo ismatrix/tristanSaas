@@ -18,4 +18,24 @@ router.post('/family-tree', auth(), dnbController.syncFamilyTree);
  */
 router.get('/family-tree/sync-stream', auth(), dnbController.syncFamilyTreeStream);
 
+/**
+ * POST /api/v1/dnb/company-detail/sync
+ * 批量同步 DNB 详情数据
+ * 请求体：{ dunsList: Array<string> }
+ */
+router.post('/company-detail/sync', auth(), dnbController.syncCompanyDetail);
+
+/**
+ * POST /api/v1/dnb/company-detail/check-exist
+ * 批量检查 DUNS 公司详情在数据库中是否存在
+ * 请求体：{ dunsList: Array<string> }
+ */
+router.post('/company-detail/check-exist', auth(), dnbController.checkCompanyDetailExist);
+
+/**
+ * GET /api/v1/dnb/company-detail/:duns
+ * 获取单个 DUNS 详情
+ */
+router.get('/company-detail/:duns', auth(), dnbController.getCompanyDetail);
+
 module.exports = router;

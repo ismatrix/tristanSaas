@@ -95,6 +95,18 @@ export default [
     component: './iboss/dnb-family-tree',
   },
   {
+    name: 'DNB WEB家族树',
+    path: '/DNBWebFamilyTree/:duns',
+    hideInMenu: true,
+    component: './iboss/dnb-web-family-tree',
+  },
+  {
+    name: '境外分支比对',
+    path: '/diffDNBFamilyTree/:duns',
+    hideInMenu: true,
+    component: './iboss/diff-dnb-family-tree',
+  },
+  {
     path: '/keycustomer',
     name: '行业要客',
     icon: 'CrownOutlined',

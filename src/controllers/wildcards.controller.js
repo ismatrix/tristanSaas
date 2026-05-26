@@ -1,6 +1,16 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
+const ApiError = require('../utils/ApiError');
 const wildcardsService = require('../services/wildcards.service');
+
+// 权限拦截助手函数：只允许特定用户修改 keycustomer 集合
+const checkKeycustomerPermission = (req) => {
+  if (req.params.collection === 'keycustomer') {
+    if (!req.user || req.user.email !== 'tristan@tristan.wang') {
+      throw new ApiError(httpStatus.FORBIDDEN, '只有 tristan@tristan.wang 用户有权限修改要客清单');
+    }
+  }
+};
 
 const getCollections = catchAsync(async (req, res) => {
   const collections = await wildcardsService.getCollections(req.query.prefix);
@@ -8,11 +18,13 @@ const getCollections = catchAsync(async (req, res) => {
 });
 
 const createRecord = catchAsync(async (req, res) => {
+  checkKeycustomerPermission(req);
   const record = await wildcardsService.createRecord(req.params.collection, req.body);
   res.status(httpStatus.CREATED).send(record);
 });
 
 const bulkUpsert = catchAsync(async (req, res) => {
+  checkKeycustomerPermission(req);
   const { records, primaryKey } = req.body;
   const result = await wildcardsService.bulkUpsert(req.params.collection, records, primaryKey);
   res.send(result);
@@ -41,11 +53,13 @@ const getRecord = catchAsync(async (req, res) => {
 });
 
 const updateRecord = catchAsync(async (req, res) => {
+  checkKeycustomerPermission(req);
   const record = await wildcardsService.updateRecordById(req.params.collection, req.params.id, req.body);
   res.send(record);
 });
 
 const deleteRecord = catchAsync(async (req, res) => {
+  checkKeycustomerPermission(req);
   await wildcardsService.deleteRecordById(req.params.collection, req.params.id);
   res.status(httpStatus.NO_CONTENT).send();
 });
@@ -59,3 +73,4 @@ module.exports = {
   updateRecord,
   deleteRecord,
 };
+

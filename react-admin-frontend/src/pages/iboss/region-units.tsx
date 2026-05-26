@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { request } from '@umijs/max';
+import { request, useModel } from '@umijs/max';
 import { Pagination, Spin, message, Button } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
@@ -14,6 +14,8 @@ ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
  * 展示 cmibranches 集合数据，支持编辑和保存
  */
 const RegionUnits: React.FC = () => {
+  const { initialState } = useModel('@@initialState');
+  const isTristan = initialState?.currentUser?.email === 'tristan@tristan.wang';
   const gridRef = useRef<AgGridReact>(null);
 
   // --- 数据状态 ---
@@ -93,29 +95,34 @@ const RegionUnits: React.FC = () => {
   };
 
   // 列定义
-  const colDefs = useMemo<any[]>(() => [
-    { 
-      headerName: '#', 
-      valueGetter: "node.rowIndex + 1", 
-      width: 60, minWidth: 40, pinned: 'left',
-      filter: false, sortable: false,
-      suppressHeaderMenuButton: true, suppressHeaderFilterButton: true 
-    },
-    { headerName: "ID", field: "columnValue", hide: true },
-    { headerName: "Status", field: "status", hide: true },
-    { headerName: "所属区域\nRegionCode", field: "RegionCode", editable: true },
-    { headerName: "机构编码\nUnitCode", field: "UnitCode", editable: true },
-    { headerName: "单元名称\ncolumnDesc_zh", field: "columnDesc_zh", editable: true },
-    { headerName: "单元英文\ncolumnDesc", field: "columnDesc", editable: true },
-    { 
-      headerName: "操作", 
-      width: 100,
-      pinned: 'right',
-      cellRenderer: SaveActionRenderer,
-      filter: false,
-      sortable: false
+  const colDefs = useMemo<any[]>(() => {
+    const base: any[] = [
+      { 
+        headerName: '#', 
+        valueGetter: "node.rowIndex + 1", 
+        width: 60, minWidth: 40, pinned: 'left',
+        filter: false, sortable: false,
+        suppressHeaderMenuButton: true, suppressHeaderFilterButton: true 
+      },
+      { headerName: "ID", field: "columnValue", hide: true },
+      { headerName: "Status", field: "status", hide: true },
+      { headerName: "所属区域\nRegionCode", field: "RegionCode", editable: isTristan },
+      { headerName: "机构编码\nUnitCode", field: "UnitCode", editable: isTristan },
+      { headerName: "单元名称\ncolumnDesc_zh", field: "columnDesc_zh", editable: isTristan },
+      { headerName: "单元英文\ncolumnDesc", field: "columnDesc", editable: isTristan },
+    ];
+    if (isTristan) {
+      base.push({ 
+        headerName: "操作", 
+        width: 100,
+        pinned: 'right',
+        cellRenderer: SaveActionRenderer,
+        filter: false,
+        sortable: false
+      });
     }
-  ], [dirtyIds]);
+    return base;
+  }, [dirtyIds, isTristan]);
 
   const defaultColDef = useMemo(() => ({
     flex: 1,
