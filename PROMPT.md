@@ -2542,3 +2542,31 @@ curl --location 'https://bcocesb.cmitry.com/bcoc/B/EDC/v1/exactMatch/{duns}?bloc
 1. **数据库同步执行**：运行 `node syncMongoDB.js`，全自动完成 70 个集合（dnbCompanyDetail + 69 个 DNBWebFamilyTree-*）从开发端到生产端的迁移。
 2. **同步数据量**：共成功恢复 **107,677 条** 文档，0 条失败，耗时约 **639 秒**（约 10.6 分钟）。
 3. **验证结果**：SSH 到生产服务器验证，70 个集合全部存在且记录数与开发端完全一致。生产端 MongoDB（Docker 容器 mongodb）数据同步完成。
+
+## 2026-05-26 18:03:03
+
+### 用户提示词
+web页面优化：
+1、登录页面，标题「Ant Design」改为： 「数据治理工具」。 
+2、删除「Ant Design 是西湖区最具影响力的 Web 设计规范」
+3、所有页面底部，删除「Ant Design Pro」，改为「Powered by Tristan」
+4、删除欢迎页面及菜单
+5、登录后默认页面「要客清单」页面
+6、顶部右侧删除帮助按钮
+
+### 执行总结
+1. **登录页优化**：修改了 `react-admin-frontend/src/pages/user/login/index.tsx` 中的登录表单配置，将标题修改为「数据治理工具」，并移除了副标题属性以隐藏关于“西湖区最具影响力的 Web 设计规范”的描述。
+2. **底部页脚优化**：修改了 `react-admin-frontend/src/components/Footer/index.tsx` 中的版权声明，将其改为 `Powered by Tristan`，并且清空了所有的 `links` 列表，使得页面底部不再显示 "Ant Design Pro" 链接及其他默认链接。
+3. **路由配置与欢迎页移除**：修改了 `react-admin-frontend/config/routes.ts`，删除了 `/welcome` 的欢迎页路由，同时将根路由 `/` 的重定向目标由 `/welcome` 变更为 `/key-customers`（要客清单页），实现登录后默认进入「要客清单」。
+4. **顶部帮助按钮移除**：修改了 `react-admin-frontend/src/app.tsx`，在全局布局的 `actionsRender` 中删除了顶部导航右侧的帮助按钮 `<Question key="doc" />` 及其组件导入。
+
+## 2026-05-26 18:05:50
+
+### 用户提示词
+删除登录页面的：其他登录方式 
+完成后push到github，然后服务器端pull最新版本运行
+
+### 执行总结
+1. **删除其他登录方式**：修改了 `react-admin-frontend/src/pages/user/login/index.tsx`，将 `LoginForm` 的 `actions` 属性彻底移除，从而隐藏了登录页面底部的“其他登录方式”文本以及对应的支付宝、淘宝、微博第三方登录图标。
+2. **代码推送 GitHub**：将前端修改以及本地记录提交并推送至远程 GitHub 仓库。
+3. **生产服务器部署运行**：SSH 连接至生产服务器，执行代码拉取并完成了前端静态包的编译构建与服务热重载。

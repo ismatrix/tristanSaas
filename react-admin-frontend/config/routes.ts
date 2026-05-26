@@ -22,13 +22,7 @@ export default [
       },
     ],
   },
-  {
-    path: '/welcome',
-    name: 'welcome',
-    icon: 'smile',
-    access: 'canWelcome',
-    component: './Welcome',
-  },
+
   {
     path: '/admin',
     name: 'admin',
@@ -147,7 +141,7 @@ export default [
   },
   {
     path: '/',
-    redirect: '/welcome',
+    redirect: '/key-customers',
   },
   {
     component: '404',

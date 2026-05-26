@@ -9,7 +9,6 @@ import {
   AvatarDropdown,
   AvatarName,
   Footer,
-  Question,
   SelectLang,
 } from '@/components';
 import { currentUser as queryCurrentUser } from '@/services/ant-design-pro/api';
@@ -169,7 +168,6 @@ export const layout: RunTimeLayoutConfig = ({
 }) => {
   return {
     actionsRender: () => [
-      <Question key="doc" />,
       <SelectLang key="SelectLang" />,
     ],
     avatarProps: {
