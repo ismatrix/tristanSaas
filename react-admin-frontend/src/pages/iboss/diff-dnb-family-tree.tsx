@@ -444,7 +444,7 @@ const DiffDnbFamilyTreePage: React.FC = () => {
       let apiList: any[] = [];
       let webList: any[] = [];
 
-      // 2. 异步并行获取两个表的境外分支记录
+      // 2. 异步并行获取两个表的境外分支记录，同时包含 GU 自身信息（即使国家为 China）
       const fetchJobs = [];
       if (colNames.api) {
         fetchJobs.push(
@@ -452,7 +452,10 @@ const DiffDnbFamilyTreePage: React.FC = () => {
             method: 'GET',
             params: {
               query: JSON.stringify({
-                "primaryAddress.addressCountry.name": { "$ne": "China", "$nin": [null, ""] }
+                $or: [
+                  { duns: duns },
+                  { "primaryAddress.addressCountry.name": { "$ne": "China", "$nin": [null, ""] } }
+                ]
               }),
             },
           }).then(res => {
@@ -466,7 +469,11 @@ const DiffDnbFamilyTreePage: React.FC = () => {
             method: 'GET',
             params: {
               query: JSON.stringify({
-                "fields.company_addresses_countryId_country_name": { "$ne": "China", "$nin": [null, ""] }
+                $or: [
+                  { company_dunsNumber: duns },
+                  { "fields.company_dunsNumber": duns },
+                  { "fields.company_addresses_countryId_country_name": { "$ne": "China", "$nin": [null, ""] } }
+                ]
               }),
             },
           }).then(res => {
@@ -544,8 +551,13 @@ const DiffDnbFamilyTreePage: React.FC = () => {
         });
       });
 
-      // 将不一致的记录排在最上方
+      // 将 GU 这条记录强制排在第一条，其次是不一致的记录
       compareResultList.sort((a, b) => {
+        const aIsGu = a.duns === duns ? 1 : 0;
+        const bIsGu = b.duns === duns ? 1 : 0;
+        if (aIsGu !== bIsGu) {
+          return bIsGu - aIsGu;
+        }
         const aDiff = a.status !== 'consistent' ? 1 : 0;
         const bDiff = b.status !== 'consistent' ? 1 : 0;
         return bDiff - aDiff;
@@ -620,12 +632,13 @@ const DiffDnbFamilyTreePage: React.FC = () => {
   // --- 行高亮 Class ---
   const getRowClass = useCallback((params: any) => {
     if (!params.data) return '';
+    if (params.data.duns === duns) return 'row-gu-highlight';
     const status = params.data.status;
     if (status === 'only_web') return 'row-only-web';
     if (status === 'only_api') return 'row-only-api';
     if (status === 'name_diff') return 'row-name-diff';
     return '';
-  }, []);
+  }, [duns]);
 
   const pageTitle = nameCn ? `「${nameCn}」境外分支比对详情` : 'DNB WEB 与 API 境外分支对比';
 
@@ -642,6 +655,13 @@ const DiffDnbFamilyTreePage: React.FC = () => {
     }}>
       {/* 注入高亮行样式 */}
       <style>{`
+        /* GU 全球最高母公司高亮行：浅灰色 */
+        .row-gu-highlight {
+          background-color: #f0f0f0 !important;
+        }
+        .row-gu-highlight:hover {
+          background-color: #e8e8e8 !important;
+        }
         /* 仅在 WEB 树存在的行：淡蓝色 */
         .row-only-web {
           background-color: #e6f7ff !important;
