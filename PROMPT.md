@@ -2580,3 +2580,22 @@ web页面优化：
 1. **数据拉取优化**：在 `react-admin-frontend/src/pages/iboss/diff-dnb-family-tree.tsx` 页面中，优化了对 WEB 和 API 境外分支表的查询条件。利用 `$or` 条件允许将当前 DUNS 对应的 GU 公司本身记录（即使国家是 China 或是空的）拉取出来，而不受“排除国家为 China”过滤条件的限制。
 2. **比对数据排序与高亮**：修改了比对结果数组的 `sort` 排序算法，使得 `duns` 匹配当前页面参数的 GU 记录强制排列在第一条。并在行高亮回调 `getRowClass` 中为该行绑定了 `row-gu-highlight` Class，在 CSS 中注入了浅灰色高亮背景 `#f0f0f0`（悬浮状态为 `#e8e8e8`）。
 3. **本地校验、代码提交推送与远程部署**：本地完成 TypeScript 校验（`npm run tsc`）无误后，将前端修改以及本地记录提交并推送至远程 GitHub 仓库，并通过 SSH 远程运行 `deploy.sh` 脚本在生产服务器完成代码部署、前端重编与 PM2 进程热重启。
+
+## 2026-05-26 18:33:57
+
+### 用户提示词
+「要客清单」合并列：
+1、「家族树表行数」和「web家族树表行数」合并为一列，标题为「家族数API/WEB」，显示值{api表的总数}/{web表的总数}
+2、「境外分支数」和「web境外分支数」合并为一列，标题为「境外分支数API/WEB」，显示值{api境外分支数}/{web境外分支数}
+
+### 执行总结
+1. **「要客清单」合并列逻辑开发**：
+   - 修改了 `react-admin-frontend/src/pages/iboss/key-customers.tsx` 页面中的 baseColumns 定义，将原本的“家族表行数”和“Web家族表行数”合并为「家族数API/WEB」一列，通过 `valueGetter` 动态解析 `{_ftCount}/{_webFtCount}` 格式。
+   - 将原本的“境外分支数”和“Web境外分支数”合并为「境外分支数API/WEB」一列，通过 `valueGetter` 动态解析并显示 `{_ftOverseasCount}/{_webFtOverseasCount}` 格式。
+   - 优化了境外分支数的 cellRenderer 渲染逻辑，若两端数据任意一端大于 0，即将其渲染为超链接形式，点击可正常跳转至境外分支比对详情页面。
+   - 针对两处新合并列分别自定义了 `comparator` 排序比较器，以确保在严格模式下按其数值属性进行精准的数值排序。
+2. **TypeScript 严格类型报错修复**：
+   - 显式定义了两个 comparator 的参数类型 `(valueA: any, valueB: any, nodeA: any, nodeB: any)`，修复了 `noImplicitAny` 引起的 TypeScript 编译错误。
+3. **本地校验、代码推送与远程部署**：
+   - 本地 `npm run tsc` 编译校验完美通过。
+   - 提交并推送至 GitHub 仓库，并通过远程执行 `deploy.sh` 脚本在生产服务器自动完成最新代码部署与前端重打包。

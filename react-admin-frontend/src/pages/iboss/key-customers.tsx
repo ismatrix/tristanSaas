@@ -358,94 +358,78 @@ const KeyCustomerList: React.FC = () => {
     { headerName: "行业编码", field: "industryCode", width: 140, editable: isTristan },
     { headerName: "集团行业", field: "industryGroupCode", width: 160, editable: isTristan, hide: true },
     {
-      headerName: "家族表行数",
-      field: "_ftCount",
-      width: 100,
+      headerName: "家族数API/WEB",
+      width: 150,
       editable: false,
       filter: false,
       sortable: true,
-      type: 'numericColumn',
+      valueGetter: (params: any) => {
+        const apiVal = params.data?._ftCount;
+        const webVal = params.data?._webFtCount;
+        if (apiVal === '__loading__' || webVal === '__loading__') return '__loading__';
+        const apiStr = apiVal != null ? String(apiVal) : '-';
+        const webStr = webVal != null ? String(webVal) : '-';
+        return `${apiStr}/${webStr}`;
+      },
       valueFormatter: (p: any) => {
         if (p.value === '__loading__') return '查询中...';
-        if (p.value == null) return '-';
-        return String(p.value);
+        return p.value;
       },
+      comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
+        const countA = nodeA.data?._ftCount ?? 0;
+        const countB = nodeB.data?._ftCount ?? 0;
+        return countA - countB;
+      }
     },
     {
-      headerName: "境外分支数",
-      field: "_ftOverseasCount",
-      width: 100,
+      headerName: "境外分支数API/WEB",
+      width: 170,
       editable: false,
       filter: true,
       sortable: true,
-      type: 'numericColumn',
+      valueGetter: (params: any) => {
+        const apiVal = params.data?._ftOverseasCount;
+        const webVal = params.data?._webFtOverseasCount;
+        if (apiVal === '__loading__' || webVal === '__loading__') return '__loading__';
+        const apiStr = apiVal != null ? String(apiVal) : '-';
+        const webStr = webVal != null ? String(webVal) : '-';
+        return `${apiStr}/${webStr}`;
+      },
       valueFormatter: (p: any) => {
         if (p.value === '__loading__') return '查询中...';
-        if (p.value == null) return '-';
-        return String(p.value);
+        return p.value;
+      },
+      comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
+        const countA = nodeA.data?._ftOverseasCount ?? 0;
+        const countB = nodeB.data?._ftOverseasCount ?? 0;
+        return countA - countB;
       },
       cellRenderer: (params: any) => {
-        const val = params.value;
-        if (val === '__loading__') return '查询中...';
-        if (val == null || val === '') return '-';
+        if (params.value === '__loading__') return '查询中...';
+        const apiVal = params.data?._ftOverseasCount;
+        const webVal = params.data?._webFtOverseasCount;
+        if (apiVal == null && webVal == null) return '-';
+        
         const nameCn = encodeURIComponent(params.data?.nameCn || '');
         const abbr = encodeURIComponent(params.data?.abbr || '');
         const duns = params.data?.globalUltimateDuns || '';
-        return (
-          <span
-            style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => history.push(`/diffDNBFamilyTree/${duns}?nameCn=${nameCn}&abbr=${abbr}`)}
-            title={`对比境外分支机构: ${params.data?.nameCn || duns}`}
-          >
-            {val}
-          </span>
-        );
-      },
-    },
-    {
-      // Web家族表行数（来自数据库 DNBWebFamilyTree-* 集合统计）
-      headerName: "Web家族表行数",
-      field: "_webFtCount",
-      width: 140,
-      editable: false,
-      filter: true,
-      sortable: true,
-      type: 'numericColumn',
-      valueFormatter: (p: any) => {
-        if (p.value === '__loading__') return '查询中...';
-        if (p.value == null || p.value === '') return '-';
-        return Number(p.value).toLocaleString();
-      },
-    },
-    {
-      headerName: "Web境外分支数",
-      field: "_webFtOverseasCount",
-      width: 130,
-      editable: false,
-      filter: true,
-      sortable: true,
-      type: 'numericColumn',
-      valueFormatter: (p: any) => {
-        if (p.value === '__loading__') return '查询中...';
-        if (p.value == null) return '-';
-        return String(p.value);
-      },
-      cellRenderer: (params: any) => {
-        const val = params.value;
-        if (val === '__loading__') return '查询中...';
-        if (val == null || val === '') return '-';
-        const nameCn = encodeURIComponent(params.data?.nameCn || '');
-        const abbr = encodeURIComponent(params.data?.abbr || '');
-        const duns = params.data?.globalUltimateDuns || '';
-        return (
-          <span
-            style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => history.push(`/diffDNBFamilyTree/${duns}?nameCn=${nameCn}&abbr=${abbr}`)}
-            title={`对比境外分支机构: ${params.data?.nameCn || duns}`}
-          >
-            {val}
-          </span>
-        );
+
+        const apiStr = apiVal != null ? String(apiVal) : '-';
+        const webStr = webVal != null ? String(webVal) : '-';
+
+        const hasOverseas = (apiVal != null && apiVal > 0) || (webVal != null && webVal > 0);
+        if (hasOverseas) {
+          return (
+            <span
+              style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={() => history.push(`/diffDNBFamilyTree/${duns}?nameCn=${nameCn}&abbr=${abbr}`)}
+              title={`对比境外分支机构: ${params.data?.nameCn || duns}`}
+            >
+              {apiStr}/{webStr}
+            </span>
+          );
+        }
+        return <span>{apiStr}/{webStr}</span>;
       },
     },
     { headerName: "客户类型", field: "customerType", width: 120, editable: isTristan },
