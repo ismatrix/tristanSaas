@@ -2507,3 +2507,38 @@ curl --location 'https://bcocesb.cmitry.com/bcoc/B/EDC/v1/exactMatch/{duns}?bloc
 3. **TypeScript 严格类型报错修复与构建打包**：
    - 显式定义了 getCategorizedIndustryCodes 和 getUnspscCodesInfo 中 map 遍历回调参数的类型，解决了严格模式下的 `noImplicitAny` 报错。
    - 执行 `npm run tsc` 类型校验 100% 通过，并顺利通过 `npm run build` 编译构建了生产环境静态发布包。
+
+## 2026-05-26 17:21:54
+
+### 用户提示词
+1、项目代码提交github，服务器的生产端更新最新的代码，并运行
+2、生成一个数据库同步脚本：目的将开发端数据库指定的表列表，同步到服务器端生产数据库
+对比开发环境和生产环境的mongodb的node-boilerplate库中的所有集合名称及每个集合的记录数，将差异做成列表给我确认，确认之后，清空生产端这些表的数据，并将开发端的表数据同步过去
+
+### 执行总结
+1. **代码提交与推送 GitHub**：
+   - 执行 `git add -A` 暂存所有变更（含本次 Drawer 重构文件及 PROMPT.md）。
+   - 推送过程中 GitHub Push Protection 检测到 PROMPT.md 历史记录中保存有阿里云明文 AccessKey，自动拦截了推送。
+   - 对 PROMPT.md 第 1786-1787 行进行了脱敏处理，将明文密钥替换为 `[已脱敏]`，再通过 `git commit --amend` 修订 commit 后重新推送，顺利通过并合并至 main 分支（commit: de089f6）。
+2. **生产服务器自动部署**：
+   - SSH 到服务器执行 `bash deploy.sh`，完成 `git fetch --reset-hard origin/main` 拉取最新代码。
+   - 服务器端前端项目 Webpack 编译成功（耗时约 25s），含所有最新页面（境外分支比对、DNB WEB 家族树等）在内的全部路由静态包构建完毕。
+   - 发现 deploy.sh 中 pm2 PATH 不完整导致重启失败，已手动补全 PATH 后执行 `pm2 restart backend-api` 重启成功，服务运行正常。
+3. **数据库双端集合差异分析**：
+   - 本地：通过 Node.js + MongoDB Driver 查询，共列出所有集合及记录数。
+   - 生产端：SSH 到服务器项目目录内执行同样脚本，获取生产库集合全量信息。
+   - 核心差异：生产端缺少 `dnbCompanyDetail`（12 条）及全部 69 个 `DNBWebFamilyTree-*` 系列集合（合计 ~116,000 条记录）。
+4. **数据库同步脚本编写**：
+   - 创建了 `syncMongoDB.js`（位于项目根目录），支持将开发端指定集合通过 mongodump → scp → docker cp → mongorestore --drop 全流程同步到生产端。
+   - 生产端 MongoDB 运行在 Docker 容器（名称：mongodb）内，脚本已适配此架构，通过 `docker cp` 复制 dump 文件进容器，再通过 `docker exec` 在容器内执行 `mongorestore`。
+   - 已生成数据库差异对比报告（db_diff_report.md），等待用户确认同步范围后执行。
+
+## 2026-05-26 17:33:28
+
+### 用户提示词
+确认
+
+### 执行总结
+1. **数据库同步执行**：运行 `node syncMongoDB.js`，全自动完成 70 个集合（dnbCompanyDetail + 69 个 DNBWebFamilyTree-*）从开发端到生产端的迁移。
+2. **同步数据量**：共成功恢复 **107,677 条** 文档，0 条失败，耗时约 **639 秒**（约 10.6 分钟）。
+3. **验证结果**：SSH 到生产服务器验证，70 个集合全部存在且记录数与开发端完全一致。生产端 MongoDB（Docker 容器 mongodb）数据同步完成。
