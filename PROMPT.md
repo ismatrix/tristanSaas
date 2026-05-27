@@ -2646,3 +2646,29 @@ web页面优化：
    - 临时更改 `syncMongoDB.js` 脚本 of `COLLECTIONS_TO_SYNC`，指定仅同步 `keyGlobalFamilyTree` 集合。
    - 在本地运行 `node syncMongoDB.js`，自动导出本地数据，通过 scp 安全传输到生产服务器，并导入到容器 `mongodb` 内部，圆满完成了 1165 条高保真数据的双端同步覆盖。
    - 同步完成后，已在本地恢复 `syncMongoDB.js` 文件的修改。
+
+## 2026-05-27 13:00:34
+
+### 用户提示词
+「要客清单」页面：
+1、「家族数 API/WEB」列默认隐藏
+2、添加列「家族树」，显示GID对应「要客海外家族树」中的记录数， 链接URL同「公司中文名」
+3、如果GID对应没有记录，「家族树」「公司中文名」，不要显示能链接点击的状态
+「要客海外家族树」页面：
+1、页面的表格显示有问题，没有正常显示出数据
+2、全文搜索框放到表格的右上
+
+### 执行总结
+1. **「要客清单」页面重构与跳转保护**：
+   - 将「家族数API/WEB」列加上 `hide: true`，使其默认在网格中隐藏。
+   - 新增了「家族树」列（绑定的数据字段为 `_globalFtCount`），负责呈现当前 GID 在海外家族树（`keyGlobalFamilyTree`）中作为 `ultimateGID` 关联到的总节点数。
+   - 修改了「公司中文名」与新加的「家族树」两列的 `cellRenderer`：只有当 `_globalFtCount` 异步加载完毕且大于 0 时，才呈现蓝色的超链接点击跳转状态；如果数量等于 0、为空或尚未加载完毕，则渲染为普通纯文本，完美实现无关联记录时禁用跳转的要求。
+   - 优化了并行拉取方法 `fetchFamilyTreeStats`：放宽了 targets 的过滤限制使其支持仅拥有 GID 的行；在循环中通过异步调用 `/api/v1/wildcards/keyGlobalFamilyTree` 计算每家公司 GID 的海外树总行数，并使用 `rowNode.setData()` 动态无感刷新数据行，防范页面跳顶并过滤掉元数据字段。
+2. **「要客海外家族树」页面高度塌陷修复与搜索框位置微调**：
+   - 发现因 Tab 布局本身无绝对高度分配，且未在组件内覆盖 Ant Design 的 Tabs 内置面板高度，导致子级 AG Grid 容器因高度坍塌为 0 像素而完全无法展示数据表格。已在组件 return 根部注入了全局弹性盒子 CSS 样式规则，强制铺满 Tabs 的 holder、content 和 tabpane 容器，恢复了 AG Grid 的正常显示。
+   - 优化了获取数据的 `fetchData` 接口调用：强力指定了 `options: { limit: 10000 }` 数量限制，规避了 wildcards 默认分页数量过小导致大数家族树数据不全、渲染失败的问题。
+   - 将全文搜索框与导出 JSON 按钮的布局容器调整为 Flex 靠右对齐（`justifyContent: 'flex-end'`），将全文搜索框移到了数据表的右上方。
+3. **编译校验与部署上线**：
+   - 本地 `npm run tsc` 类型检查及 `npm run build` 打包构建 100% 成功。
+   - 代码已提交并推送至 GitHub 仓库。
+   - 登录生产服务器拉取最新代码，执行 `bash deploy.sh` 进行前端静态包的重新编译与后端服务的 PM2 热重启，验证运行正常。

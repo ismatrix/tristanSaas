@@ -181,11 +181,11 @@ const KeyCustomerList: React.FC = () => {
 
   // --- 批量加载家族树统计（并行，在 fetchData 后台执行）---
   const fetchFamilyTreeStats = useCallback(async (records: any[]) => {
-    // 筛选有 abbr 和 globalUltimateDuns 的行
-    const targets = records.filter((r: any) => r.abbr && r.globalUltimateDuns);
+    // 筛选有 abbr 且有 globalUltimateDuns 的行，或者有 GID 的行
+    const targets = records.filter((r: any) => (r.abbr && r.globalUltimateDuns) || r.GID);
     if (targets.length === 0) return;
 
-    // 并行查询每行对应集合的 count 和 最新 _syncedAt，以及境外分支数
+    // 并行查询每行对应集合的 count 和 最新 _syncedAt，以及境外分支数，以及 keyGlobalFamilyTree 的数量
     const results = await Promise.allSettled(
       targets.map(async (record: any) => {
         const collName = `DNBFamilyTree-${record.abbr}-${record.globalUltimateDuns}`;
@@ -195,57 +195,74 @@ const KeyCustomerList: React.FC = () => {
         let webFtCount = 0;
         let ftOverseasCount = 0;
         let webFtOverseasCount = 0;
+        let globalFtCount = 0;
 
-        try {
-          const res = await request(`/api/v1/wildcards/${collName}`, {
-            method: 'GET',
-            // limit=1 排序最新，totalResults 即总数
-            params: { options: JSON.stringify({ limit: 1, sort: { _syncedAt: -1 } }) },
-          });
-          ftCount = res?.totalResults ?? 0;
-          ftLastSync = res?.results?.[0]?._syncedAt ?? null;
-        } catch (e) {
-          // 集合不存在
+        if (record.abbr && record.globalUltimateDuns) {
+          try {
+            const res = await request(`/api/v1/wildcards/${collName}`, {
+              method: 'GET',
+              params: { options: JSON.stringify({ limit: 1, sort: { _syncedAt: -1 } }) },
+            });
+            ftCount = res?.totalResults ?? 0;
+            ftLastSync = res?.results?.[0]?._syncedAt ?? null;
+          } catch (e) {
+            // 集合不存在
+          }
+
+          try {
+            const res = await request(`/api/v1/wildcards/${webCollName}`, {
+              method: 'GET',
+              params: { options: JSON.stringify({ limit: 1 }) },
+            });
+            webFtCount = res?.totalResults ?? 0;
+          } catch (e) {
+            // 集合不存在
+          }
+
+          try {
+            const res = await request(`/api/v1/wildcards/${collName}`, {
+              method: 'GET',
+              params: {
+                query: JSON.stringify({
+                  "primaryAddress.addressCountry.name": { "$ne": "China", "$nin": [null, ""] }
+                }),
+                options: JSON.stringify({ limit: 1 }),
+              },
+            });
+            ftOverseasCount = res?.totalResults ?? 0;
+          } catch (e) {
+            // 集合不存在
+          }
+
+          try {
+            const res = await request(`/api/v1/wildcards/${webCollName}`, {
+              method: 'GET',
+              params: {
+                query: JSON.stringify({
+                  "fields.company_addresses_countryId_country_name": { "$ne": "China", "$nin": [null, ""] }
+                }),
+                options: JSON.stringify({ limit: 1 }),
+              },
+            });
+            webFtOverseasCount = res?.totalResults ?? 0;
+          } catch (e) {
+            // 集合不存在
+          }
         }
 
-        try {
-          const res = await request(`/api/v1/wildcards/${webCollName}`, {
-            method: 'GET',
-            params: { options: JSON.stringify({ limit: 1 }) },
-          });
-          webFtCount = res?.totalResults ?? 0;
-        } catch (e) {
-          // 集合不存在
-        }
-
-        try {
-          const res = await request(`/api/v1/wildcards/${collName}`, {
-            method: 'GET',
-            params: {
-              query: JSON.stringify({
-                "primaryAddress.addressCountry.name": { "$ne": "China", "$nin": [null, ""] }
-              }),
-              options: JSON.stringify({ limit: 1 }),
-            },
-          });
-          ftOverseasCount = res?.totalResults ?? 0;
-        } catch (e) {
-          // 集合不存在
-        }
-
-        try {
-          const res = await request(`/api/v1/wildcards/${webCollName}`, {
-            method: 'GET',
-            params: {
-              query: JSON.stringify({
-                "fields.company_addresses_countryId_country_name": { "$ne": "China", "$nin": [null, ""] }
-              }),
-              options: JSON.stringify({ limit: 1 }),
-            },
-          });
-          webFtOverseasCount = res?.totalResults ?? 0;
-        } catch (e) {
-          // 集合不存在
+        if (record.GID) {
+          try {
+            const res = await request(`/api/v1/wildcards/keyGlobalFamilyTree`, {
+              method: 'GET',
+              params: {
+                query: JSON.stringify({ ultimateGID: String(record.GID) }),
+                options: JSON.stringify({ limit: 1 }),
+              },
+            });
+            globalFtCount = res?.totalResults ?? 0;
+          } catch (e) {
+            // 集合不存在
+          }
         }
 
         return {
@@ -255,12 +272,20 @@ const KeyCustomerList: React.FC = () => {
           _webFtCount: webFtCount,
           _ftOverseasCount: ftOverseasCount,
           _webFtOverseasCount: webFtOverseasCount,
+          _globalFtCount: globalFtCount,
         };
       })
     );
 
     // 构建统计 Map
-    const statsMap = new Map<string, { _ftCount: number; _ftLastSync: any; _webFtCount: number; _ftOverseasCount: number; _webFtOverseasCount: number }>();
+    const statsMap = new Map<string, { 
+      _ftCount: number; 
+      _ftLastSync: any; 
+      _webFtCount: number; 
+      _ftOverseasCount: number; 
+      _webFtOverseasCount: number;
+      _globalFtCount: number;
+    }>();
     results.forEach((r) => {
       if (r.status === 'fulfilled' && r.value) {
         statsMap.set(r.value._id, {
@@ -269,6 +294,7 @@ const KeyCustomerList: React.FC = () => {
           _webFtCount: r.value._webFtCount,
           _ftOverseasCount: r.value._ftOverseasCount,
           _webFtOverseasCount: r.value._webFtOverseasCount,
+          _globalFtCount: r.value._globalFtCount,
         });
       }
     });
@@ -284,6 +310,7 @@ const KeyCustomerList: React.FC = () => {
           _webFtCount: stats._webFtCount,
           _ftOverseasCount: stats._ftOverseasCount,
           _webFtOverseasCount: stats._webFtOverseasCount,
+          _globalFtCount: stats._globalFtCount,
         });
       }
     });
@@ -292,11 +319,9 @@ const KeyCustomerList: React.FC = () => {
     gridRef.current?.api?.forEachNode((node: any) => {
       if (!node.data) return;
       const rowId = String(node.data._id);
-      // 有 abbr+globalUltimateDuns 但不在 statsMap（请求失败并被过滤）的行，已在上面覆盖过
-      // 没有 abbr 或 globalUltimateDuns 的行，如果还尚是 '__loading__' 则设为 null
       if (!targetIds.has(rowId) &&
-          (node.data._ftCount === '__loading__' || node.data._ftLastSync === '__loading__' || node.data._webFtCount === '__loading__' || node.data._ftOverseasCount === '__loading__' || node.data._webFtOverseasCount === '__loading__')) {
-        node.setData({ ...node.data, _ftCount: null, _ftLastSync: null, _webFtCount: null, _ftOverseasCount: null, _webFtOverseasCount: null });
+          (node.data._ftCount === '__loading__' || node.data._ftLastSync === '__loading__' || node.data._webFtCount === '__loading__' || node.data._ftOverseasCount === '__loading__' || node.data._webFtOverseasCount === '__loading__' || node.data._globalFtCount === '__loading__')) {
+        node.setData({ ...node.data, _ftCount: null, _ftLastSync: null, _webFtCount: null, _ftOverseasCount: null, _webFtOverseasCount: null, _globalFtCount: null });
       }
     });
   }, []);
@@ -362,7 +387,10 @@ const KeyCustomerList: React.FC = () => {
         const gid = params.data?.GID;
         const nameCn = encodeURIComponent(params.data?.nameCn || '');
         const abbr = encodeURIComponent(params.data?.abbr || '');
-        if (gid) {
+        const globalFtCount = params.data?._globalFtCount;
+
+        // 仅在存在 GID、数据已加载完成、且 GID 关联记录数大于 0 时渲染为超链接
+        if (gid && globalFtCount !== '__loading__' && globalFtCount != null && globalFtCount > 0) {
           return (
             <span
               style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
@@ -376,6 +404,38 @@ const KeyCustomerList: React.FC = () => {
         return <span>{val}</span>;
       }
     },
+    {
+      headerName: "家族树",
+      field: "_globalFtCount",
+      width: 120,
+      editable: false,
+      filter: false,
+      sortable: true,
+      cellRenderer: (params: any) => {
+        const val = params.value;
+        if (val === '__loading__') return <span style={{ color: '#999' }}>查询中...</span>;
+        if (val == null) return '-';
+        if (val === 0) return '0';
+        
+        const gid = params.data?.GID;
+        const nameCn = encodeURIComponent(params.data?.nameCn || '');
+        const abbr = encodeURIComponent(params.data?.abbr || '');
+        return (
+          <span
+            style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => history.push(`/keyGlobalFamilyTree/${gid}?nameCn=${nameCn}&abbr=${abbr}`)}
+            title={`查看境外家族树，共 ${val} 条记录`}
+          >
+            {val}
+          </span>
+        );
+      },
+      comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
+        const countA = nodeA.data?._globalFtCount ?? 0;
+        const countB = nodeB.data?._globalFtCount ?? 0;
+        return countA - countB;
+      }
+    },
     { headerName: "缩写", field: "abbr", width: 150, editable: isTristan },
     { headerName: "来源", field: "source", width: 160, editable: isTristan, hide: true },
     { headerName: "来源类型", field: "sourceType", width: 200, editable: isTristan, hide: true },
@@ -387,6 +447,7 @@ const KeyCustomerList: React.FC = () => {
       editable: false,
       filter: false,
       sortable: true,
+      hide: true,
       valueGetter: (params: any) => {
         const apiVal = params.data?._ftCount;
         const webVal = params.data?._webFtCount;
@@ -582,6 +643,7 @@ const KeyCustomerList: React.FC = () => {
       allKeys.delete('_webFtCount');
       allKeys.delete('_ftOverseasCount');
       allKeys.delete('_webFtOverseasCount');
+      allKeys.delete('_globalFtCount');
       allKeys.delete('globalUltimateFamilyTreeMembersCount');
 
       setDynamicColDefs((prev) => {
@@ -608,6 +670,7 @@ const KeyCustomerList: React.FC = () => {
         _webFtCount: '__loading__',
         _ftOverseasCount: '__loading__',
         _webFtOverseasCount: '__loading__',
+        _globalFtCount: '__loading__',
       }));
       setRowData(recordsWithPlaceholder);
       setDirtyIds(new Set()); // 重置脏标记

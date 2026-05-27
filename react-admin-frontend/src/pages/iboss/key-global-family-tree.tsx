@@ -376,6 +376,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
         method: 'GET',
         params: {
           query: JSON.stringify({ ultimateGID: gid }),
+          options: JSON.stringify({ limit: 10000 }), // 确保拉取完整家族树
         },
       });
 
@@ -621,6 +622,27 @@ const KeyGlobalFamilyTree: React.FC = () => {
       padding: '16px',
       overflow: 'hidden',
     }}>
+      {/* 覆盖 Tabs 高度样式防止 AG Grid 容器塌陷 */}
+      <style>{`
+        .ant-tabs-content-holder {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        .ant-tabs-content {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        .ant-tabs-tabpane {
+          display: flex !important;
+          flex-direction: column;
+          flex: 1;
+          min-height: 0;
+        }
+      `}</style>
       {/* 顶部标题区域 */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space align="center">
@@ -760,8 +782,8 @@ const KeyGlobalFamilyTree: React.FC = () => {
               ),
               children: (
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  {/* 全文搜索与操作栏 */}
-                  <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {/* 全文搜索与操作栏（靠右排列） */}
+                  <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                     <Space>
                       <Input
                         placeholder="在数据表中全文搜索..."
@@ -771,8 +793,6 @@ const KeyGlobalFamilyTree: React.FC = () => {
                         onChange={(e) => setTableSearchText(e.target.value)}
                         style={{ width: 280 }}
                       />
-                    </Space>
-                    <Space>
                       <Button icon={<DownloadOutlined />} onClick={handleExportJson} disabled={originalData.length === 0}>
                         导出 JSON
                       </Button>
