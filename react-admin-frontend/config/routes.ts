@@ -86,7 +86,7 @@ export default [
   },
   {
     path: '/keycustomer',
-    name: '行业要客',
+    name: '海外家族树',
     icon: 'CrownOutlined',
     routes: [
       {
