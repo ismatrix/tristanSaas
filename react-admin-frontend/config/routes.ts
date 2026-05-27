@@ -140,6 +140,12 @@ export default [
     ],
   },
   {
+    name: '要客海外家族树',
+    path: '/keyGlobalFamilyTree/:gid',
+    hideInMenu: true,
+    component: './iboss/key-global-family-tree',
+  },
+  {
     path: '/',
     redirect: '/key-customers',
   },

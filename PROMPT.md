@@ -2599,3 +2599,33 @@ web页面优化：
 3. **本地校验、代码推送与远程部署**：
    - 本地 `npm run tsc` 编译校验完美通过。
    - 提交并推送至 GitHub 仓库，并通过远程执行 `deploy.sh` 脚本在生产服务器自动完成最新代码部署与前端重打包。
+
+## 2026-05-27 12:24:39
+
+### 用户提示词
+1、将/Users/tristan/Downloads/互联网合并-260527表.xlsx 导入mongodb的node-boilerplate数据库下的keyGlobalFamilyTree表
+2、「要客清单」页面，「公司中文名」字段添加链接：keyGlobalFamilyTree/{GID}?nameCn={nameCn}&abbr={abbr}，进入要客海外家族树页面。 过滤keyGlobalFamilyTree表中ultimateGID={GID}的所有记录。
+3、「要客海外家族树」页面完全复制/dnb/tree/dnb_cnpc 页面的功能、模块、插件和布局
+- 也是为2个tab，「家族树」「数据表」。
+-「家族树」成树规则为GID（当前ID）、parentGID（上级节点ID）
+- 「数据表」页面采用AG Grid，所有字段都显示，增加全文所有框
+4、 点击树节点，或「数据表」表的companyNameCn字段，右侧划出抽屉信息（参考/dnb/tree/dnb_cnpc 页面的功能）
+确认执行
+
+### 执行总结
+1. **数据清洗与导入**：
+   - 编写 Python 脚本处理了 `/Users/tristan/Downloads/互联网合并-260527表.xlsx` 中的数据。
+   - 对 `ultimateGID`、`GID`、`parentGID` 和 `duns` 字段清洗，规范化为无浮点的纯数字字符串以规避 JavaScript 及数据库中长整型精度丢失问题。
+   - 成功将清洗后的 1165 条记录导入 MongoDB `node-boilerplate` 库下的 `keyGlobalFamilyTree` 集合中。
+2. **要客清单页面跳转路由**：
+   - 修改了 `react-admin-frontend/src/pages/iboss/key-customers.tsx`，将「公司中文名」列修改为支持超链接跳转：`/keyGlobalFamilyTree/{GID}?nameCn={nameCn}&abbr={abbr}`。
+   - 在 `react-admin-frontend/config/routes.ts` 中注册路由 `/keyGlobalFamilyTree/:gid`。
+3. **新建要客海外家族树页面**：
+   - 复制并开发了 `react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx` 页面，完美复刻 DNB 树例的双 Tab 页面布局与功能交互。
+   - **Tab 1「家族树」**：基于 GID 与 parentGID 完成 d3-org-chart 组织架构树的渲染；支持区域分组树模式。
+   - **Tab 2「数据表」**：采用 AG Grid 展示 keyGlobalFamilyTree 中所有可用字段，并添加了在数据表中全文搜索框（修复了 tableSearchText 变量绑定引起的 TypeScript 类型编译错误）。
+   - **抽屉展示**：点击树节点或数据表中的中文名称时，右侧会划出 Drawer 抽屉，展示该公司的所有相关属性。
+4. **编译校验与部署**：
+   - 本地 `npm run tsc` 及 `npm run build` 成功，无任何报错。
+   - 代码已提交并推送至 GitHub 仓库。
+   - 登录生产服务器拉取最新代码，执行 `bash deploy.sh` 进行前端静态包的重新编译与后端服务的 PM2 热重启，验证运行正常。

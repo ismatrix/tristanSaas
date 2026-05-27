@@ -351,7 +351,31 @@ const KeyCustomerList: React.FC = () => {
         );
       },
     },
-    { headerName: "公司中文名", field: "nameCn", width: 350, editable: isTristan },
+    {
+      headerName: "公司中文名",
+      field: "nameCn",
+      width: 350,
+      editable: isTristan,
+      cellRenderer: (params: any) => {
+        const val = params.value;
+        if (!val) return '';
+        const gid = params.data?.GID;
+        const nameCn = encodeURIComponent(params.data?.nameCn || '');
+        const abbr = encodeURIComponent(params.data?.abbr || '');
+        if (gid) {
+          return (
+            <span
+              style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={() => history.push(`/keyGlobalFamilyTree/${gid}?nameCn=${nameCn}&abbr=${abbr}`)}
+              title={`查看境外家族树: ${val}`}
+            >
+              {val}
+            </span>
+          );
+        }
+        return <span>{val}</span>;
+      }
+    },
     { headerName: "缩写", field: "abbr", width: 150, editable: isTristan },
     { headerName: "来源", field: "source", width: 160, editable: isTristan, hide: true },
     { headerName: "来源类型", field: "sourceType", width: 200, editable: isTristan, hide: true },
