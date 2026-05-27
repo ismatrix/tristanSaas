@@ -636,7 +636,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
           flex-direction: column;
           min-height: 0;
         }
-        .ant-tabs-tabpane {
+        .ant-tabs-tabpane-active {
           display: flex !important;
           flex-direction: column;
           flex: 1;
