@@ -12,6 +12,7 @@ import {
   TableOutlined,
   SwapOutlined,
   DownloadOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -358,6 +359,11 @@ const KeyGlobalFamilyTree: React.FC = () => {
   const [drawerRecord, setDrawerRecord] = useState<any>(null);
   const [tableSearchText, setTableSearchText] = useState('');
 
+  // 比对 Tab 状态
+  const [diffRowData, setDiffRowData] = useState<any[]>([]);
+  const [diffLoading, setDiffLoading] = useState<boolean>(false);
+  const [diffSearchText, setDiffSearchText] = useState<string>('');
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
 
@@ -366,6 +372,177 @@ const KeyGlobalFamilyTree: React.FC = () => {
     setDrawerRecord(record);
     setDrawerOpen(true);
   }, []);
+
+  // 展示比对行详情（已关联则打开本地详情，缺失则平铺展示 API 详情）
+  const handleShowDiffDetail = useCallback((rowData: any) => {
+    if (rowData.status === 'consistent') {
+      const apiDuns = String(rowData.duns).trim();
+      const apiName = String(rowData.companyName).trim().toLowerCase();
+      const found = originalData.find((item: any) => 
+        (item.duns && String(item.duns).trim() === apiDuns) ||
+        (item.companyNameEn && String(item.companyNameEn).trim().toLowerCase() === apiName) ||
+        (item.registeredName && String(item.registeredName).trim().toLowerCase() === apiName)
+      );
+      if (found) {
+        openDrawer(found);
+        return;
+      }
+    }
+    
+    const raw = rowData.rawRecord;
+    if (raw) {
+      const flatRecord: any = {
+        duns: raw.duns || rowData.duns,
+        companyNameEn: raw.primaryName || rowData.companyName,
+        registeredCountry: raw.primaryAddress?.addressCountry?.name || rowData.country,
+        registeredCity: raw.primaryAddress?.addressLocality?.name || rowData.city,
+        registeredAddress: raw.primaryAddress?.streetAddress?.line1 || undefined,
+        postalCode: raw.primaryAddress?.postalCode || undefined,
+      };
+      if (Array.isArray(raw.multilingualPrimaryName) && raw.multilingualPrimaryName.length > 0) {
+        flatRecord.multilingualName = raw.multilingualPrimaryName[0].name;
+      }
+      if (Array.isArray(raw.multilingualPrimaryAddress) && raw.multilingualPrimaryAddress.length > 0) {
+        const addr = raw.multilingualPrimaryAddress[0];
+        flatRecord.multilingualAddress = `${addr.addressRegion?.name || ''}${addr.addressLocality?.name || ''}${addr.streetAddress?.line1 || ''}`.trim();
+      }
+      if (raw.dunsControlStatus?.operatingStatus?.description) {
+        flatRecord.operatingStatus = raw.dunsControlStatus.operatingStatus.description;
+      }
+      openDrawer(flatRecord);
+    } else {
+      openDrawer(rowData);
+    }
+  }, [originalData, openDrawer]);
+
+  // 比对表格列定义
+  const diffColDefs = useMemo(() => [
+    {
+      headerName: '#',
+      valueGetter: 'node.rowIndex + 1',
+      width: 60,
+      minWidth: 40,
+      pinned: 'left' as const,
+      filter: false,
+      sortable: false,
+      suppressHeaderMenuButton: true,
+      suppressHeaderFilterButton: true,
+    },
+    {
+      headerName: 'DUNS号',
+      field: 'duns',
+      width: 160,
+      filter: true,
+      sortable: true,
+    },
+    {
+      headerName: '公司名称 (API)',
+      field: 'companyName',
+      width: 320,
+      filter: true,
+      sortable: true,
+      cellRenderer: (p: any) => {
+        return (
+          <a onClick={() => handleShowDiffDetail(p.data)} style={{ fontWeight: 500, textDecoration: 'underline' }}>
+            {p.value}
+          </a>
+        );
+      }
+    },
+    {
+      headerName: '国家',
+      field: 'country',
+      width: 140,
+      filter: true,
+      sortable: true,
+    },
+    {
+      headerName: '城市',
+      field: 'city',
+      width: 140,
+      filter: true,
+      sortable: true,
+    },
+    {
+      headerName: '对比状态',
+      field: 'status',
+      width: 200,
+      filter: true,
+      sortable: true,
+      cellRenderer: (p: any) => {
+        const status = p.value;
+        if (status === 'consistent') return <Tag color="green">数据一致 (家族树已存在)</Tag>;
+        if (status === 'only_api') return <Tag color="orange">仅在 API 存在 (家族树缺失)</Tag>;
+        return null;
+      }
+    }
+  ], [handleShowDiffDetail]);
+
+  // 获取并比对 API 与本地家族树数据差异
+  const fetchDiffData = useCallback(async (localData: any[]) => {
+    if (!gid || localData.length === 0) return;
+    
+    // 优先从 parentId === '' (根节点) 的记录中获取 duns，如果获取不到再 fallback 寻找任何非空的 duns
+    const dunsObj = localData.find((item) => item.parentId === '') || localData.find((item) => item.duns);
+    const duns = dunsObj?.duns;
+    if (!duns || !abbr) {
+      console.warn('缺少 duns 或 abbr，无法进行 API 境外分支差异比对', { duns, abbr });
+      return;
+    }
+
+    setDiffLoading(true);
+    const collectionName = `DNBFamilyTree-${abbr}-${duns}`;
+    try {
+      const res = await request(`/api/v1/wildcards/${collectionName}`, {
+        method: 'GET',
+        params: {
+          query: JSON.stringify({
+            "primaryAddress.addressCountry.name": { "$ne": "China", "$nin": [null, ""] }
+          }),
+          options: JSON.stringify({ limit: 10000 }),
+        },
+      });
+      const apiRecords = res?.results || res?.data?.results || [];
+
+      const localDunsSet = new Set<string>();
+      const localNamesSet = new Set<string>();
+      localData.forEach((item: any) => {
+        if (item.duns) localDunsSet.add(String(item.duns).trim());
+        if (item.companyNameCn) localNamesSet.add(String(item.companyNameCn).trim().toLowerCase());
+        if (item.companyNameEn) localNamesSet.add(String(item.companyNameEn).trim().toLowerCase());
+        if (item.registeredName) localNamesSet.add(String(item.registeredName).trim().toLowerCase());
+      });
+
+      const compareList: any[] = apiRecords.map((apiItem: any) => {
+        const apiDuns = String(apiItem.duns || '').trim();
+        const apiName = String(apiItem.primaryName || '').trim().toLowerCase();
+        
+        const exists = (apiDuns && localDunsSet.has(apiDuns)) || (apiName && localNamesSet.has(apiName));
+
+        return {
+          duns: apiItem.duns || '-',
+          companyName: apiItem.primaryName || '未知公司',
+          country: apiItem.primaryAddress?.addressCountry?.name || '-',
+          city: apiItem.primaryAddress?.addressLocality?.name || '-',
+          status: exists ? 'consistent' : 'only_api',
+          rawRecord: apiItem,
+        };
+      });
+
+      compareList.sort((a, b) => {
+        const aDiff = a.status === 'only_api' ? 1 : 0;
+        const bDiff = b.status === 'only_api' ? 1 : 0;
+        return bDiff - aDiff;
+      });
+
+      setDiffRowData(compareList);
+    } catch (err) {
+      console.error(`拉取对比集合 ${collectionName} 数据失败:`, err);
+      setDiffRowData([]);
+    } finally {
+      setDiffLoading(false);
+    }
+  }, [gid, abbr]);
 
   // 获取数据
   const fetchData = useCallback(async () => {
@@ -442,6 +619,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       });
 
       setOriginalData(mappedData);
+      fetchDiffData(mappedData);
     } catch (err) {
       console.error('获取要客海外家族树数据失败', err);
       message.error('获取家族树数据失败');
@@ -642,6 +820,12 @@ const KeyGlobalFamilyTree: React.FC = () => {
           flex: 1;
           min-height: 0;
         }
+        .row-diff-only-api {
+          background-color: #fff7e6 !important;
+        }
+        .row-diff-only-api:hover {
+          background-color: #ffd8bf !important;
+        }
       `}</style>
       {/* 顶部标题区域 */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -816,6 +1000,62 @@ const KeyGlobalFamilyTree: React.FC = () => {
                         statusPanels: [
                           { statusPanel: 'agTotalAndFilteredRowCountComponent', align: 'left' },
                           { statusPanel: 'agFilteredRowCountComponent' },
+                          { statusPanel: 'agSelectedRowCountComponent' },
+                        ],
+                      }}
+                    />
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: 'diff',
+              label: (
+                <span><ApartmentOutlined style={{ marginRight: 6 }} />比对</span>
+              ),
+              children: (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  {/* 全文搜索与操作栏（靠右排列） */}
+                  <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <Space>
+                      <Input
+                        placeholder="在比对表中全文搜索..."
+                        allowClear
+                        prefix={<SearchOutlined style={{ color: '#bbb' }} />}
+                        value={diffSearchText}
+                        onChange={(e) => setDiffSearchText(e.target.value)}
+                        style={{ width: 280 }}
+                      />
+                      <Button 
+                        icon={<ReloadOutlined />} 
+                        onClick={() => fetchDiffData(originalData)} 
+                        loading={diffLoading}
+                      >
+                        重新比对
+                      </Button>
+                    </Space>
+                  </div>
+
+                  {/* AG Grid React 比对表格 */}
+                  <div className="ag-theme-quartz" style={{ flex: 1, minHeight: 0 }}>
+                    <AgGridReact
+                      theme={themeQuartz}
+                      rowData={diffRowData}
+                      columnDefs={diffColDefs}
+                      defaultColDef={defaultColDef}
+                      quickFilterText={diffSearchText}
+                      enableRangeSelection={true}
+                      rowSelection="multiple"
+                      suppressRowClickSelection={true}
+                      animateRows={true}
+                      getRowClass={(params) => {
+                        if (params.data?.status === 'only_api') return 'row-diff-only-api';
+                        return undefined;
+                      }}
+                      loading={diffLoading}
+                      statusBar={{
+                        statusPanels: [
+                          { statusPanel: 'agFilteredRowCountComponent', align: 'left' },
                           { statusPanel: 'agSelectedRowCountComponent' },
                         ],
                       }}

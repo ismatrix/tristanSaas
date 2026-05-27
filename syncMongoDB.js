@@ -47,84 +47,9 @@ const CONFIG = {
 };
 
 // ============================================================
-// 需要同步的集合列表
-// 修改此数组以控制同步范围
+// 自动动态获取需要同步的集合列表
 // ============================================================
-const COLLECTIONS_TO_SYNC = [
-  // DNB 公司详情缓存（新功能依赖）
-  'dnbCompanyDetail',
-
-  // DNBWebFamilyTree 系列（共 69 个）
-  'DNBWebFamilyTree-ABC-653713891',
-  'DNBWebFamilyTree-Alibaba-864402453',
-  'DNBWebFamilyTree-AntGroup-526043754',
-  'DNBWebFamilyTree-Baidu-528181015',
-  'DNBWebFamilyTree-BOC-653708438',
-  'DNBWebFamilyTree-BOCOM-654510585',
-  'DNBWebFamilyTree-BYD-654510015',
-  'DNBWebFamilyTree-CBN-721858346',
-  'DNBWebFamilyTree-CCAG-516741880',
-  'DNBWebFamilyTree-CCB-654504299',
-  'DNBWebFamilyTree-CCT-420920381',
-  'DNBWebFamilyTree-CDT-544902661',
-  'DNBWebFamilyTree-CEAH-544648801',
-  'DNBWebFamilyTree-CEEC-421297147',
-  'DNBWebFamilyTree-CETC-529058632',
-  'DNBWebFamilyTree-CFGC-544697675',
-  'DNBWebFamilyTree-CHD-544956311',
-  'DNBWebFamilyTree-Chinalco-544840788',
-  'DNBWebFamilyTree-ChinaLife-544920770',
-  'DNBWebFamilyTree-ChinaPost-527724684',
-  'DNBWebFamilyTree-ChinaRailway-421309942',
-  'DNBWebFamilyTree-CHINT-420050304',
-  'DNBWebFamilyTree-CHNEnergy-544629942',
-  'DNBWebFamilyTree-CHNG-544871965',
-  'DNBWebFamilyTree-CITIC-653708479',
-  'DNBWebFamilyTree-CMB-653715839',
-  'DNBWebFamilyTree-CMRG-845486632',
-  'DNBWebFamilyTree-CNADG-654291343',
-  'DNBWebFamilyTree-CNCEC-528191342',
-  'DNBWebFamilyTree-CNPC-653713339',
-  'DNBWebFamilyTree-COSCO-544392544',
-  'DNBWebFamilyTree-CRC-653869396',
-  'DNBWebFamilyTree-CRCC-654519800',
-  'DNBWebFamilyTree-CSAH-529665481',
-  'DNBWebFamilyTree-CSCEC-653714618',
-  'DNBWebFamilyTree-CSCN-616548971',
-  'DNBWebFamilyTree-CSG-544903503',
-  'DNBWebFamilyTree-CTG-547744282',
-  'DNBWebFamilyTree-DiDi-815557247',
-  'DNBWebFamilyTree-Douyin-544582626',
-  'DNBWebFamilyTree-Geely-545268208',
-  'DNBWebFamilyTree-HWorld-864410444',
-  'DNBWebFamilyTree-ICBC-653710657',
-  'DNBWebFamilyTree-iFLYTEK-544747629',
-  'DNBWebFamilyTree-JD-815553395',
-  'DNBWebFamilyTree-JinJiang-544900814',
-  'DNBWebFamilyTree-Kingsoft-421363413',
-  'DNBWebFamilyTree-Kuaishou-420644923',
-  'DNBWebFamilyTree-Mango-547876680',
-  'DNBWebFamilyTree-Meituan-544523516',
-  'DNBWebFamilyTree-Minmetals-654530880',
-  'DNBWebFamilyTree-NetEase-544656606',
-  'DNBWebFamilyTree-PDD-544332001',
-  'DNBWebFamilyTree-PeoplesDaily-529229549',
-  'DNBWebFamilyTree-PICC-654510387',
-  'DNBWebFamilyTree-PingAn-654077502',
-  'DNBWebFamilyTree-SF-545398935',
-  'DNBWebFamilyTree-SGCC-544928435',
-  'DNBWebFamilyTree-Sinochem-699489765',
-  'DNBWebFamilyTree-Sinopec-654661636',
-  'DNBWebFamilyTree-SPIC-545234341',
-  'DNBWebFamilyTree-Tencent-544835283',
-  'DNBWebFamilyTree-UnionPay-544940385',
-  'DNBWebFamilyTree-Wangsu-548050511',
-  'DNBWebFamilyTree-Xiaomi-421271154',
-  'DNBWebFamilyTree-Xinhua-653726794',
-  'DNBWebFamilyTree-YTO-544851660',
-  'DNBWebFamilyTree-YUNDA-527054568',
-  'DNBWebFamilyTree-ZTO-527891418',
-];
+let COLLECTIONS_TO_SYNC = [];
 
 // ============================================================
 // 工具函数
@@ -153,8 +78,36 @@ async function main() {
   const startTime = Date.now();
   log('========================================');
   log('  MongoDB 数据同步脚本 开始执行');
-  log(`  同步集合数量: ${COLLECTIONS_TO_SYNC.length}`);
   log('========================================\n');
+
+  // 连接本地数据库以动态扫描集合
+  log('【步骤 0/4】 动态扫描开发端集合...');
+  const mongoose = require('mongoose');
+  try {
+    await mongoose.connect(`${CONFIG.LOCAL_MONGODB}/${CONFIG.LOCAL_DB}`, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    const db = mongoose.connection.db;
+    const cols = await db.listCollections().toArray();
+    const allNames = cols.map(c => c.name);
+    
+    // 动态筛选出需要同步的数据集
+    COLLECTIONS_TO_SYNC = allNames.filter(name => {
+      return name === 'keyGlobalFamilyTree' ||
+             name === 'dnbCompanyDetail' ||
+             name.startsWith('DNBFamilyTree-') ||
+             name.startsWith('DNBWebFamilyTree-');
+    }).sort();
+    
+    log(`  ✅ 动态扫描完成，共找到 ${COLLECTIONS_TO_SYNC.length} 个目标同步集合`);
+    log(`  📦 待同步集合列表: ${COLLECTIONS_TO_SYNC.join(', ')}\n`);
+  } catch (err) {
+    log(`  ❌ 动态扫描本地集合失败: ${err.message}`);
+    throw err;
+  } finally {
+    await mongoose.disconnect();
+  }
 
   // 步骤 1：在本地逐个 dump 集合到临时目录
   log('【步骤 1/4】 在本地导出指定集合...');

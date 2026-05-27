@@ -58,23 +58,7 @@ export default [
       },
     ],
   },
-  {
-    path: '/dnb',
-    name: 'DNB',
-    icon: 'ClusterOutlined',
-    routes: [
-      {
-        path: '/dnb',
-        redirect: '/dnb/tree/dnb_cnpc',
-      },
-      {
-        path: '/dnb/tree/:collection',
-        name: 'Dynamic Tree',
-        hideInMenu: true,
-        component: './Dnb/Tree',
-      },
-    ],
-  },
+
   {
     name: '要客清单',
     icon: 'ProfileOutlined',

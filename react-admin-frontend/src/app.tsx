@@ -59,12 +59,29 @@ export async function getInitialState(): Promise<{
   // 获取并构建行业要客菜单数据
   const fetchKeyCustomersMenu = async (): Promise<React.ReactNode | null> => {
     try {
-      const [customersRes, industriesRes] = await Promise.all([
+      const [customersRes, industriesRes, familyTreesRes] = await Promise.all([
         requestFn('/api/v1/wildcards/keycustomer', { method: 'GET', skipErrorHandler: true }),
         requestFn('/api/v1/wildcards/industry', { method: 'GET', skipErrorHandler: true }),
+        requestFn('/api/v1/wildcards/keyGlobalFamilyTree', {
+          method: 'GET',
+          params: {
+            projection: JSON.stringify({ ultimateGID: 1, _id: 0 }),
+            options: JSON.stringify({ limit: 20000 }),
+          },
+          skipErrorHandler: true,
+        }),
       ]);
       const customers = customersRes?.results || customersRes?.data?.results || [];
       const industries = industriesRes?.results || industriesRes?.data?.results || [];
+      const familyTrees = familyTreesRes?.results || familyTreesRes?.data?.results || [];
+
+      // 统计所有已存在的海外家族树的根节点 GID 集合
+      const activeGids = new Set<string>();
+      familyTrees.forEach((ft: any) => {
+        if (ft.ultimateGID) {
+          activeGids.add(String(ft.ultimateGID).trim());
+        }
+      });
 
       // Create a map for industryCode -> industry_name
       const industryMap: Record<string, string> = {};
@@ -109,20 +126,38 @@ export async function getInitialState(): Promise<{
                   {groupName} <span style={{ color: '#888', fontWeight: 'normal', fontSize: '12px' }}>({count})</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {grouped[code].map((c: any) => (
-                    <div key={c._id}>
-                      <Link 
-                        to={`/keycustomer/${c._id}`} 
-                        className="mega-menu-link"
-                        style={{ color: '#666', fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                        title={c.nameCn || c.nameEn || '未知公司'}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6a00')}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = '#666')}
-                      >
-                        {c.nameCn || c.nameEn || '未知公司'}
-                      </Link>
-                    </div>
-                  ))}
+                  {grouped[code].map((c: any) => {
+                    const hasTree = c.GID && activeGids.has(String(c.GID).trim());
+                    const nameCn = encodeURIComponent(c.nameCn || '');
+                    const abbr = encodeURIComponent(c.abbr || '');
+                    const displayColor = hasTree ? '#1677ff' : '#999';
+                    const hoverColor = hasTree ? '#ff6a00' : '#999';
+
+                    return (
+                      <div key={c._id}>
+                        {hasTree ? (
+                          <Link 
+                            to={`/keyGlobalFamilyTree/${c.GID}?nameCn=${nameCn}&abbr=${abbr}`} 
+                            className="mega-menu-link"
+                            style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'underline' }}
+                            title={c.nameCn || c.nameEn || '未知公司'}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = hoverColor)}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = displayColor)}
+                          >
+                            {c.nameCn || c.nameEn || '未知公司'}
+                          </Link>
+                        ) : (
+                          <span 
+                            className="mega-menu-link-disabled"
+                            style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'not-allowed' }}
+                            title={`${c.nameCn || c.nameEn || '未知公司'} (暂无境外家族树)`}
+                          >
+                            {c.nameCn || c.nameEn || '未知公司'}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

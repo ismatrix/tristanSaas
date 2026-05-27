@@ -2687,3 +2687,58 @@ web页面优化：
    - 修正了 `key-global-family-tree.tsx` 页面中的 CSS，将样式类由普通的 `.ant-tabs-tabpane` 更改为激活态独享的 `.ant-tabs-tabpane-active`。此时只有当前被激活选中的 Tab 面板才应用 `display: flex !important` 并充满高度，非激活状态的面板得以依循 antd 原生机制完美隐藏，消除了层叠重合的 Bug。
 3. **本地编译校验**：
    - 在本地环境顺利执行 `npm run tsc` 以及 `npm run build`，编译打包 100% 成功，等待同步指令。
+
+## 2026-05-27 15:46:29
+
+### 用户提示词
+1、「行业要客」菜单中的子菜单项，链接到对应的keyGlobalFamilyTree页面。
+2、菜单项的要客如果有树，有记录， 字体颜色为蓝色。 如果没有，置灰色，不可点击
+
+### 执行总结
+1. **「行业要客」菜单项大改造与跳转过滤**：
+   - 优化了 `src/app.tsx` 中的 `fetchKeyCustomersMenu` 方法。在一次性并行拉取数据时，增加了对 `keyGlobalFamilyTree` 集合中所有 `ultimateGID` 的投影投影查询。
+   - 构建了所有已拥有境外家族树的根节点 `activeGids` 集合，避免了为 70 多家要客公司并行发送多余网络请求的性能和宽带开销。
+   - 重构了菜单渲染项：
+     - 如果公司 GID 存在于 `activeGids` 集合中（有树、有记录），则将其渲染为带下划线的蓝色 Link 链接，地址指向 `/keyGlobalFamilyTree/{GID}?nameCn={nameCn}&abbr={abbr}`，鼠标悬浮时呈橙色；
+     - 如果公司 GID 不在集合中（没有树、没有记录），则将其字体置灰（灰色 `#999`），鼠标形状设置为 `not-allowed`，并不再渲染超链接组件，实现不可点击的功能。
+2. **本地校验**：
+   - 本地 `npm run tsc` 以及 `npm run build` 全部打包构建 100% 成功。根据“不主动同步”原则，代码目前保存在本地开发环境，等待进一步的同步指令。
+
+## 2026-05-27 17:08:36
+
+### 用户提示词
+1、删除一级菜单「DNB树例」
+2、清空keyGlobalFamilyTree表，导入新的数据/Users/tristan/Downloads/互联网合并表-260527完整字段版.xlsx
+
+### 执行总结
+1. **删除「DNB树例」一级菜单**：
+   - 修改了前端配置文件 `react-admin-frontend/config/routes.ts`，彻底删除了 path 为 `/dnb` 对应的「DNB树例」菜单路由。
+2. **数据清空与完整字段版 Excel 数据导入**：
+   - 优化了清洗脚本 `/Users/tristan/.gemini/antigravity/scratch/import_xlsx.py`。
+   - 发现完整字段版的 Excel 存在多个工作表（Sheet），包含说明页 `GU目录`（19行）和真实全量数据表 `出海企业客户树清单`（1174行）。
+   - 在 `pd.read_excel` 中强力指定了 `sheet_name='出海企业客户树清单'`，重新加载并对 GID 等核心超长字段进行文本强转，避免精度被截断四舍五入丢失。
+   - 成功将 1174 条完整记录清洗转换为 JSON，并在本地通过 `mongoimport --drop` 重新清空并导入到本地 MongoDB 数据库下的 `keyGlobalFamilyTree` 集合中。
+3. **本地编译校验**：
+   - 本地 `npm run tsc` 以及 `npm run build` 全部打包构建 100% 成功。根据“不主动同步”原则，程序代码与数据库数据目前仅保存在本地开发环境，等待进一步的同步指令。
+
+## 2026-05-27 17:24:16
+
+### 用户提示词
+```text
+执行的过程中，如果需要运行命令，除非涉及remove、delete、drop等删除的命令之外，其他一律不需要我确认，直接运行。保证自动化流程不间断执行。
+1、参考diffDNBFamilyTree页面的逻辑： 在「要客海外家族树」页面增加一个tab「diff」，比对该GU对应API数据表DNBFamilyTree-{abbr}-{GU} 中海外节点（排除国家China和空白）和 当前GID的家族树表keyGlobalFamilyTree数据的差异，通过duns，公司名称比对，突出显示在API表中存在，但是在家族树表不存在的记录。
+显示字段增加国家，城市。
+```
+
+### 执行总结
+1. **「要客海外家族树」比对Tab逻辑设计与开发**：
+   - 新增了「比对」(diff) 选项卡作为页面的第三个 Tab。
+   - 实现前端比对引擎 `fetchDiffData`：首先根据从上级继承并清洗的 URL 参数 `abbr` 搭配通过家族树根节点（`parentId === ''`）定位到的终极母公司（GU）`duns` 唯一标识拼接出相应的 API 数据表 `DNBFamilyTree-{abbr}-{GU}`；随后发送请求拉取海外节点数据（仅限非 China 且不为空的记录）。
+   - 双端 Join 对齐算法：建立当前 GID 本地家族树缓存的 duns 与公司名称（支持中文、英文、注册名以小写去空多模式对比）的 Hash Set，对 API 数据进行比对校验。
+   - 结果突出高亮：如果 API 存在但在本地家族树不存在，标注状态为 `only_api`（仅在 API 存在），并通过 Row Class `row-diff-only-api` 全局赋予警告橙浅底色（`#fff7e6`）高亮显式。
+   - 列定义扩展：比对结果表展示了 DUNS号、公司名称 (API)（带抽屉链接）、国家、城市、比对状态 5 大主要字段。
+   - 点击抽屉平铺解析：点击比对表格公司名称，若已存在本地则打开本地详细工商抽屉，若仅在 API 存在，则安全格式化并提取展示其 API 元数据详情。
+2. **多端编译校验与严格类型核对**：
+   - 进一步优化了 duns 属性的提取算法以优先使用根节点，增强了鲁棒性。
+   - 本地 `npm run tsc` 与 Webpack `npm run build` 静态包构建 100% 编译成功。
+
