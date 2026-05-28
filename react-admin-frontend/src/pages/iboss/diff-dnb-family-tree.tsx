@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useLocation, request, history } from '@umijs/max';
-import { Spin, message, Button, Space, Tag, Input, Card, Descriptions, Collapse, Drawer, Tabs } from 'antd';
+import { Spin, message, Button, Space, Tag, Input, Card, Descriptions, Collapse, Drawer, Tabs, Tooltip } from 'antd';
 import { ReloadOutlined, ArrowLeftOutlined, SearchOutlined, DownloadOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -728,25 +728,25 @@ const DiffDnbFamilyTreePage: React.FC = () => {
               gridRef.current?.api?.setGridOption('quickFilterText', '');
             }}
           />
-          <Button
-            type="primary"
-            icon={<ApartmentOutlined />}
-            onClick={handleSyncDetails}
-            loading={syncing}
-            disabled={selectedCount === 0 || loading}
-          >
-            同步DNB详情 {selectedCount > 0 ? `(${selectedCount})` : ''}
-          </Button>
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={handleExport}
-            disabled={rowData.length === 0}
-          >
-            导出JSON
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
-            刷新
-          </Button>
+          <Tooltip title={`同步DNB详情${selectedCount > 0 ? ` (${selectedCount})` : ''}`}>
+            <Button
+              type="primary"
+              icon={<ApartmentOutlined />}
+              onClick={handleSyncDetails}
+              loading={syncing}
+              disabled={selectedCount === 0 || loading}
+            />
+          </Tooltip>
+          <Tooltip title="导出JSON">
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              disabled={rowData.length === 0}
+            />
+          </Tooltip>
+          <Tooltip title="刷新">
+            <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading} />
+          </Tooltip>
         </Space>
       </div>
 

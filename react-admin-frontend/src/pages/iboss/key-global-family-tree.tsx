@@ -830,9 +830,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
       {/* 顶部标题区域 */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space align="center">
-          <Button icon={<SwapOutlined style={{ transform: 'rotate(180deg)' }} />} onClick={() => history.back()}>
-            返回要客清单
-          </Button>
+          <Tooltip title="返回要客清单">
+            <Button icon={<SwapOutlined style={{ transform: 'rotate(180deg)' }} />} onClick={() => history.back()} />
+          </Tooltip>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>
             {pageTitle}
           </h2>

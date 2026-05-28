@@ -2,8 +2,8 @@ import { LinkOutlined } from '@ant-design/icons';
 import type { Settings as LayoutSettings } from '@ant-design/pro-components';
 import { SettingDrawer } from '@ant-design/pro-components';
 import type { RequestConfig, RunTimeLayoutConfig } from '@umijs/max';
-import { history, Link, request as requestFn } from '@umijs/max';
-import React from 'react';
+import { history, Link, request as requestFn, useLocation } from '@umijs/max';
+import React, { useState, useEffect } from 'react';
 import { Popover } from 'antd';
 import {
   AvatarDropdown,
@@ -18,6 +18,34 @@ import { errorConfig } from './requestErrorConfig';
 const isDev = process.env.NODE_ENV === 'development';
 const isDevOrTest = isDev || process.env.CI;
 const loginPath = '/user/login';
+
+const MegaMenuPopover: React.FC<{
+  content: React.ReactNode;
+  children: React.ReactElement;
+}> = ({ content, children }) => {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+
+  // 当路径或查询参数改变时自动关闭 Popover
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname, location.search]);
+
+  return (
+    <Popover
+      content={content}
+      placement="bottom"
+      trigger="hover"
+      arrow={false}
+      open={open}
+      onOpenChange={setOpen}
+      overlayClassName="keycustomer-mega-menu-overlay"
+      overlayInnerStyle={{ padding: 0, borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.1)', backgroundColor: '#fff' }}
+    >
+      {children}
+    </Popover>
+  );
+};
 
 /**
  * @see https://umijs.org/docs/api/runtime-config#getinitialstate
@@ -276,18 +304,11 @@ export const layout: RunTimeLayoutConfig = ({
     menuItemRender: (itemProps, defaultDom) => {
       if (itemProps.path === '/keycustomer' && initialState?.keyCustomersMenu) {
         return (
-          <Popover
-            content={initialState.keyCustomersMenu}
-            placement="bottom"
-            trigger="hover"
-            arrow={false}
-            overlayClassName="keycustomer-mega-menu-overlay"
-            overlayInnerStyle={{ padding: 0, borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.1)', backgroundColor: '#fff' }}
-          >
+          <MegaMenuPopover content={initialState.keyCustomersMenu}>
             <div style={{ width: '100%', height: '100%' }}>
               {defaultDom}
             </div>
-          </Popover>
+          </MegaMenuPopover>
         );
       }
       // Re-enable routing for all other native menus!
