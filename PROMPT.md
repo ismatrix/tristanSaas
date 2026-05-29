@@ -2773,4 +2773,77 @@ web页面优化：
 1、 能否使用逐行异步查询，有返回就显示，不要等全部都统计完之后再统一显示
 
 ### 执行总结
-*(已制定实施计划，等待执行)*
+1. **本地代码推送 GitHub**：暂存并提交了本地最新的开发修改（包含 MegaMenu 点击自动关闭、返回/操作按钮图标化及 Tooltip 提示优化），生成了 commit `139b73a`，并推送至 GitHub 远程仓库的主分支。
+2. **生产服务器自动部署**：通过免密 SSH 远程连接生产服务器，并在项目目录 `/home/tristan/workspaces/TristanSaas` 下运行了自动部署脚本 `deploy.sh`。全自动拉取了最新的 GitHub 提交，顺利完成了前端项目的 Webpack 打包（耗时 24.36 秒）与后端 PM2 服务 `backend-api`（运行 PID: 2269476）的平滑热重启，所有最新交互优化已正式在生产环境上线运行。
+3. **制定要客计数列加载优化方案**：针对要客清单计数列加载缓慢问题，已制定完备的“后端单行聚合接口 + 前端逐行异步渲染”实施计划并编写了 [implementation_plan.md](file:///Users/tristan/.gemini/antigravity/brain/640e9f4f-8210-4b95-82d0-c0281ba626fb/implementation_plan.md)，等待用户授权批准以开启代码重构。
+
+## 2026-05-29 09:59:33
+
+### 用户提示词
+将文件 「/Users/tristan/Downloads/72颗客户树合并表初版-260529.xlsx」导入mongo数据的keyGlobalFamilyTree表中，清空原表数据。
+
+### 执行总结
+1. **数据清洗与高保真转换**：
+   - 更新了本地数据导入脚本 `/Users/tristan/.gemini/antigravity/scratch/import_xlsx.py`，加载新文件 `/Users/tristan/Downloads/72颗客户树合并表初版-260529.xlsx` 的 `出海企业客户树清单` 工作页。
+   - 对 `ultimateGID`、`GID`、`parentGID` 和 `duns` 等长数字 ID 指定为 `str` 读取，在处理中安全剥离浮点后缀（如 `.0`）以及 NaN 状态处理，彻底避免了长整数的精度截断与四舍五入。
+   - 增加了对 `datetime` 和 `pd.Timestamp` 类型日期字段的检测，将其自动格式化为 `YYYY-MM-DD` 字符串以解决 JSON 序列化报错。共清洗并转换生成了 **7,947 条** 高保真的 JSON 记录。
+2. **本地数据库清空与导入**：
+   - 在本地终端执行 `mongoimport --drop` 动作，清空了本地 `node-boilerplate` 数据库下的 `keyGlobalFamilyTree` 集合，并顺利导入了这 7,947 条全新数据，失败 0 条。
+3. **数据库查询索引重建**：
+   - 由于 `--drop` 会清除原有索引，故通过在本地运行的 MongoDB Docker 容器内调用 `mongosh` 快速完成了索引重建，为该表重建了 `{ ultimateGID: 1 }`、`{ GID: 1 }` 和 `{ parentGID: 1 }` 三大高频查询索引，以保障后续家族树展现时的数据检索性能。
+
+## 2026-05-29 10:02:26
+
+### 用户提示词
+keyGlobalFamilyTree 表同步到服务器生产环境
+
+### 执行总结
+1. **单表同步配置调整**：临时修改了本地的 `syncMongoDB.js` 脚本，将同步集合范围限制为仅包含 `keyGlobalFamilyTree` 集合。
+2. **数据同步执行**：运行 `node syncMongoDB.js` 脚本。成功将本地 keyGlobalFamilyTree 集合通过 mongodump、SCP 传输及远程 Docker 内部的 mongorestore 方式同步至远程生产服务器 MongoDB 容器中。
+3. **确认恢复结果**：远程恢复成功导入 7947 条最新纪录（0 失败），并依据 metadata 自动在服务端重建了 `{ ultimateGID: 1 }`、`{ GID: 1 }`、`{ parentGID: 1 }` 三大高频查询索引。
+4. **同步脚本复原**：同步执行完毕后，通过 `git checkout syncMongoDB.js` 恢复了同步脚本的原有配置。
+
+## 2026-05-29 10:16:34
+
+### 用户提示词
+1、把keycustomer从开发同步到生产
+2、另外对比一下开发数据库中存在，但生产数据中不存在的表，同步到生产数据库
+
+### 执行总结
+1. **差集比对与动态计算**：编写并运行了临时数据迁移对比脚本 `syncMissingCollections.js`。系统自动连接本地 MongoDB 实例并使用 SSH 远程分析生产端 Docker MongoDB 容器，诊断出本地存在而生产端缺失的 6 个集合：
+   - `DNBFamilyTree-CCCC-849169586`
+   - `DNBFamilyTree-CSSC-631201202`
+   - `excelParticipantContacts`
+   - `excelParticipantCust`
+   - `excelParticipants`
+   - `system.profile`
+2. **数据迁移与恢复**：将上述 6 个缺失集合与指定的 `keycustomer` 集合组合为 7 个同步目标。脚本一键执行了本地 `mongodump` 导出、SCP 传输以及远程 Docker 容器 `mongorestore --drop`。共计往返迁移传输了 **64,563 条** 记录，失败 0 条，耗时 105 秒。
+3. **远程索引完美重建**：利用 `mongorestore` 元数据还原机制，完美对齐了所有表在服务端的自定义索引（例如 `keycustomer` 上的 `PID_1`, `GID_1`, `globalUltimateDuns_1`，参与方表上的 `客户ID_1`, `企业编号_1` 等），确保了两端数据库的高频查询检索性能一致。
+4. **工作区清理**：同步确认完成后，在本地删除了临时建立的 `syncMissingCollections.js` 文件，保证了本地 Git 工作区的干净整洁。
+
+## 2026-05-29 11:05:52
+
+### 用户提示词
+「海外家族树」页面的「结构树」中节点之间的连线的颜色太轻了，请改成醒目的蓝色
+
+### 执行总结
+1. **连接线样式定制配置**：修改了前端页面 `react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx`，在 D3 组织架构树组件 `OrgChart` 实例的渲染链条中注入了自定义连接线配置函数 `.linkUpdate()`。
+2. **线条属性优化**：通过 D3 选择器动态抓取 SVG 线条路径元素，将默认淡灰色连接线重写为醒目的蓝色 `#1677ff`，并且设置高亮连线（搜索命中或祖先链）粗细为 4 像素，常规连接线粗细为 2 像素，大幅强化了海外家族树结构图在视觉上的辨识度和层次结构感。
+3. **前端编译与类型校验**：在本地 `react-admin-frontend` 下成功运行 `npm run tsc` 和 `npm run build`，Webpack 静态资源包成功打包，没有任何报错。目前修改已在本地开发环境就绪，随时可以同步至服务端部署。
+
+## 2026-05-29 11:15:25
+
+### 用户提示词
+线条再细一点点
+
+### 执行总结
+1. **连接线粗细参数微调**：修改了前端页面 `react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx`，将 `linkUpdate` 回调中连接线的常规粗细参数从 2px 微调降低为 1.5px，高亮激活线条粗细由 4px 降低为 3px。这令图表在保持鲜艳蓝色指引的同时，外观线条显得更加秀气协调、更具现代设计美感。
+2. **本地编译校验**：在前端项目下重新运行 `npm run tsc` 类型检查通过，无任何编译报错。
+
+## 2026-05-29 11:16:00
+
+### 用户提示词
+代码同步到服务器段
+
+### 执行总结
+*(暂未执行完毕，待完成后更新)*

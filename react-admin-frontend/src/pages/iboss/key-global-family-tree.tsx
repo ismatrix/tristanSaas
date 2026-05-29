@@ -656,6 +656,11 @@ const KeyGlobalFamilyTree: React.FC = () => {
           const fullRecord = originalData.find((item) => item.id === nodeData.id);
           if (fullRecord) openDrawer(fullRecord);
         })
+        .linkUpdate(function (this: any, d: any) {
+          d3.select(this)
+            .attr('stroke', '#1677ff') // 醒目的蓝色
+            .attr('stroke-width', d.data._highlighted || d.data._upToTheRootHighlighted ? 3 : 1.5);
+        })
         .render()
         .fit();
     },
