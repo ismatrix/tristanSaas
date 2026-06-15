@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useLocation, request, history } from '@umijs/max';
-import { Spin, message, Button, Input, Space, Tag, Tabs, Drawer, Descriptions, Tooltip } from 'antd';
+import { Spin, message, Button, Input, Space, Tag, Tabs, Drawer, Descriptions, Tooltip, Modal, Table } from 'antd';
 import {
   ExpandAltOutlined,
   ShrinkOutlined,
@@ -151,6 +151,7 @@ const buildRegionData = (originalData: any[]): any[] => {
     id: rootId, parentId: '', name: rootNode.name,
     position: rootNode.position, city: rootNode.city,
     iconHtml: rootNode.iconHtml, _nodeType: 'root',
+    cmiContacts: rootNode.cmiContacts,
   });
 
   const regionCountryMap: Record<string, Record<string, any[]>> = {};
@@ -199,6 +200,7 @@ const buildRegionData = (originalData: any[]): any[] => {
             id: company.id, parentId: cityId, name: company.name,
             position: company.registeredAddress || company.position || '',
             city: '', iconHtml: '', _nodeType: 'company',
+            cmiContacts: company.cmiContacts,
           });
         });
       });
@@ -218,7 +220,7 @@ const renderNodeContent = (d: any) => {
   if (nodeType === 'root') {
     return `
       <div style='width:${d.width}px;height:${d.height}px;padding-top:${imageDiffVert - 2}px;padding-left:1px;padding-right:1px'>
-        <div style="font-family:'Inter',sans-serif;background-color:#fff1f0;margin-left:-1px;width:${d.width - 2}px;height:${d.height - imageDiffVert}px;border-radius:10px;border:${borderStyle};cursor:pointer;">
+        <div style="font-family:'Inter',sans-serif;background-color:#fff1f0;margin-left:-1px;width:${d.width - 2}px;height:${d.height - imageDiffVert}px;border-radius:10px;border:${borderStyle};cursor:pointer;position:relative;">
           <div style="display:flex;justify-content:flex-end;margin-top:5px;margin-right:8px;font-size:11px;color:#888;">#${d.data.id}</div>
           <div style="background-color:#fff1f0;margin-top:${-imageDiffVert - 10}px;margin-left:15px;border-radius:100px;width:50px;height:50px;"></div>
           <div style="margin-top:${-imageDiffVert - 20}px;">   ${d.data.iconHtml}</div>
@@ -227,6 +229,7 @@ const renderNodeContent = (d: any) => {
           </div>
           ${d.data.position ? `<div style="color:#716E7B;margin-left:20px;margin-top:3px;font-size:12px;">${d.data.position}</div>` : ''}
           ${d.data.city ? `<div style="color:#999;margin-left:20px;margin-top:2px;font-size:11px;">${d.data.city}</div>` : ''}
+          ${d.data.cmiContacts && d.data.cmiContacts.length > 0 ? `<div onclick="window.handleShowCmiContact(event, '${d.data.id}')" style="position:absolute; bottom:6px; right:8px; background-color:#e6f4ff; color:#1677ff; border:1px solid #91caff; font-size:11px; padding:2px 6px; border-radius:4px; cursor:pointer; z-index:10;">cmi contact</div>` : ''}
         </div>
       </div>`;
   }
@@ -267,7 +270,7 @@ const renderNodeContent = (d: any) => {
 
   return `
     <div style='width:${d.width}px;height:${d.height}px;padding-top:${imageDiffVert - 2}px;padding-left:1px;padding-right:1px'>
-      <div style="font-family:'Inter',sans-serif;background-color:${color};margin-left:-1px;width:${d.width - 2}px;height:${d.height - imageDiffVert}px;border-radius:10px;border:${borderStyle};cursor:pointer;">
+      <div style="font-family:'Inter',sans-serif;background-color:${color};margin-left:-1px;width:${d.width - 2}px;height:${d.height - imageDiffVert}px;border-radius:10px;border:${borderStyle};cursor:pointer;position:relative;">
         <div style="display:flex;justify-content:flex-end;margin-top:5px;margin-right:8px;font-size:11px;color:#888;">#${d.data.id}</div>
         ${showIcon ? `
           <div style="background-color:${color};margin-top:${-imageDiffVert - 10}px;margin-left:15px;border-radius:100px;width:50px;height:50px;"></div>
@@ -278,6 +281,7 @@ const renderNodeContent = (d: any) => {
         </div>
         ${d.data.position ? `<div style="color:#716E7B;margin-left:20px;margin-top:3px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:${d.width - 40}px;" title="${d.data.position}">${d.data.position}</div>` : ''}
         ${d.data.city ? `<div style="color:#999;margin-left:20px;margin-top:2px;font-size:11px;">${d.data.city}</div>` : ''}
+        ${d.data.cmiContacts && d.data.cmiContacts.length > 0 ? `<div onclick="window.handleShowCmiContact(event, '${d.data.id}')" style="position:absolute; bottom:6px; right:8px; background-color:#e6f4ff; color:#1677ff; border:1px solid #91caff; font-size:11px; padding:2px 6px; border-radius:4px; cursor:pointer; z-index:10;">cmi contact</div>` : ''}
       </div>
     </div>`;
 };
@@ -366,6 +370,35 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
+
+  const [cmiContactModalOpen, setCmiContactModalOpen] = useState(false);
+  const [currentCmiContacts, setCurrentCmiContacts] = useState<any[]>([]);
+
+  useEffect(() => {
+    (window as any).handleShowCmiContact = (e: any, gid: string) => {
+      e.stopPropagation();
+      const node = originalData.find(d => d.id === gid);
+      if (node && node.cmiContacts && node.cmiContacts.length > 0) {
+        setCurrentCmiContacts(node.cmiContacts);
+        setCmiContactModalOpen(true);
+      }
+    };
+    return () => {
+      delete (window as any).handleShowCmiContact;
+    };
+  }, [originalData]);
+
+  const cmiContactColumns = [
+    { title: '角色', dataIndex: 'role', key: 'role' },
+    { title: '姓名', dataIndex: 'name', key: 'name' },
+    { title: '部门', dataIndex: 'department', key: 'department' },
+    { title: '职位', dataIndex: 'position', key: 'position' },
+    { title: '员工号', dataIndex: 'staffNo', key: 'staffNo' },
+    { title: '电话', dataIndex: 'phoneNumber', key: 'phoneNumber' },
+    { title: '邮箱', dataIndex: 'email', key: 'email' },
+    { title: '城市', dataIndex: 'City', key: 'City' },
+    { title: '直属上级', dataIndex: '直属上级', key: '直属上级' },
+  ].map(col => ({ ...col, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), title: <span style={{ whiteSpace: 'nowrap' }}>{col.title}</span> }));
 
   // 打开抽屉
   const openDrawer = useCallback((record: any) => {
@@ -574,6 +607,52 @@ const KeyGlobalFamilyTree: React.FC = () => {
       });
       const uniqueRecords = Array.from(uniqueMap.values());
       const allIds = new Set(uniqueRecords.map((r: any) => r.GID));
+
+      // Fetch CMI Contacts
+      try {
+        const keyCmiRes = await request('/api/v1/wildcards/keyCMIContacts', {
+          method: 'GET',
+          params: {
+            query: JSON.stringify({ GID: { $in: Array.from(allIds) } }),
+            options: JSON.stringify({ limit: 10000 }),
+          },
+        });
+        const keyCmiRecords = keyCmiRes.results || keyCmiRes.data?.results || [];
+        
+        const cmiContactIds = keyCmiRecords.map((r: any) => r.cmiContactId).filter(Boolean);
+        
+        let cmiContactsRecords: any[] = [];
+        if (cmiContactIds.length > 0) {
+          const cmiContactsRes = await request('/api/v1/wildcards/cmiContacts', {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({}),
+              options: JSON.stringify({ limit: 10000 }),
+            },
+          });
+          cmiContactsRecords = cmiContactsRes.results || cmiContactsRes.data?.results || [];
+        }
+
+        const contactDetailsMap = new Map();
+        cmiContactsRecords.forEach((c: any) => contactDetailsMap.set(String(c._id), c));
+
+        const gidToContactsMap = new Map();
+        keyCmiRecords.forEach((k: any) => {
+          const kGid = String(k.GID).trim();
+          const cid = String(k.cmiContactId);
+          if (contactDetailsMap.has(cid)) {
+            if (!gidToContactsMap.has(kGid)) gidToContactsMap.set(kGid, []);
+            gidToContactsMap.get(kGid).push(contactDetailsMap.get(cid));
+          }
+        });
+
+        uniqueRecords.forEach((r: any) => {
+          const rGid = String(r.GID).trim();
+          r.cmiContacts = gidToContactsMap.get(rGid) || [];
+        });
+      } catch (err) {
+        console.error('获取CMI联系人失败', err);
+      }
 
       // 计算根节点
       let mainRootId: string = '';
@@ -1075,6 +1154,24 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
       {/* 详情抽屉 */}
       <DetailDrawer record={drawerRecord} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* CMI 联系人弹窗 */}
+      <Modal
+        title="CMI 联系人"
+        open={cmiContactModalOpen}
+        onCancel={() => setCmiContactModalOpen(false)}
+        footer={null}
+        width={900}
+      >
+        <Table 
+          dataSource={currentCmiContacts} 
+          columns={cmiContactColumns} 
+          rowKey="_id"
+          pagination={false}
+          size="small"
+          scroll={{ x: 'max-content' }}
+        />
+      </Modal>
     </div>
   );
 };

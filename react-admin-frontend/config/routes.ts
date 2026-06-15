@@ -98,6 +98,12 @@ export default [
     ],
   },
   {
+    name: '集团同步清单',
+    icon: 'SyncOutlined',
+    path: '/group-sync-list',
+    component: './iboss/group-sync-list',
+  },
+  {
     name: '信息数据',
     icon: 'database',
     path: '/info-data',

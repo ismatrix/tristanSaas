@@ -417,6 +417,32 @@
             const pages = Math.max(1, Math.ceil(total / pageSize));
             console.log(`📊 共 ${total} 条合同，${pages} 页，开始分页同步...`);
 
+            console.log('📡 正在从本地数据库获取已有的合同列表用于比对更新...');
+            let localContractsDict = {};
+            try {
+                const dbRecords = await new Promise((resolve, reject) => {
+                    const url = 'http://127.0.0.1:3000/v1/wildcards/contracts?projection={"uuid":1,"updateTime":1}&options={"limit":0}';
+                    GM_xmlhttpRequest({
+                        method: "GET",
+                        url: url,
+                        headers: { "Authorization": `Bearer ${adminToken}` },
+                        onload: (res) => {
+                            if (res.status === 200) resolve(JSON.parse(res.responseText).results || []);
+                            else reject(`状态码: ${res.status}`);
+                        },
+                        onerror: reject
+                    });
+                });
+                dbRecords.forEach(record => {
+                    if (record.uuid) {
+                        localContractsDict[record.uuid] = record.updateTime;
+                    }
+                });
+                console.log(`📊 成功获取本地现有合同记录: ${Object.keys(localContractsDict).length} 条`);
+            } catch (e) {
+                console.warn(`获取本地合同列表失败，将默认获取全部详情: ${e}`);
+            }
+
             // 收集所有合同
             let allContracts = [];
             for (let p = 1; p <= pages; p++) {
@@ -435,6 +461,7 @@
             const targetProducts = ['6850200002', '6850200003'];
             let detailCount = 0;
             let skippedCount = 0;
+            let noUpdateCount = 0;
             for (let i = 0; i < allContracts.length; i++) {
                 const row = allContracts[i];
                 const projectCode = row.projectCode || '';
@@ -450,6 +477,13 @@
 
                 if (!uuid) {
                     console.log(`⚠️ 第 ${i + 1}/${allContracts.length} 条缺少 uuid，跳过`);
+                    continue;
+                }
+
+                // 比对 updateTime
+                if (row.updateTime && localContractsDict[uuid] && localContractsDict[uuid] === row.updateTime) {
+                    console.log(`⏭️ 第 ${i + 1}/${allContracts.length} 条合同无更新 (UUID: ${uuid})，跳过详情获取`);
+                    noUpdateCount++;
                     continue;
                 }
 
@@ -471,7 +505,7 @@
                 }
             }
 
-            alert(`🎉 合同同步完成！共 ${allContracts.length} 条合同，${detailCount} 条详情已入库，${skippedCount} 条非目标产品已跳过`);
+            alert(`🎉 合同同步完成！共 ${allContracts.length} 条合同，${detailCount} 条详情已入库，${noUpdateCount} 条无更新跳过，${skippedCount} 条非目标产品已跳过`);
         } catch (e) {
             console.error('合同同步失败', e);
             alert('合同同步失败，请查看控制台');
@@ -690,7 +724,7 @@
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
                         data: JSON.stringify({ records: validDetails, primaryKey: "companyBasicId" }),
                         onload: (r) => {
-                            if(r.status !== 200) {
+                            if (r.status !== 200) {
                                 console.error(`💾 后端写入新表报错，状态码: ${r.status}`, r.responseText);
                             }
                             resolve();
@@ -699,6 +733,92 @@
                     });
                 });
                 console.log(`💾 本批 ${validDetails.length} 条详情成功推送到 ibossParticipantDetail 新表。`);
+            }
+            console.log(`📈 总进度: ${Math.min(i + BATCH_SIZE, ids.length)} / ${ids.length}`);
+        }
+
+        alert(`🎉 参与方详情并发获取完成！\n共处理: ${ids.length} 个\n成功写入: ${successCount} 个\n失败: ${failCount} 个`);
+    };
+
+    // --- 5.3 并发批量增加获取参与方详情并回写 ---
+    const runNewParticipantsDetailsQuery = async function () {
+        let token = await ensureScmToken();
+        if (!token) return;
+
+        console.log('📡 正在从本地数据库 ibossParticipants20260609 获取参与方列表...');
+        let dbRecords = [];
+        try {
+            dbRecords = await new Promise((resolve, reject) => {
+                const url = 'http://127.0.0.1:3000/v1/wildcards/ibossParticipants20260609?projection={"companyId":1}&options={"limit":0}';
+                GM_xmlhttpRequest({
+                    method: "GET",
+                    url: url,
+                    headers: { "Authorization": `Bearer ${adminToken}` },
+                    onload: (res) => {
+                        if (res.status === 200) resolve(JSON.parse(res.responseText).results || []);
+                        else reject(`状态码: ${res.status}`);
+                    },
+                    onerror: reject
+                });
+            });
+        } catch (e) {
+            alert(`获取本地参与方列表失败: ${e}`);
+            return;
+        }
+
+        let ids = dbRecords.map(r => r.companyId).filter(id => id !== undefined && id !== null && id !== '');
+        ids = [...new Set(ids)];
+
+        if (ids.length === 0) {
+            alert('数据库中未找到任何有效的 companyId 记录。');
+            return;
+        }
+
+        console.log(`📊 共找到 ${ids.length} 个参与方 companyId，开始分批并发获取详情...`);
+        const BATCH_SIZE = 200;
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+            const batchIds = ids.slice(i, i + BATCH_SIZE);
+            console.log(`⚡ 正在处理第 ${i + 1} 到 ${Math.min(i + BATCH_SIZE, ids.length)} 个参与方详情...`);
+
+            const promises = batchIds.map(id => {
+                return window.runParticipantDetailQuery(id)
+                    .then(res => {
+                        // 不做任何结构性强校验，只要有返回就视为成功，并包装为新表所需格式
+                        return { companyBasicId: id, detailInfo: res };
+                    })
+                    .catch(err => {
+                        console.error(`❌ [DEBUG] 参与方 ID: ${id} 获取异常:`, err);
+                        return null;
+                    });
+            });
+
+            const t0 = Date.now();
+            const results = await Promise.all(promises);
+            const validDetails = results.filter(r => r !== null);
+            successCount += validDetails.length;
+            failCount += (batchIds.length - validDetails.length);
+            console.log(`⏱️ 本批 ${batchIds.length} 个详情请求完成 | 耗时: ${Date.now() - t0}ms | 成功有效数据: ${validDetails.length}`);
+
+            if (validDetails.length > 0) {
+                await new Promise((resolve) => {
+                    GM_xmlhttpRequest({
+                        method: "POST",
+                        url: "http://127.0.0.1:3000/v1/wildcards/ibossParticipantDetail20260609/bulk-upsert",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+                        data: JSON.stringify({ records: validDetails, primaryKey: "companyBasicId" }),
+                        onload: (r) => {
+                            if (r.status !== 200) {
+                                console.error(`💾 后端写入新表报错，状态码: ${r.status}`, r.responseText);
+                            }
+                            resolve();
+                        },
+                        onerror: () => resolve()
+                    });
+                });
+                console.log(`💾 本批 ${validDetails.length} 条详情成功推送到 ibossParticipantDetail20260609 新表。`);
             }
             console.log(`📈 总进度: ${Math.min(i + BATCH_SIZE, ids.length)} / ${ids.length}`);
         }
@@ -753,8 +873,14 @@
         b6.style.cssText = btnStyle + 'background: #17a2b8;'; // 青色
         b6.onclick = runAllParticipantsDetailsQuery;
 
+        const b7 = document.createElement('button');
+        b7.innerText = '📋 获取增量参与方详情';
+        b7.style.cssText = btnStyle + 'background: #20c997;'; // 青绿色
+        b7.onclick = runNewParticipantsDetailsQuery;
+
         panel.appendChild(b5);
         panel.appendChild(b6);
+        panel.appendChild(b7);
         (document.body || document.documentElement).appendChild(panel);
     };
 
