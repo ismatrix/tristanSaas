@@ -220,12 +220,20 @@ const GroupSyncList: React.FC = () => {
       const titleField = getMappedField(mappingKeyContacts, 'KEY_CONTACT_TITLE') || 'title';
       const levelField = getMappedField(mappingKeyContacts, 'KEY_CONTACT_LEVEL') || 'level';
       const customLevelField = getMappedField(mappingKeyContacts, 'USER_DEFINED_LEVEL') || 'customLevel';
-      t2Data = t2Data.map((r: any) => ({ 
-        ...r, 
-        [titleField]: r[titleField] && String(r[titleField]).trim() ? r[titleField] : '其他', 
-        [levelField]: r[levelField] && String(r[levelField]).trim() ? r[levelField] : '其他',
-        [customLevelField]: r[customLevelField] && String(r[customLevelField]).trim() ? r[customLevelField] : ''
-      }));
+      t2Data = t2Data.map((r: any) => {
+        const finalTitle = r[titleField] && String(r[titleField]).trim() ? String(r[titleField]).trim() : '其他';
+        const finalLevel = r[levelField] && String(r[levelField]).trim() ? String(r[levelField]).trim() : '其他';
+        const finalCustomLevel = r[customLevelField] && String(r[customLevelField]).trim() ? String(r[customLevelField]).trim() : '';
+        return {
+          ...r,
+          [titleField]: finalTitle,
+          KEY_CONTACT_TITLE: finalTitle,
+          [levelField]: finalLevel,
+          KEY_CONTACT_LEVEL: finalLevel,
+          [customLevelField]: finalCustomLevel,
+          USER_DEFINED_LEVEL: finalCustomLevel
+        };
+      });
       setTab2Data(assignPidGid(t2Data, pid));
 
       // Tab 3: cmiContacts via keyCMIContacts
@@ -273,7 +281,7 @@ const GroupSyncList: React.FC = () => {
       .filter((m: any) => m.cmccColumnName && String(m.cmccColumnName).trim() !== '')
       .map((m: any) => ({
         headerName: String(m.cmccColumnName).trim(),
-        field: m.cmiColumnName || m.columnName,
+        field: m.cmiColumnName === 'x' ? m.cmccColumnName : (m.cmiColumnName || m.columnName),
         sortable: true,
         filter: true,
         resizable: true,
@@ -383,12 +391,20 @@ const GroupSyncList: React.FC = () => {
         const titleField = getMappedField(mappingKeyContacts, 'KEY_CONTACT_TITLE') || 'title';
         const levelField = getMappedField(mappingKeyContacts, 'KEY_CONTACT_LEVEL') || 'level';
         const customLevelField = getMappedField(mappingKeyContacts, 'USER_DEFINED_LEVEL') || 'customLevel';
-        t2DataRaw = t2DataRaw.map((r: any) => ({ 
-          ...r, 
-          [titleField]: r[titleField] && String(r[titleField]).trim() ? r[titleField] : '其他', 
-          [levelField]: r[levelField] && String(r[levelField]).trim() ? r[levelField] : '其他',
-          [customLevelField]: r[customLevelField] && String(r[customLevelField]).trim() ? r[customLevelField] : ''
-        }));
+        t2DataRaw = t2DataRaw.map((r: any) => {
+          const finalTitle = r[titleField] && String(r[titleField]).trim() ? String(r[titleField]).trim() : '其他';
+          const finalLevel = r[levelField] && String(r[levelField]).trim() ? String(r[levelField]).trim() : '其他';
+          const finalCustomLevel = r[customLevelField] && String(r[customLevelField]).trim() ? String(r[customLevelField]).trim() : '';
+          return {
+            ...r,
+            [titleField]: finalTitle,
+            KEY_CONTACT_TITLE: finalTitle,
+            [levelField]: finalLevel,
+            KEY_CONTACT_LEVEL: finalLevel,
+            [customLevelField]: finalCustomLevel,
+            USER_DEFINED_LEVEL: finalCustomLevel
+          };
+        });
         const t2Data = assignPidGid(t2DataRaw, pid);
         const csv2 = generateCSV(t2Data, colDefs2);
 

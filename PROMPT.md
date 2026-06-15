@@ -3318,3 +3318,18 @@ MAIN_BUSINESS，即mainBusiness值去表keyEnCN中关联
 3. **远程服务器一键部署更新**：
    - SSH 连接到生产服务器，手动完成了前端 `npm install` 依赖安装，成功解决由新依赖 `jszip` 引起的编译报错。
    - 重新执行了服务器端的 `deploy.sh` 脚本，重新编译前端代码，并平滑重启了后端的 PM2 进程。最新的逻辑和数据库数据已在生产环境正式上线生效。
+
+## 2026-06-15 17:31:41
+
+### 用户提示词
+「集团同步清单」的tab2的字段KEY_CONTACT_TITLE，KEY_CONTACT_LEVEL还是空的，如果是空的显示'其他'
+
+### 执行总结
+1. **排查并发现字段覆盖重合的 Bug**：
+   - 经排查，由于映射表 `columnMappingKeyContacts` 中，`KEY_CONTACT_TITLE`、`KEY_CONTACT_LEVEL`、`USER_DEFINED_LEVEL` 这三个表头的底层关联键均被填为了 `'x'`，导致在原始数据赋值阶段这三个属性被同时解析为同一个属性 `x`，在 JavaScript 中后者的空值覆盖了前者的 `'其他'` 兜底值，使这三列最终显示及导出全为空值。
+2. **多表头动态解耦重构**：
+   - 在 `group-sync-list.tsx` 中修改了 `getColDefs` 的列定义生成逻辑：当检测到 `m.cmiColumnName === 'x'` 这种无独立对应字段的情况时，将该列的 `field` 动态设置为其表头名称 `m.cmccColumnName`，防止 AG Grid 在取值时产生重合。
+   - 升级了 Tab 2 前端列表和 CSV 打包导出里的数据处理 map 逻辑，当检测到对应字段为空时，职务与级别分别解耦写入各自独立的表头属性中（且同时写入底层的映射键以做双重保险），并填充兜底中文值 `'其他'`。
+3. **Git 提交及生产端自动更新部署**：
+   - 将修改后的前端文件进行了 Git 缓存、提交，并推送到了 GitHub 远程。
+   - 远程 SSH 连接生产服务器执行 `deploy.sh`。拉取了最新代码，前端 Webpack 打包顺利通过，并平滑重启了 PM2 守护的后端进程，使更新即时生效。
