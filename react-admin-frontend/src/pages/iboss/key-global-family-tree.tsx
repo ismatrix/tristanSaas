@@ -95,7 +95,7 @@ const iconBtnStyle = {
 };
 
 // 抽屉中隐藏字段
-const HIDDEN_FIELDS = new Set(['_id', 'id', 'parentId', 'iconHtml', '_nodeType', '_highlighted', '_upToTheRootHighlighted', '_expanded', '_directSubordinates', '_totalSubordinates']);
+const HIDDEN_FIELDS = new Set(['_id', 'id', 'parentId', 'iconHtml', '_nodeType', '_highlighted', '_upToTheRootHighlighted', '_expanded', '_directSubordinates', '_totalSubordinates', 'cmiContacts']);
 
 // 区域分组
 const REGION_MAP: Record<string, string> = {
@@ -229,7 +229,6 @@ const renderNodeContent = (d: any) => {
           </div>
           ${d.data.position ? `<div style="color:#716E7B;margin-left:20px;margin-top:3px;font-size:12px;">${d.data.position}</div>` : ''}
           ${d.data.city ? `<div style="color:#999;margin-left:20px;margin-top:2px;font-size:11px;">${d.data.city}</div>` : ''}
-          ${d.data.cmiContacts && d.data.cmiContacts.length > 0 ? `<div onclick="window.handleShowCmiContact(event, '${d.data.id}')" style="position:absolute; bottom:6px; right:8px; background-color:#e6f4ff; color:#1677ff; border:1px solid #91caff; font-size:11px; padding:2px 6px; border-radius:4px; cursor:pointer; z-index:10;">cmi contact</div>` : ''}
         </div>
       </div>`;
   }
@@ -288,6 +287,35 @@ const renderNodeContent = (d: any) => {
 
 // ============ 详情 Drawer 组件 ============
 const DetailDrawer: React.FC<{ record: any; open: boolean; onClose: () => void }> = ({ record, open, onClose }) => {
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+
+  // 当抽屉打开且 record 发生变化时，根据 GID 异步加载客户联系人
+  useEffect(() => {
+    if (open && record && (record.GID || record.id)) {
+      setContactsLoading(true);
+      request('/api/v1/wildcards/custContacts', {
+        method: 'GET',
+        params: {
+          query: JSON.stringify({ GID: record.GID || record.id }),
+          options: JSON.stringify({ limit: 100 }),
+        },
+      })
+        .then((res: any) => {
+          const data = res.results || res.data?.results || [];
+          setContacts(data);
+        })
+        .catch((err: any) => {
+          console.error('获取客户联系人失败:', err);
+        })
+        .finally(() => {
+          setContactsLoading(false);
+        });
+    } else {
+      setContacts([]);
+    }
+  }, [open, record]);
+
   if (!record) return null;
 
   const displayFields = Object.entries(record).filter(
@@ -310,6 +338,132 @@ const DetailDrawer: React.FC<{ record: any; open: boolean; onClose: () => void }
       open={open}
       onClose={onClose}
     >
+      {/* CMI 联系人信息段落，显示在最上方，浅蓝色背景区域 */}
+      {record.cmiContacts && record.cmiContacts.length > 0 && (
+        <div
+          style={{
+            background: '#e6f7ff',
+            border: '1px solid #91d5ff',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div style={{ fontWeight: 600, color: '#0958d9', marginBottom: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>👤 CMI 联系人信息</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {record.cmiContacts.map((contact: any, index: number) => (
+              <div
+                key={contact._id || index}
+                style={{
+                  borderBottom: index < record.cmiContacts.length - 1 ? '1px dashed #adc6ff' : 'none',
+                  paddingBottom: index < record.cmiContacts.length - 1 ? '12px' : '0',
+                }}
+              >
+                <Descriptions
+                  size="small"
+                  column={1}
+                  colon={false}
+                  contentStyle={{ color: '#333', fontSize: '13px' }}
+                  labelStyle={{ color: '#595959', width: '120px', fontWeight: 500, fontSize: '13px' }}
+                >
+                  <Descriptions.Item label="姓名">
+                    <span style={{ fontWeight: 600 }}>{contact.name || '—'}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="角色">
+                    {contact.role || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="部门">
+                    {contact.department || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="职位">
+                    {contact.position || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="员工号">
+                    {contact.staffNo || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="电话">
+                    <span style={{ color: '#096dd9', fontWeight: 500 }}>{contact.phoneNumber || '—'}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="邮箱">
+                    {contact.email || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="城市">
+                    {contact.City || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="直属上级">
+                    {contact.直属上级 || '—'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 客户联系人信息段落，显示在最上方，浅绿色背景区域 */}
+      <div
+        style={{
+          background: '#f6ffed',
+          border: '1px solid #b7eb8f',
+          borderRadius: '8px',
+          padding: '16px',
+          marginBottom: '16px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        }}
+      >
+        <div style={{ fontWeight: 600, color: '#389e0d', marginBottom: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>👥 客户联系人信息</span>
+          {contactsLoading && <Spin size="small" />}
+        </div>
+        {contactsLoading ? (
+          <div style={{ padding: '10px 0', textAlign: 'center', color: '#888' }}>加载中...</div>
+        ) : contacts.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {contacts.map((contact, index) => (
+              <div
+                key={contact._id || index}
+                style={{
+                  borderBottom: index < contacts.length - 1 ? '1px dashed #d9f7be' : 'none',
+                  paddingBottom: index < contacts.length - 1 ? '12px' : '0',
+                }}
+              >
+                <Descriptions
+                  size="small"
+                  column={1}
+                  colon={false}
+                  contentStyle={{ color: '#333', fontSize: '13px' }}
+                  labelStyle={{ color: '#595959', width: '120px', fontWeight: 500, fontSize: '13px' }}
+                >
+                  <Descriptions.Item label="姓名">
+                    <span style={{ fontWeight: 600 }}>
+                      {`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || '—'}
+                    </span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="头衔">
+                    {contact.title || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="职能">
+                    {contact.functionName || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="联系电话">
+                    <span style={{ color: '#096dd9', fontWeight: 500 }}>
+                      {contact.phoneNumber || '—'}
+                    </span>
+                  </Descriptions.Item>
+                </Descriptions>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ color: '#8c8c8c', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '8px 0' }}>
+            暂无客户联系人信息
+          </div>
+        )}
+      </div>
+
       <Descriptions
         column={1}
         bordered

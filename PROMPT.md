@@ -3333,3 +3333,64 @@ MAIN_BUSINESS，即mainBusiness值去表keyEnCN中关联
 3. **Git 提交及生产端自动更新部署**：
    - 将修改后的前端文件进行了 Git 缓存、提交，并推送到了 GitHub 远程。
    - 远程 SSH 连接生产服务器执行 `deploy.sh`。拉取了最新代码，前端 Webpack 打包顺利通过，并平滑重启了 PM2 守护的后端进程，使更新即时生效。
+
+## 2026-06-16 12:19:42
+
+### 用户提示词
+「集团同步清单」页面的要客清单的搜索框，需支持要客清单表的全字段搜索
+
+### 执行总结
+*(待执行完毕后填充)*
+
+## 2026-06-16 14:03:32
+
+### 用户提示词
+「海外家族树」菜单中的每个要客的超链接的下划线样式太难看，请给出一些美化的建议让我选择
+
+### 执行总结
+1. 针对「海外家族树」巨型菜单中各行业要客超链接样式，提出了 4 种现代前端美化方案供用户选择。
+2. 依据用户选择的「方案三：精致胶囊背景悬浮高亮」，已修改 `react-admin-frontend/src/app.tsx` 文件，移除超链接行内的 `textDecoration: 'underline'` 样式。
+3. 在布局组件全局样式块中，为 `.mega-menu-link` 增加了无下划线、圆角以及基于 `cubic-bezier` 的平滑动效。同时，悬停时会浮现轻微的圆角浅蓝背景色（`rgba(22, 119, 255, 0.08)`）以及 4px 的向右平移动效，为菜单交互体验增添了现代化的精致感。
+
+## 2026-06-16 14:53:27
+
+### 用户提示词
+「要客海外家族树」结构树点击节点，右侧的抽屉信息卡中增加节点客户联系人信息段落
+1、通过节点GID关联custContacts的GID获取信息，字段显示：
+firstName，lastName，title，functionName，phoneNumber
+2、客户联系人显示在最抽屉信息卡的最上方，该段落区域背景使用浅绿色
+
+### 执行总结
+1. **抽屉详情加载联系人逻辑重构**：
+   - 修改了 `react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx` 中的 `DetailDrawer` 组件。
+   - 使用 React 的 `useState` 与 `useEffect` Hooks 在抽屉打开且 record 及有效 GID（`record.GID || record.id`）改变时，异步请求 `/api/v1/wildcards/custContacts` 接口。
+   - 将查询到的联系人列表存储在组件的 local state `contacts` 中。
+2. **联系人区域视觉展现美化**：
+   - 将客户联系人信息段落放置在抽屉内容区的最上方（即 Descriptions 之前）。
+   - 区域背景采用精美的护眼浅绿色（`#f6ffed`），外框辅以浅绿色边框（`#b7eb8f`）及 `8px` 圆角，并且带有柔和的盒阴影以增强视觉的高级感。
+   - 段落内优雅地呈现了联系人的五个核心字段：姓名（拼合 `firstName` 与 `lastName`）、头衔 (`title`)、职能 (`functionName`) 以及联系电话 (`phoneNumber`)。
+   - 提供了加载中（`Spin`）状态，且在没有关联到联系人数据时智能显示“暂无客户联系人信息”。
+3. **本地编译通过**：
+   - 运行前端 `npm run build` 打包构建，Webpack 编译成功，无任何语法、类型及打包报错。
+
+## 2026-06-16 15:18:28
+
+### 用户提示词
+结构树的根节点的信息卡上，删除 cmi contact 按钮，把CMI 联系人信息也放到右侧的抽屉信息卡上：
+1、放到最上面
+2、该信息区域背景用浅蓝色
+
+### 执行总结
+1. **移除根节点 CMI 按钮**：修改了 `key-global-family-tree.tsx` 页面中的 `renderNodeContent` 渲染逻辑，移除根节点卡片上的 `cmi contact` 按钮。
+2. **隐藏列表中排除原字段**：将 `cmiContacts` 字段追加到了 `HIDDEN_FIELDS` 常量 Set 中，防止其作为普通属性重复渲染到抽屉底部的属性大表中。
+3. **在右侧抽屉最上方嵌入 CMI 联系人**：修改了 `DetailDrawer`，在抽屉的最上方（即客户联系人之上）新增了一个精致的 CMI 联系人展示块。设计上采用浅蓝色背景（`#e6f7ff`），加上浅蓝虚线分隔符，完整支持了姓名、角色、部门、职位、工号、电话、邮箱、城市及直属上级等字段的优雅排版。
+4. **本地编译校验通过**：在 `react-admin-frontend` 目录下运行 `npm run build`，编译打包顺利完成，无任何 TypeScript / 页面打包错误。
+
+## 2026-06-16 15:26:19
+
+### 用户提示词
+客户联系人卡片的字段名称，只显示中文即可，不用显示字段英文名称
+
+### 执行总结
+1. **修改客户联系人卡片字段名称**：修改了 `react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx` 中的 `DetailDrawer` 组件。将客户联系人卡片中原本显示的“头衔 (Title)”和“职能 (FunctionName)”字段标签，去除了英文后缀，简化为“头衔”和“职能”，从而使用户在查看客户联系人信息卡时只显示中文名称。
+2. **本地编译校验通过**：在 `react-admin-frontend` 目录下运行了 `npm run build`，Webpack 编译打包顺利完成，确认没有导致前端编译和页面打包报错。

@@ -167,7 +167,7 @@ export async function getInitialState(): Promise<{
                           <Link 
                             to={`/keyGlobalFamilyTree/${c.GID}?nameCn=${nameCn}&abbr=${abbr}`} 
                             className="mega-menu-link"
-                            style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'underline' }}
+                            style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                             title={c.nameCn || c.nameEn || '未知公司'}
                             onMouseEnter={(e) => (e.currentTarget.style.color = hoverColor)}
                             onMouseLeave={(e) => (e.currentTarget.style.color = displayColor)}
@@ -329,6 +329,17 @@ export const layout: RunTimeLayoutConfig = ({
               left: 50vw !important;
               transform: translateX(-50%) !important;
               max-width: 100vw !important;
+            }
+            .mega-menu-link {
+              text-decoration: none !important;
+              padding: 2px 6px !important;
+              margin: 0 -6px !important;
+              border-radius: 4px !important;
+              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            }
+            .mega-menu-link:hover {
+              background-color: rgba(22, 119, 255, 0.08) !important;
+              padding-left: 10px !important;
             }
           `}</style>
           {children}

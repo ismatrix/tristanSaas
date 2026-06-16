@@ -18,6 +18,29 @@ const GroupSyncList: React.FC = () => {
   const leftGridRef = useRef<AgGridReact>(null);
   const [quickFilterText, setQuickFilterText] = useState('');
 
+  const isExternalFilterPresent = React.useCallback(() => {
+    return quickFilterText.trim() !== '';
+  }, [quickFilterText]);
+
+  const doesExternalFilterPass = React.useCallback((node: any) => {
+    if (!quickFilterText.trim()) return true;
+    const lowerText = quickFilterText.trim().toLowerCase();
+    const data = node.data;
+    if (!data) return false;
+    return Object.keys(data).some((key) => {
+      if (key.startsWith('_')) return false; // 排除内部 MongoDB 字段
+      const val = data[key];
+      if (val === null || val === undefined) return false;
+      return String(val).toLowerCase().includes(lowerText);
+    });
+  }, [quickFilterText]);
+
+  useEffect(() => {
+    if (leftGridRef.current?.api) {
+      leftGridRef.current.api.onFilterChanged();
+    }
+  }, [quickFilterText]);
+
   const sequenceRef = useRef(0);
   const [activeSeq, setActiveSeq] = useState('000');
 
@@ -517,7 +540,8 @@ const GroupSyncList: React.FC = () => {
                 ref={leftGridRef}
                 theme={themeQuartz}
                 rowData={customers}
-                quickFilterText={quickFilterText}
+                isExternalFilterPresent={isExternalFilterPresent}
+                doesExternalFilterPass={doesExternalFilterPass}
                 getRowId={(params: any) => String(params.data.GID || params.data.PID || params.data._id || params.data.nameCn)}
                 columnDefs={leftColDefs}
                 rowSelection="multiple"
