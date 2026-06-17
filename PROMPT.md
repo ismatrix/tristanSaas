@@ -3394,3 +3394,24 @@ firstName，lastName，title，functionName，phoneNumber
 ### 执行总结
 1. **修改客户联系人卡片字段名称**：修改了 `react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx` 中的 `DetailDrawer` 组件。将客户联系人卡片中原本显示的“头衔 (Title)”和“职能 (FunctionName)”字段标签，去除了英文后缀，简化为“头衔”和“职能”，从而使用户在查看客户联系人信息卡时只显示中文名称。
 2. **本地编译校验通过**：在 `react-admin-frontend` 目录下运行了 `npm run build`，Webpack 编译打包顺利完成，确认没有导致前端编译和页面打包报错。
+
+## 2026-06-16 16:55:33
+
+### 用户提示词
+代码同步到服务器生产环境
+
+### 执行总结
+1. **本地代码提交与推送**：将本地包含“客户联系人卡片中英文字段精简”在内的所有最新改动（包括此前的样式微调和搜索框全字段搜索增强等未提交改动）进行了 `git add` 和 `git commit`，并成功推送到 GitHub 远程 `main` 分支。
+2. **远程服务器自动部署**：SSH 登录生产服务器 `tristan.wang:6822`，并定位到项目目录 `workspaces/TristanSaas`。执行了自动部署脚本 `deploy.sh`，拉取最新代码，在服务器端成功进行了前端 Webpack 编译打包，并平滑重启了后端的 PM2 进程。所有更新已在生产环境成功上线并生效。
+
+## 2026-06-17 17:36:19
+
+### 用户提示词
+「集团同步清单」页面，导出的逻辑做些修改：
+1、不需要按照PID分目录
+2、共导出2个zip压缩包：
+第一个压缩包： 包含所有所选客户的tab1、tab2、tab3的csv文件zip文件名GlobalFamilyTreeInfo_{YYYYMMDDHHMISS}
+第二个研所包： 包含所有所选客户的tab4的csv文件，zip文件名GlobalGIDCust_{YYYYMMDDHHMISS}
+
+### 执行总结
+（待完成）

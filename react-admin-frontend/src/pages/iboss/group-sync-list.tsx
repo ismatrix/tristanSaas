@@ -377,7 +377,9 @@ const GroupSyncList: React.FC = () => {
     
     message.loading({ content: '正在打包导出CSV...', key: 'exporting' });
     
-    const zip = new JSZip();
+    // 初始化两个 JSZip 实例，分别用于存储 tab1-3 和 tab4 的数据
+    const zip1 = new JSZip();
+    const zip2 = new JSZip();
     let successCount = 0;
     const timeStr = dayjs().format('YYYYMMDD');
 
@@ -463,14 +465,11 @@ const GroupSyncList: React.FC = () => {
         const t4Data = assignPidGid(t4DataRaw, pid);
         const csv4 = generateCSV(t4Data, colDefs4);
 
-        // 写入 zip 中以 pid 命名的文件夹里
-        const pidFolder = zip.folder(pid);
-        if (pidFolder) {
-          pidFolder.file(`${filePrefix}BasicInfo_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv1);
-          pidFolder.file(`${filePrefix}ContactInfo_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv2);
-          pidFolder.file(`${filePrefix}AMInfo_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv3);
-          pidFolder.file(`${filePrefix}GIDCust_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv4);
-        }
+        // 直接写入 zip 的根目录下，不按照 PID 分目录
+        zip1.file(`${filePrefix}BasicInfo_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv1);
+        zip1.file(`${filePrefix}ContactInfo_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv2);
+        zip1.file(`${filePrefix}AMInfo_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv3);
+        zip2.file(`${filePrefix}GIDCust_${timeStr}_${seqStr}.csv`, '\uFEFF' + csv4);
         
         successCount++;
         await delay(100);
@@ -483,19 +482,36 @@ const GroupSyncList: React.FC = () => {
     
     if (successCount > 0) {
       try {
-        const zipFilename = `cmccKeyCustomerFamilyTree_${dayjs().format('YYYYMMDDHHmmss')}_${successCount}.zip`;
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const timestamp = dayjs().format('YYYYMMDDHHmmss');
+        const zip1Filename = `GlobalFamilyTreeInfo_${timestamp}.zip`;
+        const zip2Filename = `GlobalGIDCust_${timestamp}.zip`;
+
+        // 下载第一个 ZIP 压缩包 (包含 tab1, tab2, tab3)
+        const zip1Blob = await zip1.generateAsync({ type: 'blob' });
+        const url1 = URL.createObjectURL(zip1Blob);
+        const link1 = document.createElement('a');
+        link1.href = url1;
+        link1.setAttribute('download', zip1Filename);
+        document.body.appendChild(link1);
+        link1.click();
+        document.body.removeChild(link1);
+        URL.revokeObjectURL(url1);
+
+        // 延迟 300 毫秒，防止浏览器阻止多文件并发下载
+        await delay(300);
+
+        // 下载第二个 ZIP 压缩包 (包含 tab4)
+        const zip2Blob = await zip2.generateAsync({ type: 'blob' });
+        const url2 = URL.createObjectURL(zip2Blob);
+        const link2 = document.createElement('a');
+        link2.href = url2;
+        link2.setAttribute('download', zip2Filename);
+        document.body.appendChild(link2);
+        link2.click();
+        document.body.removeChild(link2);
+        URL.revokeObjectURL(url2);
         
-        const url = URL.createObjectURL(zipBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', zipFilename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        message.success({ content: `成功导出 ${successCount} 家要客数据包`, key: 'exporting' });
+        message.success({ content: `成功导出 ${successCount} 家要客数据包，已下载 2 个 ZIP 压缩包`, key: 'exporting' });
       } catch (err) {
         console.error('Failed to generate zip file', err);
         message.error({ content: '生成 ZIP 压缩包失败', key: 'exporting' });
