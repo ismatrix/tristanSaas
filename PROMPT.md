@@ -3414,4 +3414,5 @@ firstName，lastName，title，functionName，phoneNumber
 第二个研所包： 包含所有所选客户的tab4的csv文件，zip文件名GlobalGIDCust_{YYYYMMDDHHMISS}
 
 ### 执行总结
-（待完成）
+1. **修改集团同步清单导出逻辑**：修改了前端页面 `react-admin-frontend/src/pages/iboss/group-sync-list.tsx` 中 `handleExportCSV` 函数。实例化了 `zip1` 与 `zip2` 两个 `JSZip` 压缩包，并移除 `zip.folder(pid)` 逻辑。使 CSV 文件直接存入各自 ZIP 的根目录下；打包下载逻辑改造为以 300ms 为间隔依次在前端触发两个 ZIP 压缩包的下载；压缩包分别重命名为符合要求的 `GlobalFamilyTreeInfo_{YYYYMMDDHHMISS}.zip` 与 `GlobalGIDCust_{YYYYMMDDHHMISS}.zip`。
+2. **本地打包编译与自动部署**：本地进行 `npm run build` 前端项目编译通过，确保代码逻辑及语法无误。随后，将更新代码推送到远程 GitHub 仓库，并在生产服务器上执行 `deploy.sh` 脚本，拉取最新代码重新打包前端资源并平滑重启 PM2 后端进程，改动已在生产服务器端实时生效。
