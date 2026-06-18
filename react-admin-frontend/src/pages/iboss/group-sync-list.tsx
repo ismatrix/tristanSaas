@@ -41,12 +41,31 @@ const GroupSyncList: React.FC = () => {
     }
   }, [quickFilterText]);
 
-  const sequenceRef = useRef(0);
   const [activeSeq, setActiveSeq] = useState('000');
 
-  const getNextSeq = () => {
-    const seq = sequenceRef.current;
-    sequenceRef.current += 1;
+  // 获取或累加导出序号的辅助逻辑（使用 localStorage，支持跨天从 000 重置）
+  const getExportSeq = (increment = false) => {
+    const today = dayjs().format('YYYYMMDD');
+    const storedDate = localStorage.getItem('group_export_seq_date');
+    const storedSeq = localStorage.getItem('group_export_seq_val');
+
+    let seq = 0;
+    if (storedDate === today && storedSeq !== null) {
+      seq = parseInt(storedSeq, 10);
+    }
+
+    if (increment) {
+      const nextSeq = seq + 1;
+      localStorage.setItem('group_export_seq_date', today);
+      localStorage.setItem('group_export_seq_val', String(nextSeq));
+    } else {
+      // 首次使用或跨天时，初始化写入
+      if (storedDate !== today) {
+        localStorage.setItem('group_export_seq_date', today);
+        localStorage.setItem('group_export_seq_val', '0');
+      }
+    }
+
     return String(seq).padStart(3, '0');
   };
 
@@ -78,6 +97,8 @@ const GroupSyncList: React.FC = () => {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
+      // 初始化获取当前待使用的序号以进行预览
+      setActiveSeq(getExportSeq(false));
       const custRes = await request('/api/v1/wildcards/keycustomer', {
         method: 'GET',
         params: {
@@ -212,7 +233,8 @@ const GroupSyncList: React.FC = () => {
   const fetchTabData = async (customer: any) => {
     setTabLoading(true);
     try {
-      setActiveSeq(getNextSeq());
+      // 仅预览当前待使用的序列号，不进行递增消耗
+      setActiveSeq(getExportSeq(false));
       const gid = customer.GID;
       const pid = customer.PID;
       
@@ -382,11 +404,13 @@ const GroupSyncList: React.FC = () => {
     const zip2 = new JSZip();
     let successCount = 0;
     const timeStr = dayjs().format('YYYYMMDD');
+    
+    // 同一批导出文件使用相同的序号
+    const seqStr = getExportSeq(false);
 
     for (const customer of selectedCustomers) {
       const gid = customer.GID;
       const pid = customer.PID || 'UnknownPID';
-      const seqStr = getNextSeq();
       const filePrefix = `${pid}_Global`;
 
       try {
@@ -510,6 +534,10 @@ const GroupSyncList: React.FC = () => {
         link2.click();
         document.body.removeChild(link2);
         URL.revokeObjectURL(url2);
+
+        // 下载成功后，递增序号并更新界面显示
+        getExportSeq(true);
+        setActiveSeq(getExportSeq(false));
         
         message.success({ content: `成功导出 ${successCount} 家要客数据包，已下载 2 个 ZIP 压缩包`, key: 'exporting' });
       } catch (err) {
