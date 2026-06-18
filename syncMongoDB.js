@@ -95,6 +95,8 @@ async function main() {
     // 动态筛选出需要同步的数据集
     COLLECTIONS_TO_SYNC = allNames.filter(name => {
       return name === 'keyGlobalFamilyTree' ||
+             name === 'custContacts' ||
+             name === 'keyFamilyTreeCustMapping' ||
              name === 'dnbCompanyDetail' ||
              name.startsWith('DNBFamilyTree-') ||
              name.startsWith('DNBWebFamilyTree-');

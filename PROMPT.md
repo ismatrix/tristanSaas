@@ -3426,3 +3426,14 @@ firstName，lastName，title，functionName，phoneNumber
 ### 执行总结
 1. **序列号 seqStr 机制优化**：修改了前端 `group-sync-list.tsx`，移除内存递增的 `sequenceRef` 与 `getNextSeq`；新增使用 `localStorage` 持久化管理导出日期与序列号的 `getExportSeq` 方法。实现了在点击左侧企业查看数据时，仅进行当前最新序列号的只读预览而不做累加；而在点击“导出”时，同一批次导出的所有客户的 CSV 文件均共享同一个 `seqStr`；只有当 2 个 ZIP 文件全部下载成功后，才在本地将序号加 1 并更新界面状态，且支持跨天自动重置回 `000`。
 2. **本地编译与服务器更新**：本地打包构建 `npm run build` 测试通过。提交代码并推送到 GitHub 远程仓库，并 SSH 登录生产服务器执行部署脚本，顺利更新了前端编译包并平滑重启 PM2 服务，功能已在生产服务器端实时生效。
+
+## 2026-06-18 16:29:08
+
+### 用户提示词
+1、/Users/tristan/Downloads/72颗客户树总表修订版（更新部分数据枚举值错误）-20260618.xlsx ，覆盖导入表「keyGlobalFamilyTree」
+2、/Users/tristan/Downloads/客户树联系人表更新版-20260618.xlsx，覆盖导入表「custContacts」
+3、/Users/tristan/Downloads/存量数据匹配更新版-0618交付.xlsx，sheet1「1、客户树存量匹配」覆盖导入表「keyFamilyTreeCustMapping」
+
+### 执行总结
+1. **编写并执行数据导入脚本**：在项目 `scripts/` 目录下创建了 `import_excel_to_mongo.js` 脚本，基于 Node.js 原生的 `xlsx` 库解析 Excel，对 `ultimateGID`, `GID`, `contactId` 等关键大数字段做格式清洗与防丢失精度转换；在导入时先执行 `deleteMany({})` 清空旧数据。共覆盖导入 `keyGlobalFamilyTree`（7668 条）、`custContacts`（117,304 条）和 `keyFamilyTreeCustMapping`（1115 条）。
+2. **同步脚本调整与数据同步**：修改了 `syncMongoDB.js` 脚本，将新导入的 `custContacts` 和 `keyFamilyTreeCustMapping` 表加到待同步列表中。在本地执行 `node syncMongoDB.js`，成功将 3 个表的最新数据全量同步更新至生产服务器的 MongoDB 中，在生产环境成功运行生效。
