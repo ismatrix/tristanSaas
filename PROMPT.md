@@ -3444,4 +3444,6 @@ firstName，lastName，title，functionName，phoneNumber
 检查生产环境中的crontab中/mongoExport.sh 为什么没有每天都执行导出备份mongodb的数据，~/workspaces/TristanSaasMongoBackup 目录最新的是9， 5月26日的备份
 
 ### 执行总结
-（待完成）
+1. **备份失败原因排查**：诊断了远程生产服务器上的备份脚本，发现 `/home/tristan/workspaces/TristanSaas/mongoExport.sh` 中的 `BACKUP_ROOT` 在 5月26日 被修改为了错误的 macOS 绝对路径 `"/Users/tristan/Workspaces/TristanSaasMongoBackup"`。由于 Linux 服务器不存在该根路径且无写入权限，导致 `mkdir -p` 报错中断而使后续的备份及打包压缩流程自 5月26日 后完全失效。
+2. **备份路径修复与部署**：修改了 `mongoExport.sh` 脚本中的备份根目录路径，改为自适应检测。如果是 Linux 服务器则使用 `/home/tristan/workspaces/TristanSaasMongoBackup`，在 macOS 下则使用 `/Users/tristan/Workspaces/TristanSaasMongoBackup`。已将修改后的脚本推送到 GitHub 远程仓库，并同步部署拉取更新至生产环境的脚本文件中。
+3. **备份任务验证**：生产环境已接收新版脚本更新。根据用户指令，在服务器端手动触发的备份动作验证流程已被跳过，后续定时任务将在每天 16:00 按照正确路径默默执行。
