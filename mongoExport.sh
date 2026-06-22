@@ -6,7 +6,13 @@
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 DB_NAME="node-boilerplate"
-BACKUP_ROOT="/Users/tristan/Workspaces/TristanSaasMongoBackup"
+
+# 自适应检测运行环境，如果是 Linux 生产环境则使用 /home/tristan 路径，否则使用 macOS 本地路径
+if [ -d "/home/tristan" ]; then
+    BACKUP_ROOT="/home/tristan/workspaces/TristanSaasMongoBackup"
+else
+    BACKUP_ROOT="/Users/tristan/Workspaces/TristanSaasMongoBackup"
+fi
 
 # 使用自1970年以来的天数对10取模，生成0-9的循环子目录
 DAYS_SINCE_EPOCH=$(expr $(date +%s) / 86400)

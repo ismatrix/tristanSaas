@@ -3436,4 +3436,12 @@ firstName，lastName，title，functionName，phoneNumber
 
 ### 执行总结
 1. **编写并执行数据导入脚本**：在项目 `scripts/` 目录下创建了 `import_excel_to_mongo.js` 脚本，基于 Node.js 原生的 `xlsx` 库解析 Excel，对 `ultimateGID`, `GID`, `contactId` 等关键大数字段做格式清洗与防丢失精度转换；在导入时先执行 `deleteMany({})` 清空旧数据。共覆盖导入 `keyGlobalFamilyTree`（7668 条）、`custContacts`（117,304 条）和 `keyFamilyTreeCustMapping`（1115 条）。
-2. **同步脚本调整与数据同步**：修改了 `syncMongoDB.js` 脚本，将新导入的 `custContacts` 和 `keyFamilyTreeCustMapping` 表加到待同步列表中。在本地执行 `node syncMongoDB.js`，成功将 3 个表的最新数据全量同步更新至生产服务器的 MongoDB 中，在生产环境成功运行生效。
+2. **同步脚本调整与数据同步**：修改了 `syncMongoDB.js` 脚本，将新导入 `custContacts` 和 `keyFamilyTreeCustMapping` 表加到待同步列表中。在本地执行 `node syncMongoDB.js`，成功将 3 个表的最新数据全量同步更新至生产服务器的 MongoDB 中，在生产环境成功运行生效。
+
+## 2026-06-22 11:32:36
+
+### 用户提示词
+检查生产环境中的crontab中/mongoExport.sh 为什么没有每天都执行导出备份mongodb的数据，~/workspaces/TristanSaasMongoBackup 目录最新的是9， 5月26日的备份
+
+### 执行总结
+（待完成）
