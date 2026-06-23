@@ -23,6 +23,37 @@
     const DEFAULT_TABLE_NAME = "99a7c34daf8249b7858637ee791d199a";
     const DEFAULT_SUBJECT_ID = "ada5e9a2abf541bc895f6923d70a816d";
 
+    // --- 0. 载荷拦截器 ---
+    let lastTcvPayload = null;
+
+    // 拦截页面的 AJAX 请求以自动截获最新、合法的 TCV Payload
+    (function () {
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSend = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.open = function (method, url) {
+            this._url = url;
+            this._method = method;
+            return originalOpen.apply(this, arguments);
+        };
+
+        XMLHttpRequest.prototype.send = function (data) {
+            try {
+                if (this._url && typeof this._url === 'string' && this._url.includes('cache/widget/data')) {
+                    if (this._url.includes('widgetId=c0f131a7756b4af0adb8724b6833fdb3')) {
+                        if (data && typeof data === 'string') {
+                            lastTcvPayload = JSON.parse(data);
+                            console.log('🎉 [FineBI] 拦截成功！最新真实的 TCV 请求载荷已捕获:', lastTcvPayload);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('⚠️ [FineBI] 拦截 TCV 载荷异常:', e);
+            }
+            return originalSend.apply(this, arguments);
+        };
+    })();
+
     // --- 1. Token 获取 ---
     function getAuthToken() {
         // 从 Cookie 中获取 fine_auth_token
@@ -377,7 +408,19 @@
             "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
         };
 
-        const payload = buildPayload(opts);
+        let payload;
+        if (lastTcvPayload) {
+            console.log('🚀 [FineBI] 优先使用页面拦截到的最新真实请求载荷');
+            payload = JSON.parse(JSON.stringify(lastTcvPayload));
+            payload.timeStamp = Date.now();
+            if (payload.queryInfo) {
+                payload.queryInfo.timeStamp = Date.now();
+                payload.queryInfo.sessionId = `${Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, '0')).join('')}_${Date.now().toString(36)}`;
+            }
+        } else {
+            console.warn('⚠️ [FineBI] 未截获到拦截载荷，使用默认拼装的硬编码 Payload 兜底');
+            payload = buildPayload(opts);
+        }
         const t0 = Date.now();
         console.log('📡 [FineBI] 正在请求 Widget 数据...');
         console.log('📋 [FineBI] 请求 URL:', url);
@@ -395,16 +438,32 @@
 
                 if (response.status === 200) {
                     try {
-                        const data = JSON.parse(response.responseText);
-                        console.log('📦 [FineBI] 返回数据结构:', Object.keys(data));
+                        const resJson = JSON.parse(response.responseText);
+                        console.log('📦 [FineBI] 返回数据完整响应:', resJson);
 
-                        const widgetData = data.data || data.result || data;
+                        // 明确的业务失败拦截
+                        if (resJson.success === false) {
+                            const errDetail = resJson.detailErrorMsg || resJson.errorMsg || resJson.message || '未知业务错误';
+                            console.error('❌ [FineBI] 接口业务逻辑执行失败:', resJson);
+                            alert(`❌ FineBI 业务请求失败！错误信息:\n${errDetail}`);
+                            return;
+                        }
+
+                        const widgetData = resJson.data || resJson.result || resJson;
+                        
+                        // 如果 widgetData 还是没有有效结构，进行警告并展示
+                        if (!widgetData || typeof widgetData !== 'object') {
+                            console.error('❌ [FineBI] 返回的 data 字段不是有效对象:', resJson);
+                            alert('❌ 数据格式非法，无法解析 data 部分！');
+                            return;
+                        }
+
                         const header = widgetData.header || widgetData.headers || [];
                         const items = widgetData.items || [];
 
                         if (!Array.isArray(items) || items.length === 0) {
-                            console.warn('⚠️ [FineBI] 未获取到任何数据项');
-                            alert('⚠️ 未获取到任何数据，请检查仪表板状态');
+                            console.warn('⚠️ [FineBI] 未获取到 items 数组或为空. 完整响应:', resJson);
+                            alert(`⚠️ 获取成功但数据项为空！\n错误信息: ${resJson.errorMsg || '无'}\n详情: ${resJson.detailErrorMsg || '无'}`);
                             return;
                         }
 
