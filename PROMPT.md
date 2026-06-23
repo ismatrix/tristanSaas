@@ -3478,3 +3478,18 @@ firstName，lastName，title，functionName，phoneNumber
 4. **代码提交、推送与自动部署上线**：
    - 将本地 `autoFinbi.js`、`src/controllers/wildcards.controller.js`、`src/services/wildcards.service.js` 和 `src/validations/wildcards.validation.js` 的修改打包暂存并提交，成功推送至远程 GitHub 仓库 `main` 分支。
    - 通过 SSH 连接生产服务器 `tristan.wang:6822`，在部署目录 `/home/tristan/workspaces/TristanSaas` 下成功执行 `deploy.sh` 脚本，拉取最新代码并完成了前端项目的重新编译构建，最后平滑重启了后端的 PM2 进程 `backend-api`，确保所有修改已在生产服务器部署并实时生效。
+
+## 2026-06-23 12:21:00
+
+### 用户提示词
+未获取到任何数据，请检查传入的参数，除了token是获取当前finebi的tonken之外，其余的参数都是按照下列调用：
+curl 'https://finebi.cmitry.com/webroot/decision/v5/cache/widget/data?widgetId=c0f131a7756b4af0adb8724b6833fdb3&templateId=templateHelperId_07c87dddc450570e&entryType=0&engineType=1&showSectionError=true&taskId=7cd0fddeaafd688b' \
+... (包含带有新 templateId 的 curl 语句)
+
+### 执行总结
+1. **更新默认 templateId 以及修正 resultFilter 参数**：
+   - 将 `autoFinbi.js` 中的默认模板 ID `DEFAULT_TEMPLATE_ID` 更新为最新的 `templateHelperId_07c87dddc450570e`。
+   - 修正了 `buildPayload` 里的 `resultFilter` 参数，由之前的 `[D.main_signDate2, D.main_circuitNbr]` 纠正为 `[D.main_signDate]`（对应 `"8590643d204e79ba"`），与最新 Curl 请求的数据载荷完全一致，确保接口不会因为过滤字段差异而返回空数据。
+2. **代码推送与远程生产部署**：
+   - 将修正后的代码在本地 Git 暂存并提交，推送到 GitHub 远程仓库 `main` 分支。
+   - 通过 SSH 连接生产服务器 `tristan.wang:6822` 执行部署脚本 `deploy.sh`，拉取最新修改、重新编译前端并重启后端 PM2 进程，确保最新参数修正已在生产环境运行生效。
