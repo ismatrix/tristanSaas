@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         FineBI 数据抓取工具
+// @name         FineBI TCV 数据抓取工具
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  从 FineBI 平台抓取 Widget 数据并推送到本地 Dashboard
+// @version      1.1
+// @description  从 FineBI 平台抓取 TCV 数据并推送到本地 MongoDB 数据库中
 // @author       Tristan
 // @match        *://finebi.cmitry.com/*
 // @grant        GM_xmlhttpRequest
@@ -15,12 +15,12 @@
     // ================= 配置区 =================
     const ADMIN_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWUxZmNmZTVlY2Q4NDg3Nzg5MmU4ZGUiLCJpYXQiOjE3NzY0MTgwNDYsImV4cCI6MjA5MjAzNzI0NiwidHlwZSI6ImFjY2VzcyJ9.5KdsXKEAiTC61dyINjTqDjUSgfG5eiOkKpaPxRZY2D0";
     const FINEBI_BASE = "https://finebi.cmitry.com";
-    const LOCAL_API = "http://127.0.0.1:3000/v1/finebi-data/bulk-upsert";
+    const LOCAL_API = "http://127.0.0.1:3000/v1/wildcards/dmcTCV/bulk-upsert";
 
-    // --- 默认查询参数 ---
-    const DEFAULT_WIDGET_ID = "3d97c859360b41e0bdf57cb2beab491a";
-    const DEFAULT_TEMPLATE_ID = "templateHelperId_1021aa8e66a540d6";
-    const DEFAULT_TABLE_NAME = "07de22faf70c432c8680a9c370db4064";
+    // --- 默认 TCV 查询参数 ---
+    const DEFAULT_WIDGET_ID = "c0f131a7756b4af0adb8724b6833fdb3";
+    const DEFAULT_TEMPLATE_ID = "templateHelperId_8ca2b357ccf60b77";
+    const DEFAULT_TABLE_NAME = "99a7c34daf8249b7858637ee791d199a";
     const DEFAULT_SUBJECT_ID = "ada5e9a2abf541bc895f6923d70a816d";
 
     // --- 1. Token 获取 ---
@@ -59,87 +59,155 @@
         });
     };
 
-    // --- 3. 构建 FineBI Widget 请求体 ---
+    // --- 3. 构建 FineBI Widget 请求体 (TCV 数据专属) ---
     function buildPayload(opts = {}) {
-        const tableName = opts.tableName || DEFAULT_TABLE_NAME;
+        const mainTable = opts.tableName || DEFAULT_TABLE_NAME;
+        const linkTable = "07de22faf70c432c8680a9c370db4064";
         const widgetId = opts.widgetId || DEFAULT_WIDGET_ID;
         const subjectId = opts.subjectId || DEFAULT_SUBJECT_ID;
-        const filterYear = opts.filterYear || "2026";
-        const productFilter = opts.productFilter || ["IoT Application", "Private Network & Application"];
 
         // 字段 ID 映射表（Unicode 编码字段名）
         const F = {
-            dataMonth:    `${tableName}_[6570][636e][6708][4efd]`,
-            isIntlBiz:    `${tableName}_[662f][5426][56fd][9645][4e1a][52a1][6536][5165]`,
-            ibossProduct: `${tableName}_iBOSS[4ea7][54c1][540d][79f0]`,
-            newField:     `${tableName}_new`,
-            circuitRef:   `${tableName}_[7535][8def][53c2][8003][7f16][53f7]`,
-            finCustomer:  `${tableName}_[8d22][52a1][7cfb][7edf][5ba2][6237][6216][4f9b][5e94][5546][540d][79f0]`,
-            endCustomer:  `${tableName}_[7ec8][7aef][5ba2][6237][540d][79f0]`,
-            region:       `${tableName}_[5927][533a][7f16][7801]`,
-            salesUnit:    `${tableName}_[9500][552e][5355][5143][7f16][7801]`,
-            accountMgr:   `${tableName}_[5ba2][6237][7ecf][7406][540d][79f0]`,
-            splitRatio:   `${tableName}_[5206][6210][6bd4][4f8b]`,
-            dualFlag:     `${tableName}_[53cc][8ba1][53cc][8003][6807][8bc6]`
+            // Table 07de... 关联字段
+            link_dataMonth:    `${linkTable}_[6570][636e][6708][4efd]`,
+            link_isIntlBiz:    `${linkTable}_[662f][5426][56fd][9645][4e1a][52a1][6536][5165]`,
+            link_ibossProduct: `${linkTable}_iBOSS[4ea7][54c1][540d][79f0]`,
+            link_newField:     `${linkTable}_new`,
+            link_circuitRef:   `${linkTable}_[7535][8def][53c2][8003][7f16][53f7]`,
+
+            // Table 99a7... 主表字段
+            main_signDate:     `${mainTable}_[5408][540c][7b7e][7f72][65e5][671f]`,
+            main_circuitNbr:   `${mainTable}_[7535][8def][7f16][53f7]`,
+            main_tcvHkd:       `${mainTable}_[7b7e][5355][91d1][989d]([6e2f][5e01])`,
+            main_isIntlLabel:  `${mainTable}_[662f][5426][56fd][9645][4e1a][52a1][6536][5165][6807][7b7e]`,
+            main_salesUnit:    `${mainTable}_[9500][552e][5355][5143][7f16][7801]`,
+            main_custName:     `${mainTable}_[7b7e][7ea6][5ba2][6237][540d][79f0]`,
+            main_oneTimeFee:   `${mainTable}_[4e00][6b21][6027][8d39][7528]`,
+            main_oneTimeHkd:   `${mainTable}_[4e00][6b21][6027][8d39][7528]([6e2f][5e01])`,
+            main_periodFee:    `${mainTable}_[5468][671f][6027][8d39][7528]`,
+            main_exchangeRate: `${mainTable}_[6c47][7387]`,
+            main_currency:     `${mainTable}_[5408][540c][5e01][79cd]`,
+            main_periodHkd:    `${mainTable}_[5468][671f][6027][8d39][7528]([6e2f][5e01])`,
+            main_billPeriod:   `${mainTable}_[8ba1][8d39][5468][671f]`,
+            main_regionCode:   `${mainTable}_[5927][533a][7f16][7801]`,
+            main_regionName:   `${mainTable}_[5927][533a][4e2d][6587][540d][79f0]`,
+            main_managerAcct:  `${mainTable}_[5ba2][6237][7ecf][7406][8d26][53f7]`,
+            main_custType:     `${mainTable}_[5ba2][6237][7c7b][578b]`,
+            main_custFeature:  `${mainTable}_[5ba2][6237][7279][6027]`,
+            main_signCustCode: `${mainTable}_[7b7e][7ea6][5ba2][6237][7f16][7801]`,
+            main_signCustId:   `${mainTable}_[7b7e][7ea6][5ba2][6237][6807][8bc6]`,
+            main_signCustInd:  `${mainTable}_[7b7e][7ea6][5ba2][6237][884c][4e1a]`,
+            main_parentName:   `${mainTable}_[4e0a][7ea7][4f01][4e1a][540d][79f0]`,
+            main_marketProd:   `${mainTable}_[5e02][573a][7ecf][5206][4ea7][54c1][5206][7c7b]`,
+            main_salesUnitNm:  `${mainTable}_[9500][552e][5355][5143][4e2d][6587][540d][79f0]`,
+            main_endCustName:  `${mainTable}_[7ec8][7aef][5ba2][6237][540d][79f0]`,
+            main_tcvProdName:  `${mainTable}_TCV[4ea7][54c1][540d][79f0]`,
+            main_tcvOrderType: `${mainTable}_TCV[8ba2][5355][7c7b][578b]`,
+            main_ibossProdTypeId: `${mainTable}_iBOSS[4ea7][54c1][7c7b][578b]ID`
         };
 
-        // 维度 ID 映射
+        // 维度 ID 映射表
         const D = {
-            ibossProduct: "6062379a7e401072",
-            circuitRef:   "1d101b4b5536cb31",
-            finCustomer:  "60dc52a01d2f0c3a",
-            dataMonth:    "570c415fa85a0e0a",
-            accountMgr:   "4d120506802bda4b",
-            region:       "bac03a46eb67e680",
-            salesUnit:    "471a2a859015cdd8",
-            endCustomer:  "d55488cf734997de",
-            splitRatio:   "8aa935191dfcc2ee",
-            dualFlag:     "367cd3c29a105ef5",
-            newField:     "1bd1883a9ceb49c2",
-            isIntlBiz:    "a29ada5ca9d14f2b",
-            dataMonth2:   "d1157a68bdb7ec9a",
-            ibossProduct2:"3d6d71e2166394c2"
+            main_signDate:     "8590643d204e79ba",
+            main_signDate2:    "1d54df01181da1ad",
+            main_custName:     "388ba72c2fafa181",
+            main_salesUnit:    "ac59ea80f3e5b33c",
+            main_tcvHkd:       "f4ee8ea4f2fd079b",
+            main_circuitNbr:   "919191d7918495fb",
+            main_oneTimeFee:   "2fcd7380dd39fd71",
+            main_oneTimeHkd:   "26db84cedf4bddf7",
+            main_periodFee:    "d399d8019b9a791a",
+            main_exchangeRate: "a9b31da67b457be3",
+            main_currency:     "a5a93b18cf400a9c",
+            main_periodHkd:    "e3afb71907c547d2",
+            main_billPeriod:   "21977ba979e347f4",
+            main_regionCode:   "dd7ad3b4d0d7a52f",
+            main_regionName:   "87a8a10ced396997",
+            main_managerAcct:  "81e729fbd69c7f25",
+            main_custType:     "043483c918af1cb0",
+            main_custFeature:  "2529c1931fdbaf62",
+            main_signCustCode: "d3746d1ff8baeeed",
+            main_signCustId:   "1e3e982cfeb6319b",
+            main_signCustInd:  "b40b95735ce0e129",
+            main_parentName:   "ac708c1e41d5902e",
+            main_marketProd:   "e86b8309df1f2443",
+            main_isIntlLabel:  "c4b0717ebae977e7",
+            main_salesUnitNm:  "00154957da0f137c",
+            main_endCustName:  "24c0e27430ebda4a",
+            main_tcvProdName:  "5ad9ebde1ace9fa8",
+            main_tcvOrderType: "a2bde7c4e3fe259c",
+            main_ibossProdTypeId: "1ff27cace9b80fc2"
         };
 
-        // 构建 widgetMeasures
+        // 构建 widgetMeasures 数组
         const widgetMeasures = [
+            { id: F.link_dataMonth, group: {} },
+            { id: F.link_isIntlBiz, group: {} },
+            { id: F.link_ibossProduct, group: {} },
+            { id: F.link_newField, group: {} },
+            { id: F.link_circuitRef, group: {} },
             {
-                id: F.dataMonth,
+                id: F.main_signDate,
                 detailFilter: {
-                    fieldId: F.dataMonth, filterLevel: 1, customFilterLevel: -1,
-                    filterValue: filterYear, filterType: 5, usingFilterLevel: 1
+                    fieldId: F.main_signDate, filterLevel: 1, customFilterLevel: -1,
+                    filterValue: { value: { year: "2026", month: "4", day: "1" }, type: 1 },
+                    filterType: 26, usingFilterLevel: 1
                 },
                 group: {
-                    group_11: { sort: { sortTarget: `${F.dataMonth}_11`, sortField: false, type: 1 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false },
-                    group_22: { sort: { sortTarget: `${F.dataMonth}_11`, sortField: false, type: 1 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false },
-                    group_23: { sort: { sortTarget: `${F.dataMonth}_11`, sortField: false, type: 1 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false }
+                    group_5: { sort: { sortTarget: `${F.main_signDate}_5`, sortField: false, type: 1 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false }
                 },
-                detailFilterUsedFieldIds: [F.dataMonth]
-            },
-            { id: F.isIntlBiz, group: {}, detailFilterUsedFieldIds: [] },
-            {
-                id: F.ibossProduct,
-                detailFilter: {
-                    fieldId: F.ibossProduct, filterLevel: 1, customFilterLevel: -1,
-                    filterValue: { type: 1, assist: [], value: productFilter },
-                    filterType: 1, usingFilterLevel: 1
-                },
-                group: {},
-                detailFilterUsedFieldIds: [F.ibossProduct]
+                detailFilterUsedFieldIds: [F.main_signDate]
             },
             {
-                id: F.newField,
+                id: F.main_circuitNbr,
                 group: {
-                    summary_3: {
-                        cal: { cal_0: { repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false, displayName: "拆分后港币金额｜绝对值" } },
-                        repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false
-                    }
-                }
+                    group_11: { sort: { sortTarget: `${F.main_circuitNbr}_11`, sortField: false, type: 3 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false },
+                    group_22: { sort: { sortTarget: `${F.main_circuitNbr}_11`, sortField: false, type: 3 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false },
+                    group_23: { sort: { sortTarget: `${F.main_circuitNbr}_11`, sortField: false, type: 3 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false }
+                },
+                detailFilterUsedFieldIds: []
             },
-            { id: F.circuitRef, group: {}, detailFilterUsedFieldIds: [] }
+            { id: F.main_tcvHkd, group: {}, detailFilterUsedFieldIds: [] },
+            { id: F.main_isIntlLabel, group: {} },
+            { id: F.main_salesUnit, group: {}, detailFilterUsedFieldIds: [] },
+            { id: F.main_custName, group: {}, detailFilterUsedFieldIds: [] }
         ];
 
-        // 构建 dimensions 对象
+        // 构建 measures
+        const measures = [
+            { id: F.link_dataMonth, group: {}, type: 16 },
+            { id: F.link_isIntlBiz, group: {}, type: 16 },
+            { id: F.link_ibossProduct, group: {}, type: 16 },
+            { id: F.link_newField, group: {}, type: 32 },
+            { id: F.link_circuitRef, group: {}, type: 16 },
+            {
+                id: F.main_signDate,
+                detailFilter: {
+                    fieldId: F.main_signDate, filterLevel: 1, customFilterLevel: -1,
+                    filterValue: { value: { year: "2026", month: "4", day: "1" }, type: 1 },
+                    filterType: 26, usingFilterLevel: 1
+                },
+                group: {
+                    group_5: { sort: { sortTarget: `${F.main_signDate}_5`, sortField: false, type: 1 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false }
+                },
+                type: 48
+            },
+            {
+                id: F.main_circuitNbr,
+                group: {
+                    group_11: { sort: { sortTarget: `${F.main_circuitNbr}_11`, sortField: false, type: 3 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false },
+                    group_22: { sort: { sortTarget: `${F.main_circuitNbr}_11`, sortField: false, type: 3 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false },
+                    group_23: { sort: { sortTarget: `${F.main_circuitNbr}_11`, sortField: false, type: 3 }, repeatCal: true, useDataBar: false, showMissingTime: false, depGroup: false }
+                },
+                type: 48
+            },
+            { id: F.main_tcvHkd, group: {}, type: 16 },
+            { id: F.main_isIntlLabel, group: {}, type: 16 },
+            { id: F.main_salesUnit, group: {}, type: 16 },
+            { id: F.main_custName, group: {}, type: 16 }
+        ];
+
+        // 统一构建维度对象的辅助函数
         const mkDim = (id, name, fieldId, type = 1, groupType = 11, showSum = false) => ({
             name, type, notShowNull: false, id, fieldId, toCountType: 0,
             group: { type: groupType }, calculation: { type: 0, value: 0 }, filter: null,
@@ -156,65 +224,99 @@
             formatStyle: 0, formatDecimal: 0, numLevel: 0, numSeparators: false, used: true, drillDimensions: {}
         });
 
+        // 组装 dimensions 映射对象
         const dimensions = {};
-        dimensions[D.ibossProduct]  = mkDim(D.ibossProduct, "iBOSS产品名称", F.ibossProduct);
-        dimensions[D.circuitRef]    = mkDim(D.circuitRef, "电路参考编号", F.circuitRef);
-        dimensions[D.finCustomer]   = mkDim(D.finCustomer, "财务系统客户或供应商名称", F.finCustomer);
-        dimensions[D.dataMonth]     = mkDim(D.dataMonth, "数据月份", F.dataMonth);
-        dimensions[D.accountMgr]    = mkDim(D.accountMgr, "客户经理名称", F.accountMgr);
-        dimensions[D.region]        = mkDim(D.region, "大区编码", F.region);
-        dimensions[D.salesUnit]     = mkDim(D.salesUnit, "销售单元编码", F.salesUnit);
-        dimensions[D.endCustomer]   = mkDim(D.endCustomer, "终端客户名称", F.endCustomer);
-        dimensions[D.splitRatio]    = mkDim(D.splitRatio, "分成比例", F.splitRatio, 2, 3, true);
-        dimensions[D.dualFlag]      = mkDim(D.dualFlag, "双计双考标识", F.dualFlag);
-        dimensions[D.newField]      = mkDim(D.newField, "new", F.newField, 2, 3, true);
-        dimensions[D.isIntlBiz]     = mkDim(D.isIntlBiz, "是否国际业务收入", F.isIntlBiz);
-        dimensions[D.dataMonth2]    = mkDim(D.dataMonth2, "数据月份", F.dataMonth);
-        dimensions[D.ibossProduct2] = mkDim(D.ibossProduct2, "iBOSS产品名称", F.ibossProduct);
+        dimensions[D.main_signDate] = mkDim(D.main_signDate, "合同签署日期", F.main_signDate, 1, 11);
+        dimensions[D.main_signDate2] = mkDim(D.main_signDate2, "合同签署日期", F.main_signDate, 1, 11);
+        dimensions[D.main_custName] = mkDim(D.main_custName, "签约客户名称", F.main_custName, 1, 11);
+        dimensions[D.main_salesUnit] = mkDim(D.main_salesUnit, "销售单元编码", F.main_salesUnit, 1, 11);
+        dimensions[D.main_tcvHkd] = mkDim(D.main_tcvHkd, "签单金额(港币)", F.main_tcvHkd, 2, 3, true);
+        dimensions[D.main_circuitNbr] = mkDim(D.main_circuitNbr, "电路编号", F.main_circuitNbr, 1, 11);
+        dimensions[D.main_oneTimeFee] = mkDim(D.main_oneTimeFee, "一次性费用", F.main_oneTimeFee, 2, 3, true);
+        dimensions[D.main_oneTimeHkd] = mkDim(D.main_oneTimeHkd, "一次性费用(港币)", F.main_oneTimeHkd, 2, 3, true);
+        dimensions[D.main_periodFee] = mkDim(D.main_periodFee, "周期性费用", F.main_periodFee, 2, 3, true);
+        dimensions[D.main_exchangeRate] = mkDim(D.main_exchangeRate, "汇率", F.main_exchangeRate, 2, 3, true);
+        dimensions[D.main_currency] = mkDim(D.main_currency, "合同币种", F.main_currency, 1, 11);
+        dimensions[D.main_periodHkd] = mkDim(D.main_periodHkd, "周期性费用(港币)", F.main_periodHkd, 2, 3, true);
+        dimensions[D.main_billPeriod] = mkDim(D.main_billPeriod, "计费周期", F.main_billPeriod, 1, 11);
+        dimensions[D.main_regionCode] = mkDim(D.main_regionCode, "大区编码", F.main_regionCode, 1, 11);
+        dimensions[D.main_regionName] = mkDim(D.main_regionName, "大区中文名称", F.main_regionName, 1, 11);
+        dimensions[D.main_managerAcct] = mkDim(D.main_managerAcct, "客户经理账号", F.main_managerAcct, 1, 11);
+        dimensions[D.main_custType] = mkDim(D.main_custType, "客户类型", F.main_custType, 1, 11);
+        dimensions[D.main_custFeature] = mkDim(D.main_custFeature, "客户特性", F.main_custFeature, 1, 11);
+        dimensions[D.main_signCustCode] = mkDim(D.main_signCustCode, "签约客户编码", F.main_signCustCode, 1, 11);
+        dimensions[D.main_signCustId] = mkDim(D.main_signCustId, "签约客户标识", F.main_signCustId, 1, 11);
+        dimensions[D.main_signCustInd] = mkDim(D.main_signCustInd, "签约客户行业", F.main_signCustInd, 1, 11);
+        dimensions[D.main_parentName] = mkDim(D.main_parentName, "上级企业名称", F.main_parentName, 1, 11);
+        dimensions[D.main_marketProd] = mkDim(D.main_marketProd, "市场经分产品分类", F.main_marketProd, 1, 11);
+        dimensions[D.main_isIntlLabel] = mkDim(D.main_isIntlLabel, "是否国际业务收入标签", F.main_isIntlLabel, 1, 11);
+        dimensions[D.main_salesUnitNm] = mkDim(D.main_salesUnitNm, "销售单元中文名称", F.main_salesUnitNm, 1, 11);
+        dimensions[D.main_endCustName] = mkDim(D.main_endCustName, "终端客户名称", F.main_endCustName, 1, 11);
+        dimensions[D.main_tcvProdName] = mkDim(D.main_tcvProdName, "TCV产品名称", F.main_tcvProdName, 1, 11);
+        dimensions[D.main_tcvOrderType] = mkDim(D.main_tcvOrderType, "TCV订单类型", F.main_tcvOrderType, 1, 11);
+        dimensions[D.main_ibossProdTypeId] = mkDim(D.main_ibossProdTypeId, "iBOSS产品类型ID", F.main_ibossProdTypeId, 1, 11);
 
-        // 构建 dimensionGroups
-        const dimensionGroups = {};
+        // 维度分组 mapping
         const dgMap = {
-            [`${F.ibossProduct}_11`]:  [D.ibossProduct, D.ibossProduct2],
-            [`${F.circuitRef}_11`]:    [D.circuitRef],
-            [`${F.finCustomer}_11`]:   [D.finCustomer],
-            [`${F.dataMonth}_11`]:     [D.dataMonth, D.dataMonth2],
-            [`${F.accountMgr}_11`]:    [D.accountMgr],
-            [`${F.region}_11`]:        [D.region],
-            [`${F.salesUnit}_11`]:     [D.salesUnit],
-            [`${F.endCustomer}_11`]:   [D.endCustomer],
-            [`${F.splitRatio}_3_0`]:   [D.splitRatio],
-            [`${F.dualFlag}_11`]:      [D.dualFlag],
-            [`${F.newField}_3_0`]:     [D.newField],
-            [`${F.isIntlBiz}_11`]:     [D.isIntlBiz]
+            [`${F.main_signDate}_5`]:     [D.main_signDate, D.main_signDate2],
+            [`${F.main_custName}_11`]:    [D.main_custName],
+            [`${F.main_salesUnit}_11`]:   [D.main_salesUnit],
+            [`${F.main_tcvHkd}_3_0`]:     [D.main_tcvHkd],
+            [`${F.main_circuitNbr}_11`]:   [D.main_circuitNbr],
+            [`${F.main_oneTimeFee}_3_0`]: [D.main_oneTimeFee],
+            [`${F.main_oneTimeHkd}_3_0`]: [D.main_oneTimeHkd],
+            [`${F.main_periodFee}_3_0`]:  [D.main_periodFee],
+            [`${F.main_exchangeRate}_3_0`]:[D.main_exchangeRate],
+            [`${F.main_currency}_11`]:    [D.main_currency],
+            [`${F.main_periodHkd}_3_0`]:  [D.main_periodHkd],
+            [`${F.main_billPeriod}_11`]:  [D.main_billPeriod],
+            [`${F.main_regionCode}_11`]:  [D.main_regionCode],
+            [`${F.main_regionName}_11`]:  [D.main_regionName],
+            [`${F.main_managerAcct}_11`]: [D.main_managerAcct],
+            [`${F.main_custType}_11`]:    [D.main_custType],
+            [`${F.main_custFeature}_11`]: [D.main_custFeature],
+            [`${F.main_signCustCode}_11`]:[D.main_signCustCode],
+            [`${F.main_signCustId}_11`]:  [D.main_signCustId],
+            [`${F.main_signCustInd}_11`]: [D.main_signCustInd],
+            [`${F.main_parentName}_11`]:  [D.main_parentName],
+            [`${F.main_marketProd}_11`]:  [D.main_marketProd],
+            [`${F.main_isIntlLabel}_11`]: [D.main_isIntlLabel],
+            [`${F.main_salesUnitNm}_11`]: [D.main_salesUnitNm],
+            [`${F.main_endCustName}_11`]: [D.main_endCustName],
+            [`${F.main_tcvProdName}_11`]: [D.main_tcvProdName],
+            [`${F.main_tcvOrderType}_11`]:[D.main_tcvOrderType],
+            [`${F.main_ibossProdTypeId}_11`]:[D.main_ibossProdTypeId]
         };
+        const dimensionGroups = {};
         for (const [g, ids] of Object.entries(dgMap)) {
             dimensionGroups[g] = { group: g, dimensionIds: ids };
         }
 
-        // 构建 measures (API 级别)
-        const measures = [
-            { id: F.dataMonth, detailFilter: widgetMeasures[0].detailFilter, group: widgetMeasures[0].group, type: 16 },
-            { id: F.isIntlBiz, group: {}, type: 16 },
-            { id: F.ibossProduct, detailFilter: widgetMeasures[2].detailFilter, group: {}, type: 16 },
-            { id: F.newField, group: widgetMeasures[3].group, type: 32 },
-            { id: F.circuitRef, group: {}, type: 16 }
-        ];
-
-        // 构建 measureTables
+        // 度量表配置
         const measureTables = {};
-        [F.dataMonth, F.isIntlBiz, F.ibossProduct, F.newField, F.circuitRef].forEach(id => {
-            measureTables[id] = { id, tables: [tableName], engineType: "direct" };
+        [F.link_dataMonth, F.link_isIntlBiz, F.link_ibossProduct, F.link_newField, F.link_circuitRef].forEach(id => {
+            measureTables[id] = { id, tables: [linkTable], engineType: "direct" };
+        });
+        [F.main_signDate, F.main_circuitNbr, F.main_tcvHkd, F.main_isIntlLabel, F.main_salesUnit, F.main_custName].forEach(id => {
+            measureTables[id] = { id, tables: [mainTable], engineType: "direct" };
         });
 
-        // view 配置
-        const viewIds = Object.keys(dimensions).filter(k => k !== D.dataMonth2 && k !== D.ibossProduct2);
+        // 视口展示维度列表 (28个维度列)
+        const viewIds = [
+            D.main_circuitNbr, D.main_ibossProdTypeId, D.main_tcvProdName, D.main_tcvOrderType,
+            D.main_marketProd, D.main_signDate2, D.main_signCustCode, D.main_signCustId,
+            D.main_custName, D.main_endCustName, D.main_signCustInd, D.main_parentName,
+            D.main_custType, D.main_custFeature, D.main_regionCode, D.main_regionName,
+            D.main_salesUnit, D.main_salesUnitNm, D.main_managerAcct, D.main_tcvHkd,
+            D.main_currency, D.main_exchangeRate, D.main_oneTimeFee, D.main_oneTimeHkd,
+            D.main_billPeriod, D.main_periodFee, D.main_periodHkd, D.main_isIntlLabel
+        ];
 
         const sessionId = `e07b27af-0eaa-4ec9-a2c6-e0f8afa02104_${Date.now().toString(36)}`;
 
         return {
-            chartType: "interval", type: 4, name: "Tristan-2026BR",
-            timeStamp: Date.now(), tableName: [tableName], fields: [],
+            chartType: "interval", type: 4, name: "allTCV",
+            timeStamp: Date.now(), tableName: [mainTable], fields: [],
             widgetMeasures, injection: null, widgetModel: { type: 0 },
             settings: { nameStyleType: 1, titleHeight: 25, emptyDisplayValue: "default" },
             view: { "10000": viewIds, "20000": [], "30000": [] },
@@ -224,7 +326,7 @@
                 "30000": { type: 1, left: { reversed: false, log: false, sharedDomain: true }, right: { reversed: false, log: false, sharedDomain: true }, size: 0 }
             },
             dimensions, allData: true, drillOrder: [],
-            resultFilter: [D.dataMonth2, D.ibossProduct2],
+            resultFilter: [D.main_signDate2, D.main_circuitNbr],
             dimensionGroups, legendFilter: null,
             columnSize: [], regionColumnSize: [], equallyDivideColumn: false,
             quickSettingClosed: false, uploadedImages: [], widgetParameters: [],
@@ -233,12 +335,12 @@
                 mobile: false, bounds: { height: 0, left: 0, top: 0, width: 0 },
                 previewCalLimit: 1, userId: "eb0025f0-cb8b-424f-82e0-ac3e1c2cc819",
                 userName: "tristanwang", sessionId,
-                subjectId, title: "Tristan-2026BR", widgetId, measureTables
+                subjectId, title: "allTCV", widgetId, measureTables
             },
             preview: false, page: 1, yPage: 0, xPage: 0, realData: false,
             templateChartColorChange: false, detailSetting: false,
             tableWidth: 0, seqColWidth: 0, selectTable: "",
-            sortSequence: [D.dataMonth], mobile: false, allowOverlap: false,
+            sortSequence: [D.main_signDate2, D.main_circuitNbr], mobile: false, allowOverlap: false,
             openJump: true, wId: widgetId, showTitle: true,
             measures, filter: { filterType: 34, filterValue: [] }, filterValues: []
         };
@@ -252,7 +354,7 @@
         const widgetId = opts.widgetId || DEFAULT_WIDGET_ID;
         const templateId = opts.templateId || DEFAULT_TEMPLATE_ID;
 
-        // 构建 URL 参数
+        // 构建 URL 参数，动态生成 taskId
         const taskId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
             .map(b => b.toString(16).padStart(2, '0')).join('');
         const url = `${FINEBI_BASE}/webroot/decision/v5/cache/widget/data?widgetId=${widgetId}&templateId=${templateId}&entryType=0&engineType=1&showSectionError=true&taskId=${taskId}`;
@@ -265,14 +367,14 @@
             "fine-sw-tag": "traceWorkType=data",
             "origin": FINEBI_BASE,
             "referer": `${FINEBI_BASE}/webroot/decision/v5/conf/subject/page/edit/${DEFAULT_SUBJECT_ID}/widget/${widgetId}`,
-            "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+            "sec-ch-ua": '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"macOS"',
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
             "x-requested-with": "XMLHttpRequest",
-            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
         };
 
         const payload = buildPayload(opts);
@@ -296,17 +398,48 @@
                         const data = JSON.parse(response.responseText);
                         console.log('📦 [FineBI] 返回数据结构:', Object.keys(data));
 
-                        // 解析数据
-                        const rows = data.data || data.result || data;
-                        if (Array.isArray(rows)) {
-                            console.log(`✅ [FineBI] 获取到 ${rows.length} 条数据`);
-                        } else {
-                            console.log('📊 [FineBI] 返回数据:', JSON.stringify(data).substring(0, 500));
+                        const widgetData = data.data || data.result || data;
+                        const header = widgetData.header || widgetData.headers || [];
+                        const items = widgetData.items || [];
+
+                        if (!Array.isArray(items) || items.length === 0) {
+                            console.warn('⚠️ [FineBI] 未获取到任何数据项');
+                            alert('⚠️ 未获取到任何数据，请检查仪表板状态');
+                            return;
                         }
 
-                        // 推送到本地
-                        await pushToLocal({ widgetId, timestamp: Date.now(), rawData: data }, "FineBI数据");
-                        alert(`🎉 FineBI 数据获取成功！耗时: ${elapsed}ms`);
+                        console.log(`✅ [FineBI] 成功抓取到 ${items.length} 行数据，开始解析格式...`);
+
+                        // 转换每一行数据，使用 dId 标识符和 text 中文名分别作为字段名
+                        const records = items.map(row => {
+                            const record = {};
+                            header.forEach((col, idx) => {
+                                const cell = row[idx];
+                                const val = (cell && cell.value !== undefined) ? cell.value : null;
+                                if (col.dId) {
+                                    record[col.dId] = val;
+                                }
+                                if (col.text) {
+                                    record[col.text] = val;
+                                }
+                            });
+                            return record;
+                        });
+
+                        console.log(`🚀 [FineBI] 数据解析完成。正在向本地 API 发送覆盖导入请求...`);
+
+                        // 推送到本地 dmcTCV 数据库表，开启 clear 覆盖导入
+                        const pushResult = await pushToLocal({
+                            records: records,
+                            clear: true
+                        }, "dmcTCV 覆盖导入");
+
+                        if (pushResult && pushResult.status === 200) {
+                            alert(`🎉 FineBI TCV 数据抓取并覆盖导入成功！\n共导入 ${records.length} 条记录，总耗时: ${elapsed}ms`);
+                        } else {
+                            console.error('❌ 本地 API 推送失败:', pushResult);
+                            alert(`❌ 数据导入失败！本地服务返回状态码: ${pushResult ? pushResult.status : '未知'}`);
+                        }
                     } catch (e) {
                         console.error('❌ [FineBI] 解析返回数据失败:', e);
                         console.log('📝 [FineBI] 原始响应:', response.responseText.substring(0, 1000));
@@ -341,8 +474,8 @@
         const btnStyle = `padding:10px 14px; color:#fff; font-weight:bold; border:1px solid #555; border-radius:6px; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.5); font-size:12px; white-space:nowrap;`;
 
         const b1 = document.createElement('button');
-        b1.innerText = '📊 抓取FineBI数据';
-        b1.style.cssText = btnStyle + 'background:linear-gradient(135deg,#667eea,#764ba2);';
+        b1.innerText = '获取TCV';
+        b1.style.cssText = btnStyle + 'background:linear-gradient(135deg,#11998e,#38ef7d);';
         b1.onclick = () => runFinbiQuery();
 
         panel.appendChild(b1);

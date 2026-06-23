@@ -21,8 +21,11 @@ const createRecord = async (collectionName, body) => {
   return { _id: result.insertedId, ...body };
 };
 
-const bulkUpsert = async (collectionName, records, primaryKey) => {
+const bulkUpsert = async (collectionName, records, primaryKey, clear = false) => {
   const collection = getCollection(collectionName);
+  if (clear) {
+    await collection.deleteMany({});
+  }
   if (!records || records.length === 0) return { upsertedCount: 0 };
   
   const bulkOps = records.map(record => {

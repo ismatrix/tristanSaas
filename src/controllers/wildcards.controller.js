@@ -25,8 +25,8 @@ const createRecord = catchAsync(async (req, res) => {
 
 const bulkUpsert = catchAsync(async (req, res) => {
   checkKeycustomerPermission(req);
-  const { records, primaryKey } = req.body;
-  const result = await wildcardsService.bulkUpsert(req.params.collection, records, primaryKey);
+  const { records, primaryKey, clear } = req.body;
+  const result = await wildcardsService.bulkUpsert(req.params.collection, records, primaryKey, clear);
   res.send(result);
 });
 

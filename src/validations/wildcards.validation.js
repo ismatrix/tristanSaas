@@ -50,6 +50,7 @@ const bulkUpsert = {
   body: Joi.object().keys({
     records: Joi.array().items(Joi.object()).required(),
     primaryKey: Joi.string().allow('', null),
+    clear: Joi.boolean().optional(),
   }).unknown(true),
 };
 
