@@ -3447,3 +3447,34 @@ firstName，lastName，title，functionName，phoneNumber
 1. **备份失败原因排查**：诊断了远程生产服务器上的备份脚本，发现 `/home/tristan/workspaces/TristanSaas/mongoExport.sh` 中的 `BACKUP_ROOT` 在 5月26日 被修改为了错误的 macOS 绝对路径 `"/Users/tristan/Workspaces/TristanSaasMongoBackup"`。由于 Linux 服务器不存在该根路径且无写入权限，导致 `mkdir -p` 报错中断而使后续的备份及打包压缩流程自 5月26日 后完全失效。
 2. **备份路径修复与部署**：修改了 `mongoExport.sh` 脚本中的备份根目录路径，改为自适应检测。如果是 Linux 服务器则使用 `/home/tristan/workspaces/TristanSaasMongoBackup`，在 macOS 下则使用 `/Users/tristan/Workspaces/TristanSaasMongoBackup`。已将修改后的脚本推送到 GitHub 远程仓库，并同步部署拉取更新至生产环境的脚本文件中。
 3. **备份任务验证**：生产环境已接收新版脚本更新。根据用户指令，在服务器端手动触发的备份动作验证流程已被跳过，后续定时任务将在每天 16:00 按照正确路径默默执行。
+
+## 2026-06-22 17:32:59
+
+### 用户提示词
+'/Users/tristan/Downloads/要客数据治理模型.tristan.20260522 (1).xlsx' 覆盖导入表columnMappingKeyContacts
+
+### 执行总结
+1. **编写并运行数据导入脚本**：在项目 `scripts/` 目录下创建了 `import_column_mapping_key_contacts.js` 脚本，基于 Node.js 原生的 `xlsx` 库对 `/Users/tristan/Downloads/要客数据治理模型.tristan.20260522 (1).xlsx` 的 `columnMappingKeyContacts` Sheet 进行解析。对数据进行清洗，排除了空无的 `__EMPTY*` 及 `Unnamed:` 列，将字段的首尾空格剔除，并将其他空属性统一规范化为 `null`；接着清空本地 MongoDB 中的 `columnMappingKeyContacts` 表，成功将 18 条最新字段映射数据全量导入。
+2. **同步数据到生产环境**：编写并运行了单表同步脚本 `scripts/sync_column_mapping_key_contacts.js`，通过本地 `mongodump` 导出、`scp` 传输至服务器临时目录以及远程 Docker 容器内部调用 `mongorestore --drop` 的还原流程，成功将 18 条清洗后的最新列映射记录覆盖写入了生产环境服务器 MongoDB 中的 `columnMappingKeyContacts` 集合内。
+3. **保持工作区整洁**：数据导入及同步验证无误后，已在本地删除了临时测试校验与同步脚本，仅保留核心导入工具 `scripts/import_column_mapping_key_contacts.js`，确保项目 Git 工作区干净整洁。
+
+## 2026-06-23 12:12:46
+
+### 用户提示词
+修改autoFinbi.js，按照如下调用方式获取TCV数据，要求：
+1、悬浮按钮「获取TCV」，等页面获取到authorization的token后才显示
+2、获取数据成功后，data内容写入mongo的表dmcTCV，data包含hearder是字段名，dId是字段的标识，text字段的中文，items是数据，每行数据一个array，每行数据的字段是一个json，使用value作为字段的值。
+[包含 curl 语句]
+
+### 执行总结
+1. **修改 autoFinbi.js 油猴脚本以获取 TCV 数据**：
+   - 更新了默认的 FineBI 请求参数，将 `DEFAULT_WIDGET_ID` 变更为 TCV 的组件 ID `c0f131a7756b4af0adb8724b6833fdb3`，并将 `DEFAULT_TEMPLATE_ID` 变更为 `templateHelperId_8ca2b357ccf60b77`。
+   - 彻底重构了 `buildPayload` 函数以拼装出符合 TCV 的 28 个指标/维度的大型请求载荷体，并自动从 Cookie 获取 Token 构造 Bearer 请求头和 taskId 参数。
+   - 修改了悬浮按钮的文本为 `获取TCV`，并通过定时轮询 `getAuthToken()` 保证只有页面获取到认证 Token 之后才展示悬浮按钮。
+2. **后端通用接口升级以支持清空写入**：
+   - 升级了后端的 `wildcards` 通用 CRUD 控制器、服务层与 Joi 校验定义，在 `bulkUpsert` 接口中引入了可选的 `clear` 布尔参数，当 `clear: true` 时在批量写入新数据前自动清空集合，满足覆盖导入的需求。
+3. **数据映射与清洗逻辑开发**：
+   - 在 `runFinbiQuery` 回调函数中实现了完整的清洗逻辑。接收 FineBI 返回的数据后，提取 `header` 字段对应的 `dId`（标识）与 `text`（中文名称），遍历 `items` 每一行的数据单元格 JSON 提取 `value` 属性，并将 `dId` 和 `text` 同时作为键对值写入 MongoDB 的 `dmcTCV` 集合中（通过推送请求传入 `clear: true` 保证全量覆盖导入）。
+4. **代码提交、推送与自动部署上线**：
+   - 将本地 `autoFinbi.js`、`src/controllers/wildcards.controller.js`、`src/services/wildcards.service.js` 和 `src/validations/wildcards.validation.js` 的修改打包暂存并提交，成功推送至远程 GitHub 仓库 `main` 分支。
+   - 通过 SSH 连接生产服务器 `tristan.wang:6822`，在部署目录 `/home/tristan/workspaces/TristanSaas` 下成功执行 `deploy.sh` 脚本，拉取最新代码并完成了前端项目的重新编译构建，最后平滑重启了后端的 PM2 进程 `backend-api`，确保所有修改已在生产服务器部署并实时生效。
