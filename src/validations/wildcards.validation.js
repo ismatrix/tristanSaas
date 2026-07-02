@@ -43,6 +43,13 @@ const deleteRecord = {
   }),
 };
 
+const deleteRecords = {
+  params: Joi.object().keys({
+    collection: Joi.string().required(),
+  }),
+  body: Joi.object().unknown(),
+};
+
 const bulkUpsert = {
   params: Joi.object().keys({
     collection: Joi.string().required(),
@@ -62,4 +69,5 @@ module.exports = {
   getRecord,
   updateRecord,
   deleteRecord,
+  deleteRecords,
 };

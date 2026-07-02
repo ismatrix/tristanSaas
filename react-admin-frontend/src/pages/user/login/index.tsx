@@ -182,7 +182,7 @@ const Login: React.FC = () => {
             minWidth: 280,
             maxWidth: '75vw',
           }}
-          logo={<img alt="logo" src="/logo.svg" />}
+          logo={<img alt="logo" src="/logo.png" style={{ height: 40, objectFit: 'contain' }} />}
           title="数据治理工具"
           initialValues={{}}
           onFinish={async (values) => {

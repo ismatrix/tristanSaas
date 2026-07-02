@@ -25,7 +25,7 @@ export default defineConfig({
   hash: true,
 
   publicPath: PUBLIC_PATH,
-  favicons: ['/logo.svg'],
+  favicons: ['/logo.png'],
   jsMinifierOptions: {
     target: ['chrome80', 'es2020'],
   },

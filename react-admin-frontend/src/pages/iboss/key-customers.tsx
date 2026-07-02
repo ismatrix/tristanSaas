@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { request, history, useModel } from '@umijs/max';
-import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip } from 'antd';
-import { SaveOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ApartmentOutlined, DownloadOutlined, ExportOutlined } from '@ant-design/icons';
+import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip, Tabs } from 'antd';
+import { SaveOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ApartmentOutlined, DownloadOutlined, ExportOutlined, DashboardOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import KeyCustomerOverview from './KeyCustomerOverview';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
 import { AllEnterpriseModule } from 'ag-grid-enterprise';
@@ -841,16 +842,26 @@ const KeyCustomerList: React.FC = () => {
   // --- 是否有变更 ---
   const hasDirty = dirtyIds.size > 0;
 
+  // --- Tab 状态控制 ---
+  const [activeTab, setActiveTab] = useState<string>('overview');
+
+  // --- 监听 Tab 切换强刷 AG Grid 宽高自适应防不显示 ---
+  useEffect(() => {
+    if (activeTab === 'list') {
+      const timer = setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+        gridRef.current?.api?.sizeColumnsToFit();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+    return;
+  }, [activeTab]);
+
   return (
     <div style={{
-      height: 'calc(100vh - 70px)',
-      display: 'flex',
-      flexDirection: 'column',
-      background: '#fff',
-      borderRadius: 8,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      padding: '16px',
-      overflow: 'hidden'
+      minHeight: '100%',
+      background: '#f0f2f5',
+      paddingBottom: '24px'
     }}>
       <style>{`
         .tristan-center-header .ag-header-cell-label {
@@ -864,106 +875,167 @@ const KeyCustomerList: React.FC = () => {
         .row-ft-synced:hover {
           background-color: #d9f7d9 !important;
         }
+        .tristan-tabs-card {
+          height: 100%;
+        }
+        .tristan-tabs-card .ant-tabs-nav {
+          margin-bottom: 0px !important;
+          padding: 0 16px;
+          background: #fff;
+          border-bottom: 1px solid #f0f0f0;
+        }
+        .tristan-tabs-card .ant-tabs-content-holder {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          overflow: hidden;
+        }
+        .tristan-tabs-card .ant-tabs-tabpane {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          min-height: 0;
+        }
+        .tristan-tabs-card .ant-tabs-tabpane-hidden {
+          display: none !important;
+        }
       `}</style>
 
-      {/* 顶部操作栏 */}
-      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>要客清单</h2>
-        <Space>
-          <Input
-            placeholder="全文搜索..."
-            prefix={<SearchOutlined />}
-            style={{ width: 200 }}
-            value={quickFilterText}
-            onChange={(e) => setQuickFilterText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                gridRef.current?.api?.setGridOption('quickFilterText', quickFilterText);
-              }
-            }}
-            allowClear
-            onClear={() => {
-              setQuickFilterText('');
-              gridRef.current?.api?.setGridOption('quickFilterText', '');
-            }}
-          />
-          <Button
-            icon={<ExportOutlined />}
-            onClick={() => {
-              gridRef.current?.api?.exportDataAsCsv({
-                fileName: 'keycustomer.csv',
-              });
-            }}
-          >
-            导出CSV
-          </Button>
-          <Button
-            icon={<PlusOutlined />}
-            onClick={() => setAddColVisible(true)}
-            disabled={!isTristan}
-          >
-            添加列
-          </Button>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={fetchData}
-          >
-            刷新
-          </Button>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            onClick={handleSaveAll}
-            loading={saving}
-            disabled={!hasDirty || !isTristan}
-            style={hasDirty && isTristan ? { background: '#ff4d4f', borderColor: '#ff4d4f' } : {}}
-          >
-            保存变更 {hasDirty ? `(${dirtyIds.size})` : ''}
-          </Button>
-        </Space>
-      </div>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        type="card"
+        className="tristan-tabs-card"
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
+        items={[
+          {
+            key: 'overview',
+            label: (
+              <span><DashboardOutlined style={{ marginRight: 6 }} />Dashboard</span>
+            ),
+            children: (
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <KeyCustomerOverview />
+              </div>
+            )
+          },
+          {
+            key: 'list',
+            label: (
+              <span><UnorderedListOutlined style={{ marginRight: 6 }} />要客清单</span>
+            ),
+            children: (
+              <div style={{
+                background: '#fff',
+                padding: '16px',
+                borderRadius: '0 0 8px 8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                height: '750px'
+              }}>
+                {/* 顶部操作栏 */}
+                <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>要客清单</h2>
+                  <Space>
+                    <Input
+                      placeholder="全文搜索..."
+                      prefix={<SearchOutlined />}
+                      style={{ width: 200 }}
+                      value={quickFilterText}
+                      onChange={(e) => setQuickFilterText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          gridRef.current?.api?.setGridOption('quickFilterText', quickFilterText);
+                        }
+                      }}
+                      allowClear
+                      onClear={() => {
+                        setQuickFilterText('');
+                        gridRef.current?.api?.setGridOption('quickFilterText', '');
+                      }}
+                    />
+                    <Button
+                      icon={<ExportOutlined />}
+                      onClick={() => {
+                        gridRef.current?.api?.exportDataAsCsv({
+                          fileName: 'keycustomer.csv',
+                        });
+                      }}
+                    >
+                      导出CSV
+                    </Button>
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() => setAddColVisible(true)}
+                      disabled={!isTristan}
+                    >
+                      添加列
+                    </Button>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={fetchData}
+                    >
+                      刷新
+                    </Button>
+                    <Button
+                      type="primary"
+                      icon={<SaveOutlined />}
+                      onClick={handleSaveAll}
+                      loading={saving}
+                      disabled={!hasDirty || !isTristan}
+                      style={hasDirty && isTristan ? { background: '#ff4d4f', borderColor: '#ff4d4f' } : {}}
+                    >
+                      保存变更 {hasDirty ? `(${dirtyIds.size})` : ''}
+                    </Button>
+                  </Space>
+                </div>
 
-      {/* AG Grid 主体 */}
-      <div style={{ flex: 1, position: 'relative' }}>
-        {loading && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', zIndex: 999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Spin tip="加载要客数据中..." size="large" />
-          </div>
-        )}
-        <AgGridReact
-          theme={themeQuartz}
-          ref={gridRef}
-          rowData={rowData}
-          columnDefs={dynamicColDefs}
-          defaultColDef={defaultColDef}
-          // 以 MongoDB _id 为行唯一标识，支持 getRowNode() 定位单行更新
-          getRowId={(params: any) => String(params.data._id)}
-          enableRangeSelection={true}
-          rowSelection="multiple"
-          suppressRowClickSelection={true}
-          animateRows={true}
-          onCellValueChanged={onCellValueChanged}
-          getContextMenuItems={getContextMenuItems}
-          // 已同步家族树的行（_ftCount > 0）显示浅绿色背景
-          getRowClass={(params: any) => {
-            const count = params.data?._ftCount;
-            if (typeof count === 'number' && count > 0) return 'row-ft-synced';
-            return '';
-          }}
-          onFirstDataRendered={(params: any) => {
-            params.api.autoSizeColumns(['nameEn', 'nameCn']);
-          }}
-          sideBar={{ toolPanels: ['columns', 'filters'], defaultToolPanel: '' }}
-          statusBar={{
-            statusPanels: [
-              { statusPanel: 'agTotalAndFilteredRowCountComponent', align: 'left' },
-              { statusPanel: 'agFilteredRowCountComponent' },
-              { statusPanel: 'agSelectedRowCountComponent' },
-              { statusPanel: 'agAggregationComponent' },
-            ]
-          }}
-        />
-      </div>
+                {/* AG Grid 主体 */}
+                <div style={{ height: '650px', position: 'relative' }}>
+                  {loading && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', zIndex: 999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                      <Spin tip="加载要客数据中..." size="large" />
+                    </div>
+                  )}
+                  <AgGridReact
+                    theme={themeQuartz}
+                    ref={gridRef}
+                    rowData={rowData}
+                    columnDefs={dynamicColDefs}
+                    defaultColDef={defaultColDef}
+                    // 以 MongoDB _id 为行唯一标识，支持 getRowNode() 定位单行更新
+                    getRowId={(params: any) => String(params.data._id)}
+                    enableRangeSelection={true}
+                    rowSelection="multiple"
+                    suppressRowClickSelection={true}
+                    animateRows={true}
+                    onCellValueChanged={onCellValueChanged}
+                    getContextMenuItems={getContextMenuItems}
+                    // 已同步家族树的行（_ftCount > 0）显示浅绿色背景
+                    getRowClass={(params: any) => {
+                      const count = params.data?._ftCount;
+                      if (typeof count === 'number' && count > 0) return 'row-ft-synced';
+                      return '';
+                    }}
+                    onFirstDataRendered={(params: any) => {
+                      params.api.autoSizeColumns(['nameEn', 'nameCn']);
+                    }}
+                    sideBar={{ toolPanels: ['columns', 'filters'], defaultToolPanel: '' }}
+                    statusBar={{
+                      statusPanels: [
+                        { statusPanel: 'agTotalAndFilteredRowCountComponent', align: 'left' },
+                        { statusPanel: 'agFilteredRowCountComponent' },
+                        { statusPanel: 'agSelectedRowCountComponent' },
+                        { statusPanel: 'agAggregationComponent' },
+                      ]
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          }
+        ]}
+      />
 
       {/* 添加列弹窗 */}
       <Modal

@@ -95,7 +95,7 @@ const iconBtnStyle = {
 };
 
 // 抽屉中隐藏字段
-const HIDDEN_FIELDS = new Set(['_id', 'id', 'parentId', 'iconHtml', '_nodeType', '_highlighted', '_upToTheRootHighlighted', '_expanded', '_directSubordinates', '_totalSubordinates', 'cmiContacts']);
+const HIDDEN_FIELDS = new Set(['_id', 'id', 'parentId', 'iconHtml', '_nodeType', '_highlighted', '_upToTheRootHighlighted', '_expanded', '_directSubordinates', '_totalSubordinates', 'cmiContacts', 'custContacts']);
 
 // 区域分组
 const REGION_MAP: Record<string, string> = {
@@ -152,13 +152,15 @@ const buildRegionData = (originalData: any[]): any[] => {
     position: rootNode.position, city: rootNode.city,
     iconHtml: rootNode.iconHtml, _nodeType: 'root',
     cmiContacts: rootNode.cmiContacts,
+    custContacts: rootNode.custContacts, // 保留客户联系人
   });
 
   const regionCountryMap: Record<string, Record<string, any[]>> = {};
   originalData.forEach((item) => {
     if (item.id === rootId) return;
     const country = item.position || 'Unknown';
-    const region = getRegion(country);
+    // 优先使用数据库中存储的 cmiRegion 字段进行分组，若无值则降级分类为 'Other Regions'
+    const region = item.cmiRegion || 'Other Regions';
     if (!regionCountryMap[region]) regionCountryMap[region] = {};
     if (!regionCountryMap[region][country]) regionCountryMap[region][country] = [];
     regionCountryMap[region][country].push(item);
@@ -201,6 +203,7 @@ const buildRegionData = (originalData: any[]): any[] => {
             position: company.registeredAddress || company.position || '',
             city: '', iconHtml: '', _nodeType: 'company',
             cmiContacts: company.cmiContacts,
+            custContacts: company.custContacts, // 保留客户联系人
           });
         });
       });
@@ -216,6 +219,39 @@ const renderNodeContent = (d: any) => {
   const nodeType = d.data._nodeType || '';
   const borderStyle = d.data._highlighted || d.data._upToTheRootHighlighted ? '5px solid #1677ff' : '1px solid #E4E2E9';
 
+  const hasCmi = d.data.cmiContacts && d.data.cmiContacts.length > 0;
+  const hasCust = d.data.custContacts && d.data.custContacts.length > 0;
+
+  const cmiIndicator = hasCmi ? `
+    <div style="
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 16px;
+      height: 16px;
+      border-bottom-left-radius: 9px;
+      background: linear-gradient(45deg, #bae7ff 50%, transparent 50%);
+      filter: drop-shadow(1px 1px 2px rgba(0, 58, 140, 0.2));
+      pointer-events: none;
+      z-index: 9;
+    " title="存在 CMI 联系人"></div>
+  ` : '';
+
+  const custIndicator = hasCust ? `
+    <div style="
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 16px;
+      height: 16px;
+      border-bottom-right-radius: 9px;
+      background: linear-gradient(-45deg, #d9f7be 50%, transparent 50%);
+      filter: drop-shadow(-1px 1px 2px rgba(19, 82, 0, 0.2));
+      pointer-events: none;
+      z-index: 9;
+    " title="存在客户联系人"></div>
+  ` : '';
+
   // 根节点
   if (nodeType === 'root') {
     return `
@@ -229,6 +265,8 @@ const renderNodeContent = (d: any) => {
           </div>
           ${d.data.position ? `<div style="color:#716E7B;margin-left:20px;margin-top:3px;font-size:12px;">${d.data.position}</div>` : ''}
           ${d.data.city ? `<div style="color:#999;margin-left:20px;margin-top:2px;font-size:11px;">${d.data.city}</div>` : ''}
+          ${cmiIndicator}
+          ${custIndicator}
         </div>
       </div>`;
   }
@@ -281,6 +319,8 @@ const renderNodeContent = (d: any) => {
         ${d.data.position ? `<div style="color:#716E7B;margin-left:20px;margin-top:3px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:${d.width - 40}px;" title="${d.data.position}">${d.data.position}</div>` : ''}
         ${d.data.city ? `<div style="color:#999;margin-left:20px;margin-top:2px;font-size:11px;">${d.data.city}</div>` : ''}
         ${d.data.cmiContacts && d.data.cmiContacts.length > 0 ? `<div onclick="window.handleShowCmiContact(event, '${d.data.id}')" style="position:absolute; bottom:6px; right:8px; background-color:#e6f4ff; color:#1677ff; border:1px solid #91caff; font-size:11px; padding:2px 6px; border-radius:4px; cursor:pointer; z-index:10;">cmi contact</div>` : ''}
+        ${cmiIndicator}
+        ${custIndicator}
       </div>
     </div>`;
 };
@@ -294,10 +334,17 @@ const DetailDrawer: React.FC<{ record: any; open: boolean; onClose: () => void }
   useEffect(() => {
     if (open && record && (record.GID || record.id)) {
       setContactsLoading(true);
+      const targetGid = record.GID || record.id;
       request('/api/v1/wildcards/custContacts', {
         method: 'GET',
         params: {
-          query: JSON.stringify({ GID: record.GID || record.id }),
+          query: JSON.stringify({
+            $or: [
+              { GID: targetGid },
+              { companyGId: targetGid },
+              { companyGID: targetGid }
+            ]
+          }),
           options: JSON.stringify({ limit: 100 }),
         },
       })
@@ -521,6 +568,11 @@ const KeyGlobalFamilyTree: React.FC = () => {
   const [diffRowData, setDiffRowData] = useState<any[]>([]);
   const [diffLoading, setDiffLoading] = useState<boolean>(false);
   const [diffSearchText, setDiffSearchText] = useState<string>('');
+
+  // 映射 Tab 状态
+  const [mappingRowData, setMappingRowData] = useState<any[]>([]);
+  const [mappingLoading, setMappingLoading] = useState<boolean>(false);
+  const [mappingSearchText, setMappingSearchText] = useState<string>('');
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -808,6 +860,36 @@ const KeyGlobalFamilyTree: React.FC = () => {
         console.error('获取CMI联系人失败', err);
       }
 
+      // Fetch Customer Contacts
+      try {
+        const custContactsRes = await request('/api/v1/wildcards/custContacts', {
+          method: 'GET',
+          params: {
+            query: JSON.stringify({ ultimateGID: gid }),
+            options: JSON.stringify({ limit: 10000 }),
+          },
+        });
+        const custContactsRecords = custContactsRes.results || custContactsRes.data?.results || [];
+
+        const gidToCustContactsMap = new Map();
+        custContactsRecords.forEach((c: any) => {
+          const cGid = String(c.companyGId || c.companyGID || c.GID || '').trim();
+          if (cGid) {
+            if (!gidToCustContactsMap.has(cGid)) {
+              gidToCustContactsMap.set(cGid, []);
+            }
+            gidToCustContactsMap.get(cGid).push(c);
+          }
+        });
+
+        uniqueRecords.forEach((r: any) => {
+          const rGid = String(r.GID).trim();
+          r.custContacts = gidToCustContactsMap.get(rGid) || [];
+        });
+      } catch (err) {
+        console.error('获取客户联系人失败', err);
+      }
+
       // 计算根节点
       let mainRootId: string = '';
       for (const r of uniqueRecords) {
@@ -861,9 +943,256 @@ const KeyGlobalFamilyTree: React.FC = () => {
     }
   }, [gid]);
 
+  // 获取映射 iBOSS 客户数据
+  const fetchMappingData = useCallback(async () => {
+    if (!gid) return;
+    setMappingLoading(true);
+    try {
+      const mapRes = await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
+        method: 'GET',
+        params: {
+          query: JSON.stringify({ ultimateGID: gid }),
+          options: JSON.stringify({ limit: 10000 })
+        }
+      });
+      const t4Data = mapRes.results || mapRes.data?.results || [];
+      if (t4Data.length === 0) {
+        setMappingRowData([]);
+        return;
+      }
+
+      const gids = t4Data.map((r: any) => r.GID).filter(Boolean);
+      const extIds = t4Data.map((r: any) => r.extCustId).filter(Boolean);
+
+      const gTreeInfoMap = new Map();
+      if (gids.length > 0) {
+        try {
+          const gTreeRes = await request('/api/v1/wildcards/keyGlobalFamilyTree', {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({ GID: { $in: gids } }),
+              options: JSON.stringify({ limit: 10000 })
+            }
+          });
+          const gTreeRecords = gTreeRes.results || gTreeRes.data?.results || [];
+          gTreeRecords.forEach((r: any) => gTreeInfoMap.set(String(r.GID), r));
+        } catch (e) {
+          console.error('Failed to fetch keyGlobalFamilyTree details', e);
+        }
+      }
+
+      const custToCompanyIdMap = new Map();
+      if (extIds.length > 0) {
+        try {
+          const partMapRes = await request('/api/v1/wildcards/excelParticipantCustMapping', {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({ extCustId: { $in: extIds } }),
+              options: JSON.stringify({ limit: 10000 })
+            }
+          });
+          const partMapRecords = partMapRes.results || partMapRes.data?.results || [];
+          partMapRecords.forEach((r: any) => custToCompanyIdMap.set(String(r.extCustId), r));
+        } catch (e) {
+          console.error('Failed to fetch excelParticipantCustMapping', e);
+        }
+      }
+
+      const customerMap = new Map();
+      if (extIds.length > 0) {
+        try {
+          const custRes = await request('/api/v1/wildcards/ibosscustomers', {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({ custId: { $in: extIds } }),
+              options: JSON.stringify({ limit: 10000 })
+            }
+          });
+          const custRecords = custRes.results || custRes.data?.results || [];
+          custRecords.forEach((r: any) => customerMap.set(String(r.custId), r));
+        } catch (e) {
+          console.error('Failed to fetch ibosscustomers', e);
+        }
+      }
+
+      const companyIds = Array.from(new Set(Array.from(custToCompanyIdMap.values()).map((r: any) => r.companyId).filter(Boolean)));
+      const participantMap = new Map();
+      if (companyIds.length > 0) {
+        try {
+          const partRes = await request('/api/v1/wildcards/ibossParticipantDetail', {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({ companyId: { $in: companyIds.map(String) } }),
+              options: JSON.stringify({ limit: 10000 })
+            }
+          });
+          const partRecords = partRes.results || partRes.data?.results || [];
+          partRecords.forEach((r: any) => participantMap.set(String(r.companyId), r));
+        } catch (e) {
+          console.error('Failed to fetch ibossParticipantDetail', e);
+        }
+      }
+
+      const assembledList = t4Data.map((r: any) => {
+        const rowGid = String(r.GID || '');
+        const rowExtId = String(r.extCustId || '');
+
+        const gTreeMatch = gTreeInfoMap.get(rowGid) || {};
+        
+        const mapMatch = custToCompanyIdMap.get(rowExtId) || {};
+        const companyId = mapMatch.companyId || '';
+        
+        const partMatch = companyId ? (participantMap.get(String(companyId)) || {}) : {};
+        const companyBasic = partMatch.detailInfo?.companyBasicDTO || {};
+
+        const custMatch = customerMap.get(rowExtId) || {};
+
+        let companyNum = custMatch.companyNum || custMatch.companyCode || '';
+        if (mapMatch.companyNum || mapMatch.companyCode) {
+          companyNum = mapMatch.companyNum || mapMatch.companyCode;
+        }
+
+        return {
+          _id: r._id,
+          GID: rowGid,
+          companyNameCn: gTreeMatch.companyNameCn || '',
+          companyNameEn: gTreeMatch.companyNameEn || '',
+          registeredCountry: gTreeMatch.registeredCountry || '',
+          registeredCity: gTreeMatch.registeredCity || '',
+          detailCompanyName: companyBasic.companyName || '',
+          detailCountry: companyBasic.registeredCountryName || '',
+          ibossEnterpriseName: custMatch.enterpriseName || '',
+          ibossCountry: custMatch.country || '',
+          ibossCity: custMatch.city || '',
+          companyId,
+          companyNum,
+          enterpriseId: custMatch.enterpriseId || '',
+          ebsCustCode: custMatch.ebsCustCode || custMatch.ebsCustomerCode || '',
+          mappingPath: r.mappingPath || ''
+        };
+      });
+
+      setMappingRowData(assembledList);
+    } catch (err) {
+      console.error('获取映射数据失败', err);
+      message.error('获取映射数据失败');
+    } finally {
+      setMappingLoading(false);
+    }
+  }, [gid]);
+
+  const mappingColDefs = useMemo(() => [
+    {
+      headerName: 'GID',
+      field: 'GID',
+      width: 180,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '参与方 ID',
+      field: 'companyId',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '企业编号',
+      field: 'companyNum',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: 'iBOSS企业 ID',
+      field: 'enterpriseId',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: 'EBS客户编码',
+      field: 'ebsCustCode',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '映射路径',
+      field: 'mappingPath',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '客户树中文名',
+      field: 'companyNameCn',
+      width: 200,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '客户树英文名',
+      field: 'companyNameEn',
+      width: 200,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '客户树国家',
+      field: 'registeredCountry',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '客户树城市',
+      field: 'registeredCity',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '参与方企业名',
+      field: 'detailCompanyName',
+      width: 200,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: '参与方国家',
+      field: 'detailCountry',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: 'iBOSS企业名',
+      field: 'ibossEnterpriseName',
+      width: 200,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: 'iBOSS客户国家',
+      field: 'ibossCountry',
+      width: 150,
+      filter: true,
+      sortable: true
+    },
+    {
+      headerName: 'iBOSS客户城市',
+      field: 'ibossCity',
+      width: 150,
+      filter: true,
+      sortable: true
+    }
+  ], []);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchMappingData();
+  }, [fetchData, fetchMappingData]);
 
   // 渲染图表
   const renderChart = useCallback(
@@ -1097,7 +1426,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
             {
               key: 'tree',
               label: (
-                <span><PartitionOutlined style={{ marginRight: 6 }} />结构树</span>
+                <span><PartitionOutlined style={{ marginRight: 6 }} />家族树</span>
               ),
               children: (
                 <div style={{ position: 'relative', height: '100%' }}>
@@ -1291,6 +1620,58 @@ const KeyGlobalFamilyTree: React.FC = () => {
                         return undefined;
                       }}
                       loading={diffLoading}
+                      statusBar={{
+                        statusPanels: [
+                          { statusPanel: 'agFilteredRowCountComponent', align: 'left' },
+                          { statusPanel: 'agSelectedRowCountComponent' },
+                        ],
+                      }}
+                    />
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: 'mapping',
+              label: (
+                <span><TableOutlined style={{ marginRight: 6 }} />映射iBOSS客户</span>
+              ),
+              children: (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  {/* 全文搜索与操作栏（靠右排列） */}
+                  <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <Space>
+                      <Input
+                        placeholder="在映射表中全文搜索..."
+                        allowClear
+                        prefix={<SearchOutlined style={{ color: '#bbb' }} />}
+                        value={mappingSearchText}
+                        onChange={(e) => setMappingSearchText(e.target.value)}
+                        style={{ width: 280 }}
+                      />
+                      <Button 
+                        icon={<ReloadOutlined />} 
+                        onClick={fetchMappingData} 
+                        loading={mappingLoading}
+                      >
+                        重新加载映射
+                      </Button>
+                    </Space>
+                  </div>
+
+                  {/* AG Grid React 映射表格 */}
+                  <div className="ag-theme-quartz" style={{ flex: 1, minHeight: 0 }}>
+                    <AgGridReact
+                      theme={themeQuartz}
+                      rowData={mappingRowData}
+                      columnDefs={mappingColDefs}
+                      defaultColDef={defaultColDef}
+                      quickFilterText={mappingSearchText}
+                      enableRangeSelection={true}
+                      rowSelection="multiple"
+                      suppressRowClickSelection={true}
+                      animateRows={true}
+                      loading={mappingLoading}
                       statusBar={{
                         statusPanels: [
                           { statusPanel: 'agFilteredRowCountComponent', align: 'left' },

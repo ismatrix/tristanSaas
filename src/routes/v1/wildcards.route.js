@@ -17,7 +17,8 @@ router
 router
   .route('/:collection')
   .post(auth(), validate(wildcardsValidation.createRecord), wildcardsController.createRecord)
-  .get(auth(), validate(wildcardsValidation.getRecords), wildcardsController.getRecords);
+  .get(auth(), validate(wildcardsValidation.getRecords), wildcardsController.getRecords)
+  .delete(auth(), validate(wildcardsValidation.deleteRecords), wildcardsController.deleteRecords);
 
 router
   .route('/:collection/:id')

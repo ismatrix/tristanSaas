@@ -271,6 +271,7 @@ const GroupSyncList: React.FC = () => {
         const finalCustomLevel = r[customLevelField] && String(r[customLevelField]).trim() ? String(r[customLevelField]).trim() : '';
         return {
           ...r,
+          GID: r.companyGId || r.companyGID || r.GID || '',
           [titleField]: finalTitle,
           KEY_CONTACT_TITLE: finalTitle,
           [levelField]: finalLevel,
@@ -334,9 +335,9 @@ const GroupSyncList: React.FC = () => {
       }));
 
     return [
-      { headerName: 'LineNo', field: 'LineNo', width: 80, sortable: true, filter: true, pinned: 'left' },
-      { headerName: 'PID', field: 'PID', width: 180, sortable: true, filter: true, pinned: 'left' },
-      { headerName: 'GID', field: 'GID', width: 180, sortable: true, filter: true, pinned: 'left' },
+      { headerName: 'LineNo', field: 'LineNo', width: 80, sortable: true, filter: true, pinned: 'left' as const },
+      { headerName: 'PID', field: 'PID', width: 180, sortable: true, filter: true, pinned: 'left' as const },
+      { headerName: 'GID', field: 'GID', width: 180, sortable: true, filter: true, pinned: 'left' as const },
       ...mappedCols.filter((c: any) => c.field !== 'PID' && c.field !== 'GID' && c.field !== 'LineNo')
     ];
   };
@@ -446,6 +447,7 @@ const GroupSyncList: React.FC = () => {
           const finalCustomLevel = r[customLevelField] && String(r[customLevelField]).trim() ? String(r[customLevelField]).trim() : '';
           return {
             ...r,
+            GID: r.companyGId || r.companyGID || r.GID || '',
             [titleField]: finalTitle,
             KEY_CONTACT_TITLE: finalTitle,
             [levelField]: finalLevel,

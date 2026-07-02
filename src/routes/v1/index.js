@@ -52,6 +52,10 @@ const defaultRoutes = [
     path: '/dnb',
     route: require('./dnb.route'),
   },
+  {
+    path: '/key-customer-overview',
+    route: require('./keyCustomerOverview.route'),
+  },
 ];
 
 const devRoutes = [

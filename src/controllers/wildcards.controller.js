@@ -64,6 +64,14 @@ const deleteRecord = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+const deleteRecords = catchAsync(async (req, res) => {
+  checkKeycustomerPermission(req);
+  const query = req.body || {};
+  console.log(`🧹 [DELETE] Collection: ${req.params.collection} | Query:`, JSON.stringify(query));
+  const result = await wildcardsService.deleteRecords(req.params.collection, query);
+  res.send(result);
+});
+
 module.exports = {
   getCollections,
   createRecord,
@@ -72,5 +80,6 @@ module.exports = {
   getRecord,
   updateRecord,
   deleteRecord,
+  deleteRecords,
 };
 

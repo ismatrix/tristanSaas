@@ -60,7 +60,7 @@ export default [
   },
 
   {
-    name: '要客清单',
+    name: '要客概览',
     icon: 'ProfileOutlined',
     path: '/key-customers',
     component: './iboss/key-customers',

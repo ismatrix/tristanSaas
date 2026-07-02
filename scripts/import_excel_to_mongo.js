@@ -79,6 +79,22 @@ async function runImport() {
       '出海企业客户树清单修订版',
       ['PID', 'GID', 'duns', 'ultimateGID', 'parentGID']
     );
+    const fs = require('fs');
+    const path = require('path');
+    const regionMapPath = path.join(__dirname, 'cmi_region_map.json');
+    let regionMap = {};
+    if (fs.existsSync(regionMapPath)) {
+      regionMap = JSON.parse(fs.readFileSync(regionMapPath, 'utf8'));
+      console.log('  成功读取 cmiRegion 映射字典');
+    }
+
+    // 遍历数据并自动填充 cmiRegion 字段
+    data1.forEach((row) => {
+      const rawCountry = row.registeredCountry || row.position || '';
+      const countryKey = String(rawCountry).trim().toLowerCase();
+      row.cmiRegion = regionMap[countryKey] || null;
+    });
+
     console.log('  正在覆盖写入数据库 [keyGlobalFamilyTree] ...');
     await db.collection('keyGlobalFamilyTree').deleteMany({});
     if (data1.length > 0) {
