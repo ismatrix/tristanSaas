@@ -125,20 +125,31 @@ const getOverviewStats = catchAsync(async (req, res) => {
   });
 
   // --- 3. 获取 TCV 签单数据（按行业和年份 2023-2026 统计） ---
-  // 获取 keyFamilyTreeCustMapping 并建立 extCustId -> ultimateGID 映射
-  const mappings = await db.collection('keyFamilyTreeCustMapping').find({}, { projection: { extCustId: 1, ultimateGID: 1 } }).toArray();
+  // 获取 keyFamilyTreeCustMapping 并建立 extCustId -> ultimateGID 映射（含 mappingPath）
+  const mappings = await db.collection('keyFamilyTreeCustMapping').find({}, { projection: { extCustId: 1, ultimateGID: 1, mappingPath: 1 } }).toArray();
   const extCustIdToGidMap = new Map();
   const extCustIds = new Set();
+
+  // A端：仅 mappingPath="endCustomer" 的记录，用于通过 ibosscustomers 关联终端客户名称
+  const endCustExtIdToGidMap = new Map();
+  const endCustExtIds = new Set();
 
   mappings.forEach(m => {
     if (m.extCustId) {
       const extId = String(m.extCustId).trim();
-      extCustIdToGidMap.set(extId, m.ultimateGID ? String(m.ultimateGID).trim() : '');
+      const gidStr = m.ultimateGID ? String(m.ultimateGID).trim() : '';
+      // B端：所有记录均纳入（通过签约客户标识匹配 dmcTCV）
+      extCustIdToGidMap.set(extId, gidStr);
       extCustIds.add(extId);
+      // A端：仅 endCustomer 路径
+      if (m.mappingPath === 'endCustomer') {
+        endCustExtIdToGidMap.set(extId, gidStr);
+        endCustExtIds.add(extId);
+      }
     }
   });
 
-  // 查询匹配的 TCV 签单记录
+  // 查询匹配的 B端 TCV 签单记录（通过签约客户标识关联）
   const tcvRecords = await db.collection('dmcTCV').find(
     { '签约客户标识': { $in: Array.from(extCustIds) } },
     { projection: { '签约客户标识': 1, '合同签署日期': 1, '设置起租日期': 1, '电路编号': 1, '订单状态': 1, '签单金额(港币)': 1 } }
@@ -223,7 +234,100 @@ const getOverviewStats = catchAsync(async (req, res) => {
     };
   });
 
-  // --- 4. 获取 2026 年计费收入数据（dmcBR） ---
+  // --- 3-A. 获取 A端 TCV 签单数据（通过 ibosscustomers.enterpriseName 关联 终端客户名称）---
+  // 先通过 endCustomer extCustId 批量查询 ibosscustomers 的 enterpriseName
+  const ibossRecs = await db.collection('ibosscustomers').find(
+    { custId: { $in: Array.from(endCustExtIds) } },
+    { projection: { custId: 1, enterpriseName: 1 } }
+  ).toArray();
+
+  // 建立 enterpriseName -> ultimateGID 的映射（用于从终端客户名称反查要客）
+  const enterpriseToGidMap_A = new Map();
+  const enterpriseNames_A = new Set();
+
+  ibossRecs.forEach(iboss => {
+    const custIdStr = String(iboss.custId).trim();
+    const gid = endCustExtIdToGidMap.get(custIdStr) || '';
+    if (iboss.enterpriseName) {
+      const eName = String(iboss.enterpriseName).trim();
+      enterpriseToGidMap_A.set(eName, gid);
+      enterpriseNames_A.add(eName);
+    }
+  });
+
+  // 查询 A端 TCV 记录（通过终端客户名称匹配）
+  const tcvRecords_A = await db.collection('dmcTCV').find(
+    { '终端客户名称': { $in: Array.from(enterpriseNames_A) } },
+    { projection: { '终端客户名称': 1, '合同签署日期': 1, '设置起租日期': 1, '电路编号': 1, '订单状态': 1, '签单金额(港币)': 1 } }
+  ).toArray();
+
+  // A端 TCV：同样过滤 Achive 状态并按5字段去重
+  let filteredTcv_A = tcvRecords_A.filter(rec => {
+    const status = String(rec['订单状态'] || '').trim();
+    return status.toLowerCase() !== 'achive';
+  });
+  filteredTcv_A.sort((a, b) => String(a._id).localeCompare(String(b._id)));
+
+  const uniqueTcvMap_A = new Map();
+  filteredTcv_A.forEach(rec => {
+    const kSignDate = rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '';
+    const kStartDate = rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '';
+    const kCircuit = rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '';
+    const kStatus = rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '';
+    const kAmount = rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : '';
+    const duplicateKey = `${kSignDate}_${kStartDate}_${kCircuit}_${kStatus}_${kAmount}`;
+    if (!uniqueTcvMap_A.has(duplicateKey)) {
+      uniqueTcvMap_A.set(duplicateKey, rec);
+    }
+  });
+  const finalTcvRecords_A = Array.from(uniqueTcvMap_A.values());
+
+  // 初始化 A端 TCV 签单统计（8大行业 x 年份）
+  const tcvStats_A = {};
+  Object.keys(INDUSTRY_NAME_MAP).forEach(ind => {
+    tcvStats_A[ind] = { '2023': 0, '2024': 0, '2025': 0, '2026': 0 };
+  });
+
+  // A端电路到行业/客户名的映射，供后续 A端 BR 统计使用
+  const circuitToIndustryMap_A = new Map();
+  const circuitToCustomerNameMap_A = new Map();
+  const tcvCustomerSumMap_A = {};
+
+  finalTcvRecords_A.forEach(rec => {
+    const eName = String(rec['终端客户名称'] || '').trim();
+    const parentGid = enterpriseToGidMap_A.get(eName);
+    const industry = parentGid ? gidToIndustryMap.get(parentGid) : undefined;
+    const customerName = parentGid ? (gidToCustomerNameMap.get(String(parentGid)) || '未知客户') : '未知客户';
+
+    // 记录 A端电路对应行业与客户名
+    if (rec['电路编号'] && industry && INDUSTRY_NAME_MAP[industry]) {
+      circuitToIndustryMap_A.set(String(rec['电路编号']).trim(), industry);
+    }
+    if (rec['电路编号']) {
+      circuitToCustomerNameMap_A.set(String(rec['电路编号']).trim(), customerName);
+    }
+
+    if (!industry || !INDUSTRY_NAME_MAP[industry]) return;
+
+    const signDate = rec['合同签署日期'] || '';
+    const year = signDate.substring(0, 4);
+
+    if (['2023', '2024', '2025', '2026'].includes(year)) {
+      const amount = parseFloat(rec['签单金额(港币)'] || 0);
+      tcvStats_A[industry][year] += amount;
+
+      // A端历年客户维度签单明细
+      const key = `${year}_${industry}_${customerName}`;
+      tcvCustomerSumMap_A[key] = (tcvCustomerSumMap_A[key] || 0) + amount;
+    }
+  });
+
+  const tcvCustomerStats_A = Object.keys(tcvCustomerSumMap_A).map(k => {
+    const [year, industry, customerName] = k.split('_');
+    return { year, industry, customerName, amount: tcvCustomerSumMap_A[k] };
+  });
+
+  // --- 4. 获取 2026 年计费收入数据（dmcBR）---
   const activeCircuits = Array.from(circuitToIndustryMap.keys());
   
   // 初始化计费收入统计 (8大行业 x 大类 x 小类)
@@ -295,6 +399,73 @@ const getOverviewStats = catchAsync(async (req, res) => {
     });
   }
 
+  // --- 4-A. 获取 A端 2026 年计费收入数据（dmcBR）---
+  const activeCircuits_A = Array.from(circuitToIndustryMap_A.keys());
+
+  // 初始化 A端计费收入统计（8大行业 x 大类 x 小类）
+  const brStats_A = {};
+  Object.keys(INDUSTRY_NAME_MAP).forEach(ind => {
+    brStats_A[ind] = { '通讯服务': {}, '算力服务': {}, '智能服务': {} };
+  });
+
+  // A端客户维度计费总收入统计
+  const customerIncomeStats_A = {};
+
+  if (activeCircuits_A.length > 0) {
+    const brRecords_A = await db.collection('dmcBR').find(
+      {
+        '电路参考编号': { $in: activeCircuits_A },
+        '数据月份': { $regex: /^2026/ }
+      },
+      {
+        projection: {
+          '电路参考编号': 1,
+          '市场经分产品分类': 1,
+          '拆分后港币金额': 1,
+          '拆分后港币金额｜绝对值': 1,
+          '拆分后港币金额|绝对值': 1
+        }
+      }
+    ).toArray();
+
+    brRecords_A.forEach(rec => {
+      const circuitId = String(rec['电路参考编号'] || '').trim();
+      const industry = circuitToIndustryMap_A.get(circuitId);
+      const customerName = circuitToCustomerNameMap_A.get(circuitId) || '未知客户';
+      if (!industry || !brStats_A[industry]) return;
+
+      const prodCategory = rec['市场经分产品分类'] || '其他';
+      const mapping = PRODUCT_CATEGORY_MAP[prodCategory] || { parent: '智能服务', sub: '其他' };
+      const largeCat = mapping.parent;
+      const subCat = mapping.sub;
+
+      // 优先采用"拆分后港币金额｜绝对值"字段
+      const rawAmount = rec['拆分后港币金额｜绝对值'] !== undefined
+        ? rec['拆分后港币金额｜绝对值']
+        : (rec['拆分后港币金额|绝对值'] !== undefined
+            ? rec['拆分后港币金额|绝对值']
+            : (rec['拆分后港币金额'] || 0));
+      const amount = parseFloat(rawAmount);
+
+      if (!brStats_A[industry][largeCat][subCat]) {
+        brStats_A[industry][largeCat][subCat] = 0;
+      }
+      brStats_A[industry][largeCat][subCat] += amount;
+
+      // A端客户维度 2026 计费收入
+      if (!customerIncomeStats_A[customerName]) {
+        customerIncomeStats_A[customerName] = {
+          name: customerName,
+          industry: industry,
+          total: 0,
+          products: {}
+        };
+      }
+      customerIncomeStats_A[customerName].total += amount;
+      customerIncomeStats_A[customerName].products[prodCategory] = (customerIncomeStats_A[customerName].products[prodCategory] || 0) + amount;
+    });
+  }
+
   // --- 5. 格式化并返回最终统计结果 ---
   // 将以英文为 Key 的行业转换整理，并提供对应中文名字以便前端绘图
   const formattedIndustryStats = [];
@@ -307,6 +478,7 @@ const getOverviewStats = catchAsync(async (req, res) => {
     });
   });
 
+  // B端 TCV 格式化（原有字段保持不变）
   const formattedTcvStats = [];
   Object.keys(tcvStats).forEach(indCode => {
     formattedTcvStats.push({
@@ -316,6 +488,17 @@ const getOverviewStats = catchAsync(async (req, res) => {
     });
   });
 
+  // A端 TCV 格式化（新增）
+  const formattedTcvStats_A = [];
+  Object.keys(tcvStats_A).forEach(indCode => {
+    formattedTcvStats_A.push({
+      code: indCode,
+      nameCn: INDUSTRY_NAME_MAP[indCode],
+      ...tcvStats_A[indCode]
+    });
+  });
+
+  // B端 BR 格式化（原有字段保持不变）
   const formattedBrStats = [];
   Object.keys(brStats).forEach(indCode => {
     formattedBrStats.push({
@@ -325,6 +508,33 @@ const getOverviewStats = catchAsync(async (req, res) => {
     });
   });
 
+  // A端 BR 格式化（新增）
+  const formattedBrStats_A = [];
+  Object.keys(brStats_A).forEach(indCode => {
+    formattedBrStats_A.push({
+      code: indCode,
+      nameCn: INDUSTRY_NAME_MAP[indCode],
+      categories: brStats_A[indCode]
+    });
+  });
+
+  // 计算 B端、A端 2026 年签单总额（供前端 KPI 卡片展示 B/A端分类副标题）
+  const tcv2026Total_B = Object.values(tcvStats).reduce((sum, s) => sum + (s['2026'] || 0), 0);
+  const tcv2026Total_A = Object.values(tcvStats_A).reduce((sum, s) => sum + (s['2026'] || 0), 0);
+
+  // 辅助函数：汇总 brStats 所有行业的全量计费收入
+  const calcBrTotal = (brStatsObj) => {
+    let total = 0;
+    Object.values(brStatsObj).forEach(indCats => {
+      Object.values(indCats).forEach(subMap => {
+        Object.values(subMap).forEach(v => { total += (parseFloat(v) || 0); });
+      });
+    });
+    return total;
+  };
+  const br2026Total_B = calcBrTotal(brStats);
+  const br2026Total_A = calcBrTotal(brStats_A);
+
   res.status(httpStatus.OK).send({
     quantity: {
       totalCustomers,
@@ -333,10 +543,21 @@ const getOverviewStats = catchAsync(async (req, res) => {
       industryStats: formattedIndustryStats,
       regionCountryStats: regionCountryBranchStats
     },
+    // B端数据（原有字段保持向下兼容）
     tcv: formattedTcvStats,
     br2026: formattedBrStats,
     topCustomers: Object.values(customerIncomeStats),
-    tcvCustomerStats
+    tcvCustomerStats,
+    // A端数据（新增）
+    tcv_A: formattedTcvStats_A,
+    br2026_A: formattedBrStats_A,
+    topCustomers_A: Object.values(customerIncomeStats_A),
+    tcvCustomerStats_A,
+    // 总额汇总（供 KPI 卡片展示 B端/A端 分类副标题）
+    tcv2026Total_B,
+    tcv2026Total_A,
+    br2026Total_B,
+    br2026Total_A
   });
 });
 

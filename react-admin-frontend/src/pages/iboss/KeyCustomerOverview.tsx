@@ -42,6 +42,9 @@ const KeyCustomerOverview: React.FC = () => {
   // TCV 柱状图联动年份与行业筛选状态 (默认 2026 年，无指定行业联动)
   const [tcvFilter, setTcvFilter] = useState<{ year: string; industry: string | null }>({ year: '2026', industry: null });
 
+  // 数据视角：'B' = B端国际签单/收入, 'A' = A端签单/收入, 'total' = A+B合计（默认）
+  const [dataMode, setDataMode] = useState<'B' | 'A' | 'total'>('total');
+
   // 海外分支抽屉相关状态
   const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -339,12 +342,85 @@ const KeyCustomerOverview: React.FC = () => {
     fetchStats();
   }, []);
 
-  const { quantity = {}, tcv = [], br2026 = [] } = data || {};
+  const { quantity = {}, tcv = [], br2026 = [], tcv_A = [], br2026_A = [], tcv2026Total_B = 0, tcv2026Total_A = 0, br2026Total_B = 0, br2026Total_A = 0 } = data || {};
+
+  // --- 根据 dataMode 选择活跃的 TCV/BR/topCustomers 数据源 ---
+  // 合并两个行业数组（A端与B端按行业 code 对齐）
+  const mergeTcvByIndustry = (listB: any[], listA: any[]) => {
+    const indexA = new Map(listA.map((item: any) => [item.code, item]));
+    return listB.map((bItem: any) => {
+      const aItem = indexA.get(bItem.code) || {};
+      return {
+        ...bItem,
+        '2023': (bItem['2023'] || 0) + (aItem['2023'] || 0),
+        '2024': (bItem['2024'] || 0) + (aItem['2024'] || 0),
+        '2025': (bItem['2025'] || 0) + (aItem['2025'] || 0),
+        '2026': (bItem['2026'] || 0) + (aItem['2026'] || 0),
+      };
+    });
+  };
+
+  const mergeBrByIndustry = (listB: any[], listA: any[]) => {
+    const indexA = new Map(listA.map((item: any) => [item.code, item]));
+    return listB.map((bItem: any) => {
+      const aItem = indexA.get(bItem.code);
+      if (!aItem) return bItem;
+      // 合并 categories（深度合并）
+      const mergedCats: Record<string, Record<string, number>> = {};
+      [bItem.categories, aItem.categories].forEach((cats: any) => {
+        if (!cats) return;
+        Object.keys(cats).forEach(largeCat => {
+          if (!mergedCats[largeCat]) mergedCats[largeCat] = {};
+          const subMap = cats[largeCat] || {};
+          Object.keys(subMap).forEach(subCat => {
+            mergedCats[largeCat][subCat] = (mergedCats[largeCat][subCat] || 0) + (subMap[subCat] || 0);
+          });
+        });
+      });
+      return { ...bItem, categories: mergedCats };
+    });
+  };
+
+  const mergeTopCustomers = (listB: any[], listA: any[]) => {
+    // 合并两个客户列表，同名客户汇总
+    const map = new Map<string, any>();
+    [...listB, ...listA].forEach((c: any) => {
+      if (!map.has(c.name)) {
+        map.set(c.name, { ...c, products: { ...c.products } });
+      } else {
+        const existing = map.get(c.name)!;
+        existing.total += c.total;
+        Object.keys(c.products || {}).forEach(p => {
+          existing.products[p] = (existing.products[p] || 0) + c.products[p];
+        });
+      }
+    });
+    return Array.from(map.values());
+  };
+
+  const mergeTcvCustomerStats = (listB: any[], listA: any[]) => {
+    const map = new Map<string, any>();
+    [...listB, ...listA].forEach((c: any) => {
+      const key = `${c.year}_${c.industry}_${c.customerName}`;
+      if (!map.has(key)) {
+        map.set(key, { ...c });
+      } else {
+        map.get(key)!.amount += c.amount;
+      }
+    });
+    return Array.from(map.values());
+  };
+
+  // 按 dataMode 选择活跃数据集
+  const activeTcv: any[] = dataMode === 'B' ? tcv : dataMode === 'A' ? tcv_A : mergeTcvByIndustry(tcv, tcv_A);
+  const activeBr2026: any[] = dataMode === 'B' ? br2026 : dataMode === 'A' ? br2026_A : mergeBrByIndustry(br2026, br2026_A);
+  const activeTopCustomers: any[] = dataMode === 'B' ? (data?.topCustomers || []) : dataMode === 'A' ? (data?.topCustomers_A || []) : mergeTopCustomers(data?.topCustomers || [], data?.topCustomers_A || []);
+  const activeTcvCustomerStats: any[] = dataMode === 'B' ? (data?.tcvCustomerStats || []) : dataMode === 'A' ? (data?.tcvCustomerStats_A || []) : mergeTcvCustomerStats(data?.tcvCustomerStats || [], data?.tcvCustomerStats_A || []);
 
   // --- 按照每个行业的2026年计费总收入进行倒序排列 ---
   const sortedBr2026 = React.useMemo(() => {
-    if (!br2026 || br2026.length === 0) return [];
-    return [...br2026].map(item => {
+    if (!activeBr2026 || activeBr2026.length === 0) return [];
+    return [...activeBr2026].map(item => {
       let sum = 0;
       if (item.categories) {
         Object.keys(item.categories).forEach(k => {
@@ -354,17 +430,17 @@ const KeyCustomerOverview: React.FC = () => {
       }
       return { ...item, totalIncome: sum };
     }).sort((a, b) => b.totalIncome - a.totalIncome);
-  }, [br2026]);
+  }, [activeBr2026]);
 
-  // --- 联动计算：2026年要客收入top10客户列表 ---
+  // --- 联动计算：2026年要客收入top10客户列表（根据 dataMode 切换数据源）---
   const currentTop10Customers = React.useMemo(() => {
-    const list = data?.topCustomers || [];
+    const list = activeTopCustomers;
     const filtered = selectedIndustry
       ? list.filter((item: any) => item.industry === selectedIndustry)
       : list;
     const sorted = [...filtered].sort((a: any, b: any) => b.total - a.total);
     return sorted.slice(0, 10);
-  }, [data?.topCustomers, selectedIndustry]);
+  }, [activeTopCustomers, selectedIndustry]);
 
   // 排行榜展示列定义
   const topCustomerColumns = [
@@ -457,9 +533,9 @@ const KeyCustomerOverview: React.FC = () => {
     }
   ];
 
-  // --- 联动计算：历年签单金额客户 Top 10 ---
+  // --- 联动计算：历年签单金额客户 Top 10（根据 dataMode 切换数据源）---
   const currentTcvTop10 = React.useMemo(() => {
-    const list = data?.tcvCustomerStats || [];
+    const list = activeTcvCustomerStats;
     const activeIndustry = tcvFilter.industry;
     const filtered = list.filter((item: any) => {
       const matchYear = String(item.year) === String(tcvFilter.year);
@@ -468,7 +544,7 @@ const KeyCustomerOverview: React.FC = () => {
     });
     const sorted = [...filtered].sort((a: any, b: any) => b.amount - a.amount);
     return sorted.slice(0, 10);
-  }, [data?.tcvCustomerStats, tcvFilter]);
+  }, [activeTcvCustomerStats, tcvFilter]);
 
   const handleResetTcvFilter = () => {
     setTcvFilter({ year: '2026', industry: null });
@@ -554,7 +630,7 @@ const KeyCustomerOverview: React.FC = () => {
     );
   }
 
-  // --- 联动计算：2026年计费收入构成 (全行业或指定行业) ---
+  // --- 联动计算：2026年计费收入构成（全行业或指定行业，使用 activeBr2026 数据源）---
   let combinedBr: Record<string, Record<string, number>> = {
     '通讯服务': {},
     '算力服务': {},
@@ -563,13 +639,13 @@ const KeyCustomerOverview: React.FC = () => {
 
   if (selectedIndustry) {
     // 过滤出指定行业
-    const matched = br2026.find((b: any) => b.code === selectedIndustry);
+    const matched = activeBr2026.find((b: any) => b.code === selectedIndustry);
     if (matched && matched.categories) {
       combinedBr = matched.categories;
     }
   } else {
     // 全行业汇总
-    br2026.forEach((item: any) => {
+    activeBr2026.forEach((item: any) => {
       if (item.categories) {
         Object.keys(item.categories).forEach(largeCat => {
           const subMap = item.categories[largeCat] || {};
@@ -621,7 +697,7 @@ const KeyCustomerOverview: React.FC = () => {
 
   // 计算最大签单金额作为 Y 轴上限 (仅针对选中展示年份且未隐藏的行业计算)
   let maxTcvAmount = 0;
-  tcv.forEach((item: any) => {
+  activeTcv.forEach((item: any) => {
     if (hiddenIndustries.includes(item.code)) return; // 排除被隐藏的行业
     tcvDisplayYears.forEach(year => {
       const val = (item[year] || 0) / 1000000; // 转换为百万港币
@@ -631,12 +707,20 @@ const KeyCustomerOverview: React.FC = () => {
   // 向上取整以美化Y轴刻度
   maxTcvAmount = maxTcvAmount > 0 ? Math.ceil(maxTcvAmount / 10) * 10 : 50;
 
-  // 联动计算：2026年签单与计收总额
-  const totalTcv2026 = tcv ? tcv.reduce((sum: number, item: any) => sum + (parseFloat(item['2026']) || 0), 0) : 0;
+  // 联动计算：2026年签单与计收总额（A端+B端合计，卡片副标题展示分类）
+  const tcv2026B = tcv2026Total_B;
+  const tcv2026A = tcv2026Total_A;
+  const totalTcv2026 = tcv2026B + tcv2026A;
   const totalTcv2026Formatted = (totalTcv2026 / 1000000).toFixed(2);
+  const tcv2026BFormatted = (tcv2026B / 1000000).toFixed(2);
+  const tcv2026AFormatted = (tcv2026A / 1000000).toFixed(2);
 
-  const totalBr2026 = data?.topCustomers ? data.topCustomers.reduce((sum: number, item: any) => sum + (parseFloat(item.total) || 0), 0) : 0;
+  const br2026B = br2026Total_B;
+  const br2026A = br2026Total_A;
+  const totalBr2026 = br2026B + br2026A;
   const totalBr2026Formatted = (totalBr2026 / 1000000).toFixed(2);
+  const br2026BFormatted = (br2026B / 1000000).toFixed(2);
+  const br2026AFormatted = (br2026A / 1000000).toFixed(2);
 
   // 年份对应的渐变色和颜色定义
   const YEAR_GRADIENT_MAP: Record<string, { id: string; stops: [string, string]; color: string }> = {
@@ -718,7 +802,7 @@ const KeyCustomerOverview: React.FC = () => {
 
             {/* 右侧子列：2026签单总额与2026计收总额 */}
             <Col span={12} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* 第3行卡片：2026年签单总额 */}
+              {/* 第3行卡片：2026年签单总额（A端+B端合计） */}
               <Card
                 bordered={false}
                 style={{
@@ -743,11 +827,11 @@ const KeyCustomerOverview: React.FC = () => {
                   <TransactionOutlined style={{ fontSize: '32px', opacity: 0.3 }} />
                 </div>
                 <div style={{ marginTop: 12, fontSize: '11px', opacity: 0.95, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 8 }}>
-                  2026年度各行业签约合同签单金额汇总
+                  A端+B端合计 &nbsp;|&nbsp; B端: <strong>{tcv2026BFormatted} M</strong> &nbsp;/&nbsp; A端: <strong>{tcv2026AFormatted} M</strong>
                 </div>
               </Card>
 
-              {/* 第4行卡片：2026年计收总额 */}
+              {/* 第4行卡片：2026年计收总额（A端+B端合计） */}
               <Card
                 bordered={false}
                 style={{
@@ -772,7 +856,7 @@ const KeyCustomerOverview: React.FC = () => {
                   <DashboardOutlined style={{ fontSize: '32px', opacity: 0.3 }} />
                 </div>
                 <div style={{ marginTop: 12, fontSize: '11px', opacity: 0.95, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 8 }}>
-                  2026年度财务实收计费总额绝对值
+                  A端+B端合计 &nbsp;|&nbsp; B端: <strong>{br2026BFormatted} M</strong> &nbsp;/&nbsp; A端: <strong>{br2026AFormatted} M</strong>
                 </div>
               </Card>
             </Col>
@@ -926,6 +1010,18 @@ const KeyCustomerOverview: React.FC = () => {
               options={allTcvYears.map(y => ({ label: `${y}年`, value: y }))}
               maxTagCount={4}
             />
+            {/* 数据视角切换：B端国际签单 / A端签单 / A+B合计 */}
+            <Select
+              size="small"
+              value={dataMode}
+              onChange={(val) => { setDataMode(val); setTcvFilter({ year: tcvFilter.year, industry: null }); }}
+              style={{ minWidth: 130 }}
+              options={[
+                { label: '🔵 B端', value: 'B' },
+                { label: '🟢 A端', value: 'A' },
+                { label: '⚪ A+B合计', value: 'total' },
+              ]}
+            />
           </div>
         }
         extra={<span style={{ fontSize: '12px', color: '#888' }}>单位：百万港币 (M HKD)</span>}
@@ -973,14 +1069,14 @@ const KeyCustomerOverview: React.FC = () => {
                   );
                 })}
 
-                {/* 渲染柱体（仅展示选中年份） */}
-                {tcv.map((item: any, idx: number) => {
+                {/* 渲染柱体（仅展示选中年份，使用 activeTcv 支持视角切换） */}
+                {activeTcv.map((item: any, idx: number) => {
                   const sortedYears = tcvDisplayYears.slice().sort();
                   const barWidth = 8;
                   const barGap = 2;
                   const groupWidth = sortedYears.length * (barWidth + barGap) - barGap + 6;
                   const svgWidth = 536; // 可用绘图宽度
-                  const groupSpacing = svgWidth / tcv.length;
+                  const groupSpacing = svgWidth / activeTcv.length;
                   const groupX = 48 + (idx * groupSpacing);
                   const isTcvFiltered = tcvFilter.industry !== null;
                   const xAxisLabel = INDUSTRY_SHORT_NAME[item.nameCn] || item.nameCn;
@@ -1095,7 +1191,14 @@ const KeyCustomerOverview: React.FC = () => {
         {/* 左栏：8大行业 2026 实收额总表 */}
         <Col xs={24} lg={10}>
           <Card
-            title="8大行业 2026计费收入对比"
+            title={
+              <span>
+                8大行业 2026计费收入对比
+                <span style={{ marginLeft: 8, fontSize: '11px', fontWeight: 'normal', color: dataMode === 'B' ? '#1890ff' : dataMode === 'A' ? '#52c41a' : '#888' }}>
+                  [{dataMode === 'B' ? 'B端国际' : dataMode === 'A' ? 'A端结算' : 'A+B合计'}]
+                </span>
+              </span>
+            }
             extra={<span style={{ fontSize: '12px', color: '#888' }}>点击行以过滤产品类别明细</span>}
             bordered={false}
             style={{ borderRadius: 8, height: '100%' }}
@@ -1120,7 +1223,7 @@ const KeyCustomerOverview: React.FC = () => {
                   💼 全行业汇总
                 </span>
                 <span style={{ fontWeight: 'bold' }}>
-                  {(br2026.reduce((sum: number, item: any) => {
+                  {(activeBr2026.reduce((sum: number, item: any) => {
                     let s = 0;
                     if (item.categories) {
                       Object.keys(item.categories).forEach(k => {
