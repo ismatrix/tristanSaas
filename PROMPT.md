@@ -4619,3 +4619,20 @@ keyGlobalFamilyTree
    - 生产环境顺利完成最新的 Git 拉取与 `reset --hard` 强同步。
    - 成功在生产环境下完成了前端的重新 Webpack 打包（`max build` 编译完全无错通过）。
    - 后端服务进程 `backend-api` (PM2 App ID: `0`) 成功重启上线并处于 `online` 运行状态，更新全部平滑生效。
+
+## 2026-07-02 09:38:15
+
+### 用户提示词
+生产环境的logo无法显示
+
+### 执行总结
+1. **Logo 无法显示根因定位**：
+   - 本地 `logo.png` 为健康的 PNG 图像。但项目根目录 [.gitattributes](file:///Users/tristan/Workspaces/github/node-express-boilerplate/.gitattributes) 配置中原本存在全局文本转换规则 `* text eol=lf`，而未对图片等二进制后缀进行例外说明。
+   - 这导致 Git 在将代码推送至 GitHub 远端及生产环境检出重置时，错误地将 `logo.png` 作为文本文件进行了换行符（CRLF -> LF）的自动拦截替换，破坏了 PNG 图片的二进制文件头数据，使其在生产服务器上退化为了损毁的纯二进制 `data` 流，导致浏览器加载彻底失效。
+2. **.gitattributes 修正与 renormalize**：
+   - 迅速修正了本地的 [.gitattributes](file:///Users/tristan/Workspaces/github/node-express-boilerplate/.gitattributes)，显式对二进制文件加设例外规约：`*.png binary`、`*.jpg binary` 等。
+   - 运行了本地 Git 强效重置规范化命令 `git add --renormalize react-admin-frontend/public/logo.png`，令 Git 按照最新属性规则重新提取了物理层完好、未受损的健康图片，成功将其提交并推送至 GitHub 远端主干。
+3. **紧急拷贝与安全构建**：
+   - 第一时间使用 `scp` 安全通道，将本地完好无损的 `logo.png` 直接覆盖至生产服务器的静态及打包资源目录中，立竿见影地恢复了线上图片显示。
+   - 在远程生产环境重新拉取并重载了最新的 Git 二进制提交，对 `/public/logo.png` 进行 `file` 检测，确认其目前已被系统完全识别为合法的 `PNG image data, 500 x 500`。
+   - 重新对生产环境的前端项目运行了构建（`npm run build`），再次使用 `file` 交叉核实 `dist/logo.png`，确保编译出的静态 Logo 产物同样完全健康，杜绝了未来自动部署破坏的后顾之忧。
