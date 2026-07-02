@@ -1,3 +1,11 @@
 # Convert text file line endings to lf
 * text eol=lf
 *.js text
+
+# Prevent Git from converting line endings in binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary

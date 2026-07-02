@@ -4604,3 +4604,18 @@ keyGlobalFamilyTree
 2. **构建与功能验证**：
    - 前端成功运行 `npm run build` 打包构建编译通过。
    - 在浏览器子代理中刷新页面进行测试：点击行业分类（例如“交通与物流”）后，底部的「2026年要客计费收入排行榜」随之更新为该行业下的客户排名，而上方的「2026年签单Top 10」仍保持为“全行业汇总”并未受到干扰，Bug 验证已完美修复。
+
+## 2026-07-02 09:30:58
+
+### 用户提示词
+现在的项目是tristanSaas， 不要搞混了。 同步代码到生产环境
+
+### 执行总结
+1. **代码推送与同步上线**：
+   - 将本地开发环境最新的改动文件（包括新加入的 `KeyCustomerOverview.tsx` 指标卡片拆分布局、明细弹窗 AG Grid 功能、后端 `keyCustomerOverview.controller.js` 投影字段扩展等）全部进行了 `git add` 并安全 commit。
+   - 成功将本地主分支代码推送至 GitHub 远端仓库的 `main` 分支。
+   - 通过 SSH 秘钥授权安全登录至 `tristan.wang` 生产服务器 (端口: `6822`)，在 `~/workspaces/TristanSaas` 目录下成功执行了自动化部署脚本 `./deploy.sh`。
+2. **生产构建与服务重启**：
+   - 生产环境顺利完成最新的 Git 拉取与 `reset --hard` 强同步。
+   - 成功在生产环境下完成了前端的重新 Webpack 打包（`max build` 编译完全无错通过）。
+   - 后端服务进程 `backend-api` (PM2 App ID: `0`) 成功重启上线并处于 `online` 运行状态，更新全部平滑生效。
