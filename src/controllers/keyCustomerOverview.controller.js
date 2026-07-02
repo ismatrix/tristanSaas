@@ -141,8 +141,34 @@ const getOverviewStats = catchAsync(async (req, res) => {
   // 查询匹配的 TCV 签单记录
   const tcvRecords = await db.collection('dmcTCV').find(
     { '签约客户标识': { $in: Array.from(extCustIds) } },
-    { projection: { '签约客户标识': 1, '合同签署日期': 1, '签单金额(港币)': 1, '电路编号': 1 } }
+    { projection: { '签约客户标识': 1, '合同签署日期': 1, '设置起租日期': 1, '电路编号': 1, '订单状态': 1, '签单金额(港币)': 1 } }
   ).toArray();
+
+  // 1. 过滤“订单状态” = Achive 的订单
+  let filteredTcv = tcvRecords.filter(rec => {
+    const status = String(rec['订单状态'] || '').trim();
+    return status.toLowerCase() !== 'achive';
+  });
+
+  // 2. 按照 _id 升序排序，确保重复时保留 _id 最小的记录
+  filteredTcv.sort((a, b) => String(a._id).localeCompare(String(b._id)));
+
+  // 3. TCV的金额统计去重：如果合同签署日期、设置起租日期、电路编号、订单状态、签单金额(港币)这5个字段都相同，只保留第一个（即 _id 最小的那条）
+  const uniqueTcvMap = new Map();
+  filteredTcv.forEach(rec => {
+    const kSignDate = rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '';
+    const kStartDate = rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '';
+    const kCircuit = rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '';
+    const kStatus = rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '';
+    const kAmount = rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : '';
+    
+    const duplicateKey = `${kSignDate}_${kStartDate}_${kCircuit}_${kStatus}_${kAmount}`;
+    if (!uniqueTcvMap.has(duplicateKey)) {
+      uniqueTcvMap.set(duplicateKey, rec);
+    }
+  });
+
+  const finalTcvRecords = Array.from(uniqueTcvMap.values());
 
   // 初始化 TCV 签单统计 (8大行业 x 2023, 2024, 2025, 2026 年)
   const tcvStats = {};
@@ -156,7 +182,7 @@ const getOverviewStats = catchAsync(async (req, res) => {
   const circuitToCustomerNameMap = new Map();
 
   const tcvCustomerSumMap = {};
-  tcvRecords.forEach(rec => {
+  finalTcvRecords.forEach(rec => {
     const extId = String(rec['签约客户标识'] || '').trim();
     const parentGid = extCustIdToGidMap.get(extId);
     const industry = gidToIndustryMap.get(parentGid);
@@ -410,7 +436,9 @@ const getTcvDetail = catchAsync(async (req, res) => {
     '是否国际业务收入标签': 1,
     '销售单元编码': 1,
     '销售单元中文名称': 1,
-    '签单金额(港币)': 1
+    '签单金额(港币)': 1,
+    '设置起租日期': 1,
+    '订单状态': 1
   };
 
   if (extCustIds.length > 0) {
@@ -436,7 +464,31 @@ const getTcvDetail = catchAsync(async (req, res) => {
     list = await db.collection('dmcTCV').find(filter, { projection }).toArray();
   }
 
-  res.status(httpStatus.OK).send(list);
+  // 4. 过滤与去重
+  let filteredList = list.filter(rec => {
+    const status = String(rec['订单状态'] || '').trim();
+    return status.toLowerCase() !== 'achive';
+  });
+
+  filteredList.sort((a, b) => String(a._id).localeCompare(String(b._id)));
+
+  const uniqueListMap = new Map();
+  filteredList.forEach(rec => {
+    const kSignDate = rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '';
+    const kStartDate = rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '';
+    const kCircuit = rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '';
+    const kStatus = rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '';
+    const kAmount = rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : '';
+    
+    const duplicateKey = `${kSignDate}_${kStartDate}_${kCircuit}_${kStatus}_${kAmount}`;
+    if (!uniqueListMap.has(duplicateKey)) {
+      uniqueListMap.set(duplicateKey, rec);
+    }
+  });
+
+  const finalList = Array.from(uniqueListMap.values());
+
+  res.status(httpStatus.OK).send(finalList);
 });
 
 // 获取指定客户和年份下的 BR 计费明细列表
@@ -464,9 +516,33 @@ const getBrDetail = catchAsync(async (req, res) => {
     // 2. 从 dmcTCV 中查找这些客户对应的电路编号
     const tcvRecs = await db.collection('dmcTCV').find(
       { '签约客户标识': { $in: extCustIds }, '电路编号': { $ne: null } },
-      { projection: { '电路编号': 1 } }
+      { projection: { '电路编号': 1, '合同签署日期': 1, '设置起租日期': 1, '订单状态': 1, '签单金额(港币)': 1 } }
     ).toArray();
-    circuitIds = tcvRecs.map(r => String(r['电路编号'] || '').trim()).filter(Boolean);
+
+    // 过滤与去重
+    let filteredTcvRecs = tcvRecs.filter(rec => {
+      const status = String(rec['订单状态'] || '').trim();
+      return status.toLowerCase() !== 'achive';
+    });
+
+    filteredTcvRecs.sort((a, b) => String(a._id).localeCompare(String(b._id)));
+
+    const uniqueTcvRecsMap = new Map();
+    filteredTcvRecs.forEach(rec => {
+      const kSignDate = rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '';
+      const kStartDate = rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '';
+      const kCircuit = rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '';
+      const kStatus = rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '';
+      const kAmount = rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : '';
+      
+      const duplicateKey = `${kSignDate}_${kStartDate}_${kCircuit}_${kStatus}_${kAmount}`;
+      if (!uniqueTcvRecsMap.has(duplicateKey)) {
+        uniqueTcvRecsMap.set(duplicateKey, rec);
+      }
+    });
+
+    const finalTcvRecs = Array.from(uniqueTcvRecsMap.values());
+    circuitIds = finalTcvRecs.map(r => String(r['电路编号'] || '').trim()).filter(Boolean);
   }
 
   let list = [];
