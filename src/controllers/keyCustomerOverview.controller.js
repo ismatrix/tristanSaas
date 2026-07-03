@@ -622,28 +622,16 @@ const getCountryBranches = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(formattedRecords);
 });
 
-// 获取指定客户和年份下的 TCV 签单明细列表
+// 获取指定客户和年份下的 TCV 签单明细列表（支持 mode=B/A/total 区分端别）
 const getTcvDetail = catchAsync(async (req, res) => {
-  const { customerName, year } = req.query;
+  const { customerName, year, mode } = req.query;
   if (!customerName) {
     return res.status(httpStatus.BAD_REQUEST).send({ message: '请提供客户名称 (customerName)' });
   }
 
   const db = mongoose.connection.db;
 
-  // 1. 查找要客 GID
-  const cust = await db.collection('keycustomer').findOne({ nameCn: customerName });
-  let extCustIds = [];
-  if (cust && cust.GID) {
-    const gid = String(cust.GID).trim();
-    // 2. 查出 extCustId
-    const mappings = await db.collection('keyFamilyTreeCustMapping').find({
-      ultimateGID: { $in: [gid, Number(gid), cust.GID] }
-    }).toArray();
-    extCustIds = mappings.map(m => String(m.extCustId || '').trim()).filter(Boolean);
-  }
-
-  let list = [];
+  // 投影字段
   const projection = {
     '签约客户标识': 1,
     '合同签署日期': 1,
@@ -662,55 +650,108 @@ const getTcvDetail = catchAsync(async (req, res) => {
     '订单状态': 1
   };
 
-  if (extCustIds.length > 0) {
-    const filter = { '签约客户标识': { $in: extCustIds } };
-    if (year) {
-      filter['合同签署日期'] = { $regex: new RegExp('^' + year) };
+  // 公共过滤去重函数
+  const filterAndDedup = (rawList) => {
+    let filtered = rawList.filter(rec => {
+      const status = String(rec['订单状态'] || '').trim();
+      return status.toLowerCase() !== 'achive';
+    });
+    filtered.sort((a, b) => String(a._id).localeCompare(String(b._id)));
+    const uniqueMap = new Map();
+    filtered.forEach(rec => {
+      const k = [
+        rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '',
+        rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '',
+        rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '',
+        rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '',
+        rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : ''
+      ].join('_');
+      if (!uniqueMap.has(k)) uniqueMap.set(k, rec);
+    });
+    return Array.from(uniqueMap.values());
+  };
+
+  // --- 查询 B端 TCV 数据（通过签约客户标识） ---
+  const getBList = async () => {
+    // 1. 查找要客 GID
+    const cust = await db.collection('keycustomer').findOne({ nameCn: customerName });
+    let extCustIds = [];
+    if (cust && cust.GID) {
+      const gid = String(cust.GID).trim();
+      const mappings = await db.collection('keyFamilyTreeCustMapping').find({
+        ultimateGID: { $in: [gid, Number(gid), cust.GID] }
+      }).toArray();
+      extCustIds = mappings.map(m => String(m.extCustId || '').trim()).filter(Boolean);
     }
-    list = await db.collection('dmcTCV').find(filter, { projection }).toArray();
+
+    let list = [];
+    if (extCustIds.length > 0) {
+      const filter = { '签约客户标识': { $in: extCustIds } };
+      if (year) filter['合同签署日期'] = { $regex: new RegExp('^' + year) };
+      list = await db.collection('dmcTCV').find(filter, { projection }).toArray();
+    }
+    // 后备：若 B端未关联到数据，尝试名称直接搜索
+    if (list.length === 0) {
+      const filter = {
+        $or: [
+          { '分析客户名称(规整后)': customerName },
+          { '签约客户名称': customerName }
+        ]
+      };
+      if (year) filter['合同签署日期'] = { $regex: new RegExp('^' + year) };
+      list = await db.collection('dmcTCV').find(filter, { projection }).toArray();
+    }
+    return list;
+  };
+
+  // --- 查询 A端 TCV 数据（通过 ibosscustomers.enterpriseName → 终端客户名称） ---
+  const getAList = async () => {
+    // 1. 查找要客 GID
+    const cust = await db.collection('keycustomer').findOne({ nameCn: customerName });
+    if (!cust || !cust.GID) return [];
+    const gid = String(cust.GID).trim();
+
+    // 2. 查找 endCustomer 路径的 extCustIds
+    const mappings = await db.collection('keyFamilyTreeCustMapping').find({
+      ultimateGID: { $in: [gid, Number(gid), cust.GID] },
+      mappingPath: 'endCustomer'
+    }).toArray();
+    const endCustExtIds = mappings.map(m => String(m.extCustId || '').trim()).filter(Boolean);
+    if (endCustExtIds.length === 0) return [];
+
+    // 3. 通过 ibosscustomers 获取 enterpriseName
+    const ibossRecs = await db.collection('ibosscustomers').find(
+      { custId: { $in: endCustExtIds } },
+      { projection: { custId: 1, enterpriseName: 1 } }
+    ).toArray();
+    const enterpriseNames = ibossRecs.map(r => r.enterpriseName).filter(Boolean).map(n => String(n).trim());
+    if (enterpriseNames.length === 0) return [];
+
+    // 4. 查询 A端 TCV（通过终端客户名称）
+    const filter = { '终端客户名称': { $in: enterpriseNames } };
+    if (year) filter['合同签署日期'] = { $regex: new RegExp('^' + year) };
+    const list = await db.collection('dmcTCV').find(filter, { projection }).toArray();
+    return list;
+  };
+
+  // 根据 mode 参数选择查询方式
+  let rawList = [];
+  const modeVal = (mode || 'total').toLowerCase();
+
+  if (modeVal === 'b') {
+    rawList = await getBList();
+  } else if (modeVal === 'a') {
+    rawList = await getAList();
+  } else {
+    // total：A端 + B端合并（去重时同一条记录只保留一条）
+    const [bList, aList] = await Promise.all([getBList(), getAList()]);
+    rawList = [...bList, ...aList];
   }
 
-  // 3. 后备机制：若未关联到 GID/extCustId，或者关联出来的 TCV 数据为空，尝试用名称直接搜索 dmcTCV
-  if (list.length === 0) {
-    const filter = {
-      $or: [
-        { '分析客户名称(规整后)': customerName },
-        { '签约客户名称': customerName },
-        { '终端客户名称': customerName }
-      ]
-    };
-    if (year) {
-      filter['合同签署日期'] = { $regex: new RegExp('^' + year) };
-    }
-    list = await db.collection('dmcTCV').find(filter, { projection }).toArray();
-  }
-
-  // 4. 过滤与去重
-  let filteredList = list.filter(rec => {
-    const status = String(rec['订单状态'] || '').trim();
-    return status.toLowerCase() !== 'achive';
-  });
-
-  filteredList.sort((a, b) => String(a._id).localeCompare(String(b._id)));
-
-  const uniqueListMap = new Map();
-  filteredList.forEach(rec => {
-    const kSignDate = rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '';
-    const kStartDate = rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '';
-    const kCircuit = rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '';
-    const kStatus = rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '';
-    const kAmount = rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : '';
-    
-    const duplicateKey = `${kSignDate}_${kStartDate}_${kCircuit}_${kStatus}_${kAmount}`;
-    if (!uniqueListMap.has(duplicateKey)) {
-      uniqueListMap.set(duplicateKey, rec);
-    }
-  });
-
-  const finalList = Array.from(uniqueListMap.values());
-
+  const finalList = filterAndDedup(rawList);
   res.status(httpStatus.OK).send(finalList);
 });
+
 
 // 获取指定客户和年份下的 BR 计费明细列表
 const getBrDetail = catchAsync(async (req, res) => {

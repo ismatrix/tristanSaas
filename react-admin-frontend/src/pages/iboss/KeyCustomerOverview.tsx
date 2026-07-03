@@ -143,11 +143,13 @@ const KeyCustomerOverview: React.FC = () => {
   ];
 
   const handleTcvRowClick = async (customerName: string, year: string) => {
-    setTcvModalTitle(`【${customerName}】${year}年签单合同明细 (TCV)`);
+    const modeLabelMap: Record<string, string> = { 'B': 'B端', 'A': 'A端', 'total': 'A+B合计' };
+    const modeLabel = modeLabelMap[dataMode] || 'A+B合计';
+    setTcvModalTitle(`【${customerName}】${year}年签单合同明细 (TCV) — ${modeLabel}`);
     setTcvModalVisible(true);
     setTcvModalLoading(true);
     try {
-      const res = await request(`/api/v1/key-customer-overview/tcv-detail?customerName=${encodeURIComponent(customerName)}&year=${year}`, {
+      const res = await request(`/api/v1/key-customer-overview/tcv-detail?customerName=${encodeURIComponent(customerName)}&year=${year}&mode=${dataMode}`, {
         method: 'GET'
       });
       setTcvModalData(res || []);

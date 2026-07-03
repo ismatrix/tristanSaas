@@ -4636,3 +4636,39 @@ keyGlobalFamilyTree
    - 第一时间使用 `scp` 安全通道，将本地完好无损的 `logo.png` 直接覆盖至生产服务器的静态及打包资源目录中，立竿见影地恢复了线上图片显示。
    - 在远程生产环境重新拉取并重载了最新的 Git 二进制提交，对 `/public/logo.png` 进行 `file` 检测，确认其目前已被系统完全识别为合法的 `PNG image data, 500 x 500`。
    - 重新对生产环境的前端项目运行了构建（`npm run build`），再次使用 `file` 交叉核实 `dist/logo.png`，确保编译出的静态 Logo 产物同样完全健康，杜绝了未来自动部署破坏的后顾之忧。
+
+---
+
+## Prompt 最新操作记录
+
+**时间**: 2026-07-02 17:40:03
+**提示词**:
+之前所有的统计都是「B端国际签单金额和收入」，现在需要再加一类「A端签单和收入」的统计：
+1、keyFamilyTreeCustMapping的mappingPath="endCustomer"的 extCustId 关联ibosscustomers的custId，再通过enterpriseName关联dmcTCV表中的"终端客户名称"得到记录。
+2、其他的逻辑（BR及要客分支的关联关系）和「B端国际签单金额和收入」的逻辑一致。
+要客概览页面修改：
+1、「2026年签单总额」信息卡：为A端、B端总计，副标题备注中体现各分类的合计。「2026年计收总额」信息卡相同逻辑
+2、「要客历年签单金额趋势」「8大行业 2026计费收入对比」也需要能独立体现A端数据
+
+**执行总结**:
+本次操作为「要客概览 Dashboard」增加了「A端签单和收入」维度的完整数据统计与视角切换功能。
+
+### 后端改造（keyCustomerOverview.controller.js）
+- A端数据链路：mappingPath="endCustomer" 的 extCustId → ibosscustomers.custId → enterpriseName → dmcTCV.终端客户名称
+- A端 TCV：168条映射 → 8,262条历史记录，2026年1,629条，应用相同 Achive 过滤和5字段排重
+- A端 BR：通过A端电路编号查询2026年 dmcBR 计费数据
+- API 响应新增：tcv_A, br2026_A, topCustomers_A, tcvCustomerStats_A, tcv2026Total_B/A, br2026Total_B/A
+
+### 前端改造（KeyCustomerOverview.tsx）
+- 新增 dataMode 状态（'B'|'A'|'total'，默认 total）
+- 新增数据合并函数（mergeTcvByIndustry, mergeBrByIndustry, mergeTopCustomers, mergeTcvCustomerStats）
+- activeTcv/activeBr2026/activeTopCustomers/activeTcvCustomerStats 根据 dataMode 动态切换
+- TCV 趋势图 Card 标题栏新增视角选择器：「🔵 B端 / 🟢 A端 / ⚪ A+B合计」
+- 2026年签单总额 KPI 卡片：主数字=A+B合计，副标题标注 B端 X.XX M / A端 X.XX M
+- 2026年计收总额 KPI 卡片：同上逻辑
+- 8大行业计费收入对比卡片标题实时显示当前视角标签
+
+### 构建验证
+- 本地 npm run build 编译通过，无 TypeScript 错误
+- 代码已提交到 git（commit: 7135add）
+- 等待明确指令后再同步到生产环境
