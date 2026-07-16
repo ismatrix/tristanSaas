@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useLocation, request, history } from '@umijs/max';
-import { Spin, message, Button, Input, Space, Tag, Tabs, Drawer, Descriptions, Tooltip, Modal, Table } from 'antd';
+import { Checkbox, Spin, message, Button, Input, Space, Tag, Tabs, Drawer, Descriptions, Tooltip, Modal, Table, Row, Col, Card, Progress, Select } from 'antd';
 import {
   ExpandAltOutlined,
   ShrinkOutlined,
@@ -13,6 +13,12 @@ import {
   SwapOutlined,
   DownloadOutlined,
   ReloadOutlined,
+  DashboardOutlined,
+  TeamOutlined,
+  InfoCircleOutlined,
+  DollarOutlined,
+  ProfileOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -140,6 +146,7 @@ const getRegion = (country: string): string => {
 };
 
 // ============ 区域分组树构建 （根 → 区域 → 国家 → 城市 → 公司） ============
+// 注意：调用前数据已经过 filterTreeData 过滤，空城市/国家/区域需在此处也过滤掉
 const buildRegionData = (originalData: any[]): any[] => {
   const rootNode = originalData.find((d) => d.parentId === '');
   if (!rootNode) return originalData;
@@ -153,6 +160,7 @@ const buildRegionData = (originalData: any[]): any[] => {
     iconHtml: rootNode.iconHtml, _nodeType: 'root',
     cmiContacts: rootNode.cmiContacts,
     custContacts: rootNode.custContacts, // 保留客户联系人
+    nationAgent: rootNode.nationAgent,
   });
 
   const regionCountryMap: Record<string, Record<string, any[]>> = {};
@@ -168,26 +176,44 @@ const buildRegionData = (originalData: any[]): any[] => {
 
   Object.keys(regionCountryMap).sort().forEach((region) => {
     const regionId = `__region__${region}`;
-    regionNodes.push({
-      id: regionId, parentId: rootId, name: region,
-      position: '', city: '', iconHtml: '', _nodeType: 'region',
-    });
+
+    // 预先收集该大区下所有有效的国家（及其城市分组），跳过无公司的城市/国家
+    const validCountryEntries: Array<{ country: string; flagHtml: string; cityGroups: Record<string, any[]> }> = [];
 
     Object.keys(regionCountryMap[region]).sort().forEach((country) => {
-      const countryId = `__country__${country}`;
-      const code = getCountryCode(country);
-      const flagHtml = code ? getFlagHtml(code) : DEFAULT_AVATAR;
-
-      regionNodes.push({
-        id: countryId, parentId: regionId, name: country,
-        position: '', city: '', iconHtml: flagHtml, _nodeType: 'country',
-      });
-
       const cityGroups: Record<string, any[]> = {};
       regionCountryMap[region][country].forEach((item) => {
         const city = item.city || 'Unknown';
         if (!cityGroups[city]) cityGroups[city] = [];
         cityGroups[city].push(item);
+      });
+
+      // 过滤掉没有任何公司的城市
+      const nonEmptyCities = Object.keys(cityGroups).filter((city) => cityGroups[city].length > 0);
+      if (nonEmptyCities.length === 0) return; // 此国家下无有效公司，跳过
+
+      const code = getCountryCode(country);
+      const flagHtml = code ? getFlagHtml(code) : DEFAULT_AVATAR;
+      // 只保留非空城市
+      const validCityGroups: Record<string, any[]> = {};
+      nonEmptyCities.forEach((city) => { validCityGroups[city] = cityGroups[city]; });
+      validCountryEntries.push({ country, flagHtml, cityGroups: validCityGroups });
+    });
+
+    if (validCountryEntries.length === 0) return; // 此大区下无有效国家，跳过区域节点
+
+    // 添加大区节点
+    regionNodes.push({
+      id: regionId, parentId: rootId, name: region,
+      position: '', city: '', iconHtml: '', _nodeType: 'region',
+    });
+
+    // 添加各国家 → 城市 → 公司节点
+    validCountryEntries.forEach(({ country, flagHtml, cityGroups }) => {
+      const countryId = `__country__${country}`;
+      regionNodes.push({
+        id: countryId, parentId: regionId, name: country,
+        position: '', city: '', iconHtml: flagHtml, _nodeType: 'country',
       });
 
       Object.keys(cityGroups).sort().forEach((city) => {
@@ -204,6 +230,8 @@ const buildRegionData = (originalData: any[]): any[] => {
             city: '', iconHtml: '', _nodeType: 'company',
             cmiContacts: company.cmiContacts,
             custContacts: company.custContacts, // 保留客户联系人
+            nationAgent: company.nationAgent,
+            entityTypeName: company.entityTypeName, // 透传营业网点标识，用于灰色背景渲染
           });
         });
       });
@@ -217,7 +245,10 @@ const buildRegionData = (originalData: any[]): any[] => {
 const renderNodeContent = (d: any) => {
   const imageDiffVert = 25 + 2;
   const nodeType = d.data._nodeType || '';
-  const borderStyle = d.data._highlighted || d.data._upToTheRootHighlighted ? '5px solid #1677ff' : '1px solid #E4E2E9';
+  const isNationAgent = d.data.nationAgent === 'TRUE' || d.data.nationAgent === 'true' || d.data.nationAgent === true;
+  const borderStyle = d.data._highlighted || d.data._upToTheRootHighlighted 
+    ? '5px solid #1677ff' 
+    : (isNationAgent ? '1px solid #8b0000' : '1px solid #E4E2E9');
 
   const hasCmi = d.data.cmiContacts && d.data.cmiContacts.length > 0;
   const hasCust = d.data.custContacts && d.data.custContacts.length > 0;
@@ -302,7 +333,8 @@ const renderNodeContent = (d: any) => {
       </div>`;
   }
 
-  const color = '#FFFFFF';
+  // 营业网点 Site 节点的背景采用浅灰色渲染
+  const color = d.data.entityTypeName === 'Site' ? '#f0f0f0' : '#FFFFFF';
   const showIcon = !nodeType;
 
   return `
@@ -538,6 +570,903 @@ const DetailDrawer: React.FC<{ record: any; open: boolean; onClose: () => void }
   );
 };
 
+// ============ Dashboard Tab 子组件 ============
+interface DashboardTabProps {
+  gid?: string;
+  originalData: any[];
+  loading: boolean;
+  dashboardData: any;
+  dashboardLoading: boolean;
+}
+
+const DashboardTab: React.FC<DashboardTabProps> = ({
+  gid,
+  originalData,
+  loading,
+  dashboardData,
+  dashboardLoading,
+}) => {
+  // 查找根节点（即全球母公司）
+  const rootNode = useMemo(() => {
+    return originalData.find(d => d.parentId === '' || d._nodeType === 'root');
+  }, [originalData]);
+
+  // 客户经理列表
+  const cmiContacts = useMemo(() => {
+    return rootNode?.cmiContacts || [];
+  }, [rootNode]);
+
+  // 海外分支节点列表（排除母公司根节点且排除 Site 营业网点）
+  const branchNodes = useMemo(() => {
+    if (!rootNode) return [];
+    return originalData.filter(d => d.id !== rootNode.id && d.entityTypeName !== 'Site');
+  }, [originalData, rootNode]);
+
+  // 计算海外分支的大区与国家分布
+  const branchStats = useMemo(() => {
+    const stats: Record<string, { count: number; countries: Record<string, number> }> = {};
+    branchNodes.forEach(node => {
+      const region = node.cmiRegion || 'Other Regions';
+      const country = node.registeredCountry || node.position || 'Unknown';
+      if (!stats[region]) {
+        stats[region] = { count: 0, countries: {} };
+      }
+      stats[region].count += 1;
+      stats[region].countries[country] = (stats[region].countries[country] || 0) + 1;
+    });
+    return stats;
+  }, [branchNodes]);
+
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
+
+  // 过滤出选中国家下的分支节点列表
+  const branchesInCountry = useMemo(() => {
+    if (!selectedCountry) return [];
+    return branchNodes.filter(node => {
+      const countryVal = node.registeredCountry || node.position || '';
+      return String(countryVal).trim().toLowerCase() === selectedCountry.trim().toLowerCase();
+    });
+  }, [branchNodes, selectedCountry]);
+
+  // --- 第四部分：历史签单大区/销售单元联动状态 ---
+  const tcvStats = dashboardData?.tcvStats || [];
+  const tcvRecords = dashboardData?.tcvRecords || [];
+
+  const tcvRegions = useMemo(() => {
+    const regions = new Set<string>();
+    tcvStats.forEach((s: any) => {
+      if (s.region) regions.add(s.region);
+    });
+    return ['All', ...Array.from(regions)];
+  }, [tcvStats]);
+
+  const [selectedTcvRegion, setSelectedTcvRegion] = useState<string>('All');
+  const [selectedTcvUnit, setSelectedTcvUnit] = useState<string | null>(null);
+  const [selectedLargeProductCat, setSelectedLargeProductCat] = useState<string>('通讯服务');
+
+  // 小类合同详情弹窗状态
+  const [subCatModalVisible, setSubCatModalVisible] = useState<boolean>(false);
+  const [selectedSubCat, setSelectedSubCat] = useState<string>('');
+  const [subCatTcvRecords, setSubCatTcvRecords] = useState<any[]>([]);
+
+  // 大区变化时，重置所选国家(销售单元)为 null
+  useEffect(() => {
+    setSelectedTcvUnit(null);
+  }, [selectedTcvRegion]);
+
+  const activeTcvStats = useMemo(() => {
+    if (selectedTcvRegion === 'All') {
+      return tcvStats;
+    }
+    return tcvStats.filter((s: any) => s.region === selectedTcvRegion);
+  }, [tcvStats, selectedTcvRegion]);
+
+  // 合计数据：根据选定大区计算签单个数和总金额
+  const { totalTcvCount, totalTcvAmount } = useMemo(() => {
+    let count = 0;
+    let amount = 0;
+    activeTcvStats.forEach((s: any) => {
+      count += s.count;
+      amount += s.amount;
+    });
+    return { totalTcvCount: count, totalTcvAmount: amount };
+  }, [activeTcvStats]);
+
+  // 单元排名
+  const sortedTcvStats = useMemo(() => {
+    return [...activeTcvStats].sort((a: any, b: any) => b.amount - a.amount);
+  }, [activeTcvStats]);
+
+  // 提取当前筛选大区下排名前 5 的销售单元(国家)作为柱状图的分组国家
+  const topCountries = useMemo(() => {
+    return sortedTcvStats.slice(0, 5).map(item => item.unit);
+  }, [sortedTcvStats]);
+
+  // 计算这 5 个国家在 2024、2025、2026 三年的年度签单数据 (金额与笔数)
+  const yearlyChartData = useMemo(() => {
+    const years = ['2024', '2025', '2026'];
+    return years.map(yr => {
+      const countryData: Record<string, { amount: number; count: number }> = {};
+      topCountries.forEach(cName => {
+        const recs = tcvRecords.filter((r: any) => {
+          const uName = r['销售单元中文名称'] || r['销售单元编码'] || '其他单元';
+          const signDate = String(r['合同签署日期'] || r['设置起租日期'] || '');
+          return uName === cName && signDate.startsWith(yr);
+        });
+        const amount = recs.reduce((sum: number, r: any) => sum + parseFloat(r['签单金额(港币)'] || 0), 0);
+        countryData[cName] = { amount, count: recs.length };
+      });
+      return { year: yr, data: countryData };
+    });
+  }, [tcvRecords, topCountries]);
+
+  // 获取各国家各年份单柱最高金额，以确定 Y 轴的最大值刻度
+  const yearlyMaxVal = useMemo(() => {
+    let max = 1;
+    yearlyChartData.forEach(yrData => {
+      Object.values(yrData.data).forEach((val: any) => {
+        if (val.amount > max) max = val.amount;
+      });
+    });
+    return max;
+  }, [yearlyChartData]);
+
+  // 计算指定销售单元(国家)过去 3 年 (2024-2026) 签单趋势
+  const getCountryYearlyStats = useCallback((countryName: string) => {
+    const years = ['2024', '2025', '2026'];
+    const stats = years.map(yr => {
+      const recs = tcvRecords.filter((r: any) => {
+        const uName = r['销售单元中文名称'] || r['销售单元编码'] || '其他单元';
+        const signDate = String(r['合同签署日期'] || r['设置起租日期'] || '');
+        return uName === countryName && signDate.startsWith(yr);
+      });
+      const count = recs.length;
+      const amount = recs.reduce((sum: number, r: any) => sum + parseFloat(r['签单金额(港币)'] || 0), 0);
+      return { year: yr, count, amount };
+    });
+    const maxVal = Math.max(...stats.map(s => s.amount), 1);
+    return { stats, maxVal };
+  }, [tcvRecords]);
+
+  // 根据当前联动的大区和销售单元(国家)过滤出活跃 TCV 签单明细列表
+  const activeTcvRecords = useMemo(() => {
+    let list = tcvRecords;
+    if (selectedTcvRegion !== 'All') {
+      list = list.filter((r: any) => (r['大区中文名称'] || r['大区'] || '其他大区') === selectedTcvRegion);
+    }
+    if (selectedTcvUnit) {
+      list = list.filter((r: any) => {
+        const unitName = r['销售单元中文名称'] || r['销售单元编码'] || '其他单元';
+        return unitName === selectedTcvUnit;
+      });
+    }
+    return list;
+  }, [tcvRecords, selectedTcvRegion, selectedTcvUnit]);
+
+  // 基于活跃 TCV 明细列表计算产品构成分布
+  const PRODUCT_CATEGORY_MAP: Record<string, { parent: string; sub: string }> = {
+    '算力服务': { parent: '算力服务', sub: '算力服务' },
+    '多云服务': { parent: '算力服务', sub: '多云服务' },
+    '数据中心': { parent: '算力服务', sub: '数据中心' },
+
+    'IPVPN': { parent: '通讯服务', sub: 'IPVPN' },
+    'SD-WAN': { parent: '通讯服务', sub: 'SD-WAN' },
+    '云连接': { parent: '通讯服务', sub: '云连接' },
+    '互联网转接': { parent: '通讯服务', sub: '互联网转接' },
+    '全球卡': { parent: '通讯服务', sub: '全球卡' },
+    '其他云网': { parent: '通讯服务', sub: '其他云网' },
+    '国际专线': { parent: '通讯服务', sub: '国际专线' },
+    'IPX': { parent: '通讯服务', sub: 'IPX' },
+    'LBO流量包': { parent: '通讯服务', sub: 'LBO流量包' },
+    '物联网连接': { parent: '通讯服务', sub: '物联网连接' },
+
+    '5G应用': { parent: '智能服务', sub: '5G应用' },
+    'A2P短信': { parent: '智能服务', sub: 'A2P短信' },
+    'ICT': { parent: '智能服务', sub: 'ICT' },
+    'MVNO': { parent: '智能服务', sub: 'MVNO' },
+    '内容平台': { parent: '智能服务', sub: '内容平台' },
+    '其他云网-CDN': { parent: '智能服务', sub: '其他云网-CDN' },
+    '加速产品': { parent: '智能服务', sub: '加速产品' },
+    '安全产品': { parent: '智能服务', sub: '安全产品' },
+    '智能终端': { parent: '智能服务', sub: '智能终端' },
+    '物联网应用': { parent: '智能服务', sub: '物联网应用' },
+    '登陆站': { parent: '智能服务', sub: '登陆站' },
+    '其他': { parent: '智能服务', sub: '其他' }
+  };
+
+  const productStatsMerged = useMemo(() => {
+    const stats: Record<string, Record<string, number>> = {};
+    activeTcvRecords.forEach((rec: any) => {
+      const prodCategory = rec['市场经分产品分类'] || '其他';
+      const mapping = PRODUCT_CATEGORY_MAP[prodCategory] || { parent: '智能服务', sub: '其他' };
+      const largeCat = mapping.parent;
+      const subCat = mapping.sub;
+      const amount = parseFloat(rec['签单金额(港币)'] || 0);
+
+      if (!stats[largeCat]) stats[largeCat] = {};
+      if (!stats[largeCat][subCat]) stats[largeCat][subCat] = 0;
+      stats[largeCat][subCat] += amount;
+    });
+    return stats;
+  }, [activeTcvRecords]);
+
+  const largeCatTotals = useMemo(() => {
+    const totals: Record<string, number> = { '通讯服务': 0, '算力服务': 0, '智能服务': 0 };
+    let grandTotal = 0;
+    Object.keys(productStatsMerged).forEach(largeCat => {
+      let sum = 0;
+      const subCats = productStatsMerged[largeCat] || {};
+      Object.keys(subCats).forEach(subCat => {
+        sum += subCats[subCat];
+      });
+      totals[largeCat] = sum;
+      grandTotal += sum;
+    });
+    return { totals, grandTotal };
+  }, [productStatsMerged]);
+
+  // --- 第五部分：项目计收费占比统计 ---
+  const brStats = dashboardData?.brStats || [];
+
+  const br2026Records = useMemo(() => {
+    return brStats.filter((item: any) => String(item.数据月份 || '').startsWith('2026'));
+  }, [brStats]);
+
+  const brProjectStats = useMemo(() => {
+    const map = new Map<string, { circuit: string; product: string; customer: string; amount: number }>();
+    br2026Records.forEach((item: any) => {
+      const circuit = String(item.电路参考编号 || '无电路号').trim();
+      const amount = parseFloat(item.金额 || 0);
+      if (!map.has(circuit)) {
+        map.set(circuit, {
+          circuit,
+          product: item.市场经分产品分类 || '其他',
+          customer: item.签约客户名称 || '未知客户',
+          amount: 0
+        });
+      }
+      map.get(circuit)!.amount += amount;
+    });
+    const list = Array.from(map.values());
+    return list.sort((a, b) => b.amount - a.amount);
+  }, [br2026Records]);
+
+  const totalBr2026Amount = useMemo(() => {
+    return brProjectStats.reduce((sum, item) => sum + item.amount, 0);
+  }, [brProjectStats]);
+
+  const brColumns = [
+    { title: '签约客户名称', dataIndex: '签约客户名称', key: '签约客户名称' },
+    { title: '数据月份', dataIndex: '数据月份', key: '数据月份', sorter: (a: any, b: any) => a.数据月份.localeCompare(b.数据月份) },
+    { title: '电路参考编号', dataIndex: '电路参考编号', key: '电路参考编号' },
+    { title: '大区', dataIndex: '大区中文名称', key: '大区中文名称' },
+    { title: '销售单元', dataIndex: '销售单元中文名称', key: '销售单元中文名称' },
+    { title: '产品分类', dataIndex: '市场经分产品分类', key: '市场经分产品分类' },
+    { title: '分成比例 (%)', dataIndex: '分成比例', key: '分成比例', render: (val: any) => `${parseFloat(val || 0).toFixed(2)}%` },
+    {
+      title: '金额 (港币)',
+      dataIndex: '金额',
+      key: '金额',
+      sorter: (a: any, b: any) => a.金额 - b.金额,
+      align: 'right' as const,
+      render: (val: any) => `${parseFloat(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD`
+    }
+  ];
+
+  if (loading || dashboardLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+        <Spin size="large" tip="正在加载 Dashboard 统计数据..." />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ paddingRight: '4px', paddingBottom: '24px' }}>
+      
+      {/* 第一、二部分：母公司信息与客户经理 */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={14}>
+          <Card
+            title={<span><InfoCircleOutlined style={{ marginRight: 6, color: '#1890ff' }} />基础信息</span>}
+            bordered={false}
+            style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: '100%' }}
+            bodyStyle={{ padding: '16px' }}
+          >
+            {rootNode ? (
+              <Descriptions column={2} bordered size="small" labelStyle={{ background: '#fafafa', fontWeight: 500 }}>
+                <Descriptions.Item label="公司名称" span={2}>
+                  <strong style={{ color: '#111' }}>{rootNode.companyNameCn || rootNode.companyNameEn || rootNode.name}</strong>
+                  {rootNode.companyNameEn && rootNode.companyNameCn && (
+                    <div style={{ fontSize: '11px', color: '#888', marginTop: 2 }}>{rootNode.companyNameEn}</div>
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="Root GID">{rootNode.id}</Descriptions.Item>
+                <Descriptions.Item label="DUNS 号">{rootNode.duns || '—'}</Descriptions.Item>
+                <Descriptions.Item label="注册国家">{rootNode.registeredCountry || rootNode.position || '—'}</Descriptions.Item>
+                <Descriptions.Item label="注册城市">{rootNode.registeredCity || rootNode.city || '—'}</Descriptions.Item>
+                <Descriptions.Item label="行业分类">{rootNode.cmiIndustry || '—'}</Descriptions.Item>
+                <Descriptions.Item label="CMI 行业">{rootNode.cmccIndustry || '—'}</Descriptions.Item>
+                <Descriptions.Item label="主营业务" span={2}>{rootNode.mainBusiness || '—'}</Descriptions.Item>
+                <Descriptions.Item label="运营状态">{rootNode.operatingStatus || '—'}</Descriptions.Item>
+                <Descriptions.Item label="建立日期">{rootNode.establishmentDate || '—'}</Descriptions.Item>
+              </Descriptions>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>未找到根节点母公司数据</div>
+            )}
+          </Card>
+        </Col>
+
+        <Col span={10}>
+          <Card
+            title={<span><TeamOutlined style={{ marginRight: 6, color: '#52c41a' }} />CMI内地客户经理</span>}
+            bordered={false}
+            style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: '100%' }}
+            bodyStyle={{ padding: '16px', overflowY: 'auto', maxHeight: '315px' }}
+          >
+            {cmiContacts.length > 0 ? (
+              <Row gutter={[12, 12]}>
+                {cmiContacts.map((contact: any, index: number) => (
+                  <Col span={24} key={index}>
+                    <div style={{
+                      background: '#f6ffed',
+                      border: '1px solid #d9f7be',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                    }}>
+                      <div style={{ fontWeight: 600, color: '#389e0d', fontSize: '14px', marginBottom: '6px' }}>
+                        👤 {contact.name || '—'} <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#888' }}>({contact.role || '客户经理'})</span>
+                      </div>
+                      <Descriptions size="small" column={1} colon={false} contentStyle={{ fontSize: '12px' }} labelStyle={{ color: '#666', width: '80px', fontSize: '12px' }}>
+                        <Descriptions.Item label="部门">{contact.department || '—'}</Descriptions.Item>
+                        <Descriptions.Item label="电话"><span style={{ color: '#096dd9' }}>{contact.phoneNumber || '—'}</span></Descriptions.Item>
+                        <Descriptions.Item label="邮箱">{contact.email || '—'}</Descriptions.Item>
+                        <Descriptions.Item label="城市">{contact.City || '—'}</Descriptions.Item>
+                      </Descriptions>
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#999', fontStyle: 'italic' }}>
+                暂无客户经理维护信息
+              </div>
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 第三部分：海外分支的统计信息 */}
+      <Card
+        title={<span><GlobalOutlined style={{ marginRight: 6, color: '#fa8c16' }} />海外分支机构分布 (共 {branchNodes.length} 个分支)</span>}
+        bordered={false}
+        style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 16 }}
+        bodyStyle={{ padding: '16px' }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {[
+            ['Europe', 'APAC', 'Americas'],
+            ['MENA', 'STA', 'Euro-Asia'],
+            ['Mainland China', 'HKM', 'TW']
+          ].map((row, rowIdx) => (
+            <Row key={rowIdx} gutter={[16, 16]} style={{ display: 'flex', flexWrap: 'wrap' }}>
+              {row.map(region => {
+                const countryMap = (branchStats[region] && branchStats[region].countries) || {};
+                const sortedCountries = Object.keys(countryMap).map(c => ({
+                  name: c,
+                  count: countryMap[c]
+                })).sort((a, b) => b.count - a.count);
+
+                const regionTotal = (branchStats[region] && branchStats[region].count) || 0;
+
+                return (
+                  <Col key={region} xs={24} md={8} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div style={{
+                      background: '#fafafa',
+                      borderRadius: 6,
+                      padding: '12px 14px',
+                      border: '1px solid #f0f0f0',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                      flex: 1
+                    }}>
+                      {/* 区域标题与数量 */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid #e8e8e8', paddingBottom: 6 }}>
+                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#fa8c16' }}>
+                          <GlobalOutlined style={{ marginRight: 6 }} />
+                          {region}
+                        </span>
+                        <span style={{ background: '#fff7e6', color: '#fa8c16', padding: '1px 6px', borderRadius: 10, fontSize: '11px', fontWeight: 'bold' }}>
+                          {regionTotal} 分支
+                        </span>
+                      </div>
+
+                      {/* 国家列表小标签 */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingRight: 4 }}>
+                        {sortedCountries.length === 0 ? (
+                          <span style={{ color: '#ccc', fontSize: '12px', padding: '4px 0' }}>暂无国家数据</span>
+                        ) : (
+                          sortedCountries.map(c => (
+                            <div
+                              key={c.name}
+                              onClick={() => {
+                                setSelectedCountry(c.name);
+                                setDrawerVisible(true);
+                              }}
+                              className="country-hover-badge"
+                              style={{
+                                background: '#fff',
+                                border: '1px solid #e8e8e8',
+                                borderRadius: '4px',
+                                padding: '3px 8px',
+                                fontSize: '11px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.01)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <span style={{ color: '#666', marginRight: 4 }}>{c.name}</span>
+                              <strong style={{ color: '#fa8c16' }}>{c.count}</strong>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </Col>
+                );
+              })}
+            </Row>
+          ))}
+        </div>
+      </Card>
+
+      {/* 国家海外分支机构明细展示抽屉 */}
+      <Drawer
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <GlobalOutlined style={{ color: '#fa8c16' }} />
+            <span>【{selectedCountry}】海外分支机构明细</span>
+          </div>
+        }
+        placement="right"
+        onClose={() => setDrawerVisible(false)}
+        open={drawerVisible}
+        width={750}
+        bodyStyle={{ padding: '20px', background: '#f5f7fa' }}
+      >
+        <div style={{ background: '#fff', padding: '16px', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
+              分支机构列表 (共 {branchesInCountry.length} 个分支)
+            </span>
+          </div>
+          <Table
+            dataSource={branchesInCountry}
+            rowKey="id"
+            pagination={{ pageSize: 10, showSizeChanger: false }}
+            onRow={(record) => {
+              const isNationAgent = record.nationAgent === 'TRUE' || record.nationAgent === 'true' || record.nationAgent === true;
+              if (isNationAgent) {
+                return {
+                  style: { backgroundColor: '#fff1f0' } // 国家代表用浅红色背景
+                };
+              }
+              return {};
+            }}
+            columns={[
+              {
+                title: '公司名称 (中文 / 英文)',
+                dataIndex: 'name',
+                key: 'name',
+                render: (text, record) => (
+                  <span style={{ fontWeight: 500, color: '#333' }}>
+                    🏢 {record.companyNameCn || text || record.id}
+                    {record.companyNameEn && record.companyNameEn !== record.companyNameCn && (
+                      <div style={{ fontSize: '11px', color: '#999', marginTop: 2, fontWeight: 'normal' }}>
+                        {record.companyNameEn}
+                      </div>
+                    )}
+                  </span>
+                )
+              },
+              {
+                title: '注册城市',
+                dataIndex: 'registeredCity',
+                key: 'registeredCity',
+                render: (text, record) => text || record.city || '—'
+              },
+              {
+                title: '注册地址',
+                dataIndex: 'registeredAddress',
+                key: 'registeredAddress',
+                render: (text, record) => text || record.position || '—'
+              },
+              {
+                title: '企业性质',
+                dataIndex: 'enterpriseNature',
+                key: 'enterpriseNature',
+                render: (text) => text || '—'
+              }
+            ]}
+          />
+        </div>
+      </Drawer>
+
+      {/* 第四部分：历史签单情况 */}
+      <Card
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 12 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <DollarOutlined style={{ color: '#f5222d' }} />
+              分支与 CMI 历史签单统计情况
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: '#555' }}>大区选择:</span>
+              <Select
+                size="small"
+                value={selectedTcvRegion}
+                onChange={setSelectedTcvRegion}
+                style={{ width: 150 }}
+                options={tcvRegions.map(r => ({ label: r === 'All' ? '全部大区汇总' : r, value: r }))}
+              />
+            </div>
+          </div>
+        }
+        bordered={false}
+        style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 16 }}
+      >
+        <Row gutter={16}>
+          {/* 第一列：销售单元 (国家公司) 签单排行 (4/10比例 -> span={10}) */}
+          <Col span={10}>
+            <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 'bold', color: '#666' }}>
+                  📊 销售单元近3年签单金额及数量趋势 (2024-2026)
+                </span>
+              </div>
+
+              {sortedTcvStats.length > 0 ? (
+                <div>
+                  {/* 国家/单元色彩映射图例 (点击可快速联动筛选该国家) */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', marginBottom: 12 }}>
+                    {topCountries.map((cName, idx) => {
+                      const COUNTRY_COLORS = ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96'];
+                      const isSelected = selectedTcvUnit === cName;
+                      return (
+                        <div 
+                          key={cName} 
+                          onClick={() => setSelectedTcvUnit(isSelected ? null : cName)}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            fontSize: '11px', 
+                            color: isSelected ? '#1890ff' : '#666',
+                            fontWeight: isSelected ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            padding: '2px 8px',
+                            border: isSelected ? '1px solid #91d5ff' : '1px solid transparent',
+                            background: isSelected ? '#e6f7ff' : 'transparent',
+                            borderRadius: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <span style={{ 
+                            display: 'inline-block', 
+                            width: 8, 
+                            height: 8, 
+                            borderRadius: '50%', 
+                            backgroundColor: COUNTRY_COLORS[idx % COUNTRY_COLORS.length], 
+                            marginRight: 4 
+                          }}></span>
+                          {cName}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* SVG 手工多柱图面板 */}
+                  <div style={{ width: '100%', height: '300px', position: 'relative' }}>
+                    <svg viewBox="0 0 400 280" width="100%" height="100%" style={{ display: 'block' }}>
+                      <defs>
+                        {topCountries.map((cName, idx) => {
+                          const COUNTRY_COLORS = ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96'];
+                          const col = COUNTRY_COLORS[idx % COUNTRY_COLORS.length];
+                          return (
+                            <linearGradient key={cName} id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={col} />
+                              <stop offset="100%" stopColor={col + '99'} />
+                            </linearGradient>
+                          );
+                        })}
+                      </defs>
+
+                      {/* 背景虚线网格与 Y 轴刻度 (以百万 HKD 为单位) */}
+                      {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+                        const y = 20 + (200 * (1 - ratio));
+                        const val = (yearlyMaxVal / 1000000) * ratio;
+                        return (
+                          <g key={idx}>
+                            <line x1="45" y1={y} x2="385" y2={y} stroke="#f0f0f0" strokeDasharray="3,3" />
+                            <text x="38" y={y + 3.5} textAnchor="end" fontSize="8" fill="#aaa">{val.toFixed(2)}M</text>
+                          </g>
+                        );
+                      })}
+
+                      {/* 按 2024, 2025, 2026 三个年份分组渲染多立柱 */}
+                      {yearlyChartData.map((yrData, yIdx) => {
+                        const groupCenterX = 90 + yIdx * 115; // 2024: 90, 2025: 205, 2026: 320
+                        const barWidth = 10;
+                        const barGap = 2;
+                        const groupWidth = topCountries.length * (barWidth + barGap) - barGap;
+
+                        return (
+                          <g key={yrData.year}>
+                            {/* 年份大类别标题 */}
+                            <text x={groupCenterX} y="245" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#666">
+                              {yrData.year}年
+                            </text>
+
+                            {topCountries.map((cName, cIdx) => {
+                              const val = yrData.data[cName] || { amount: 0, count: 0 };
+                              const barX = groupCenterX - groupWidth / 2 + cIdx * (barWidth + barGap);
+                              const barH = val.amount > 0 ? (val.amount / yearlyMaxVal) * 200 : 0;
+                              const barY = 220 - barH;
+
+                              const isSelected = selectedTcvUnit === cName;
+                              const isAnySelected = selectedTcvUnit !== null;
+
+                              return (
+                                <g key={cName}>
+                                  <Tooltip title={`${yrData.year}年 [${cName}]: ${val.count} 笔 / ${(val.amount / 1000000).toFixed(2)} M HKD`}>
+                                    <rect
+                                      x={barX}
+                                      y={barY}
+                                      width={barWidth}
+                                      height={barH}
+                                      fill={`url(#grad-${cIdx})`}
+                                      rx="1.5"
+                                      style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                                      opacity={isAnySelected ? (isSelected ? 1 : 0.25) : 1}
+                                      onClick={() => setSelectedTcvUnit(isSelected ? null : cName)}
+                                    />
+                                  </Tooltip>
+                                  {/* 柱体上方绘制该国当年的签单笔数 */}
+                                  {val.count > 0 && (
+                                    <text
+                                      x={barX + barWidth / 2}
+                                      y={Math.max(barY - 2.5, 9)}
+                                      textAnchor="middle"
+                                      fontSize="7.5"
+                                      fill="#333"
+                                      fontWeight="bold"
+                                      opacity={isAnySelected ? (isSelected ? 1 : 0.25) : 1}
+                                    >
+                                      {val.count}
+                                    </text>
+                                  )}
+                                </g>
+                              );
+                            })}
+                          </g>
+                        );
+                      })}
+
+                      {/* X 轴横基线 */}
+                      <line x1="45" y1="220" x2="385" y2="220" stroke="#ccc" strokeWidth="1" />
+                    </svg>
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: 4 }}>
+                    💡 提示：点击上方的国家图例或直接点击图表中的立柱，可秒级联动过滤右侧大类与小类数据
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '100px 0', color: '#999', fontStyle: 'italic' }}>
+                  当前筛选条件下暂无历史签单趋势数据
+                </div>
+              )}
+            </div>
+          </Col>
+
+          {/* 第二列：CMI 产品大类分解 (3/10比例 -> span={7}) */}
+          <Col span={7}>
+            <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '350px' }}>
+              <div style={{ fontSize: 13, fontWeight: 'bold', color: '#666', marginBottom: 16 }}>
+                📦 CMI 产品大类占比
+              </div>
+
+              {largeCatTotals.grandTotal > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {['通讯服务', '算力服务', '智能服务'].map(cat => {
+                    const amount = largeCatTotals.totals[cat] || 0;
+                    const percent = parseFloat(((amount / (largeCatTotals.grandTotal || 1)) * 100).toFixed(1));
+                    const isSelected = selectedLargeProductCat === cat;
+
+                    return (
+                      <div
+                        key={cat}
+                        onClick={() => setSelectedLargeProductCat(cat)}
+                        style={{
+                          border: isSelected ? '1px solid #91d5ff' : '1px solid #e8e8e8',
+                          background: isSelected ? '#e6f7ff' : '#fff',
+                          borderRadius: '6px',
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: 12 }}>
+                          <span style={{ fontWeight: 600, color: isSelected ? '#1890ff' : '#444' }}>{cat}</span>
+                          <span style={{ color: '#666' }}>
+                            {(amount / 1000000).toFixed(2)}M HKD ({percent}%)
+                          </span>
+                        </div>
+                        <Progress
+                          percent={percent}
+                          strokeColor={cat === '通讯服务' ? '#1890ff' : cat === '算力服务' ? '#722ed1' : '#52c41a'}
+                          showInfo={false}
+                          strokeWidth={6}
+                          style={{ margin: 0 }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '80px 0', color: '#999', fontStyle: 'italic' }}>
+                  当前筛选条件下暂无大类数据
+                </div>
+              )}
+            </div>
+          </Col>
+
+          {/* 第三列：子分类小类分解排行 (3/10比例 -> span={7}) */}
+          <Col span={7}>
+            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '6px', padding: '12px', height: '100%', minHeight: '350px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ fontSize: '12px', color: '#1890ff', fontWeight: 'bold', marginBottom: 12, borderBottom: '1px solid #e8e8e8', paddingBottom: 6 }}>
+                📝 【{selectedLargeProductCat}】小类排行
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '300px', overflowY: 'auto', flex: 1 }}>
+                {productStatsMerged[selectedLargeProductCat] && Object.keys(productStatsMerged[selectedLargeProductCat]).length > 0 ? (
+                  Object.entries(productStatsMerged[selectedLargeProductCat])
+                    .sort((a: any, b: any) => b[1] - a[1])
+                    .map(([subCat, amount]) => (
+                      <div 
+                        key={subCat} 
+                        onClick={() => {
+                          setSelectedSubCat(subCat);
+                          const filtered = activeTcvRecords.filter((r: any) => {
+                            const prodCategory = r['市场经分产品分类'] || '其他';
+                            const mapping = PRODUCT_CATEGORY_MAP[prodCategory] || { parent: '智能服务', sub: '其他' };
+                            return mapping.sub === subCat;
+                          });
+                          setSubCatTcvRecords(filtered);
+                          setSubCatModalVisible(true);
+                        }}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          borderBottom: '1px dashed #f0f0f0',
+                          paddingBottom: 4
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e6f7ff'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      >
+                        <span style={{ color: '#555', fontWeight: 500 }}>{subCat}</span>
+                        <span style={{ fontWeight: 600, color: '#1890ff', textAlign: 'right', marginTop: 2 }}>
+                          {(amount / 1000000).toFixed(2)}M HKD
+                        </span>
+                      </div>
+                    ))
+                ) : (
+                  <div style={{ fontSize: '11px', color: '#999', fontStyle: 'italic', textAlign: 'center', padding: '40px 0', flex: 1 }}>
+                    暂无子小类数据
+                  </div>
+                )}
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* 第五部分：项目计收占比柱状图 */}
+      <Card
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: 8 }}>
+            <span>
+              <ProfileOutlined style={{ marginRight: 6, color: '#722ed1' }} />
+              各分支与 CMI 项目计收占比分布 (2026年)
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 'bold', color: '#333' }}>
+              2026年项目计费总实收: <strong style={{ color: '#722ed1' }}>{(totalBr2026Amount / 1000000).toFixed(4)}M</strong> 港币
+            </span>
+          </div>
+        }
+        bordered={false}
+        style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+      >
+        {brProjectStats.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '350px', overflowY: 'auto', paddingRight: 4 }}>
+            {brProjectStats.map((item: any, index: number) => {
+              const maxAmount = brProjectStats[0]?.amount || 1;
+              const percent = Math.min((item.amount / maxAmount) * 100, 100);
+              const share = totalBr2026Amount > 0 ? ((item.amount / totalBr2026Amount) * 100).toFixed(2) : '0.00';
+              return (
+                <div key={item.circuit} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                    <span style={{ fontWeight: 600, color: '#444' }}>
+                      {index + 1}. 电路: {item.circuit} <span style={{ color: '#999', fontSize: 11, fontWeight: 'normal' }}>({item.product} | {item.customer})</span>
+                    </span>
+                    <span style={{ color: '#333' }}>
+                      <strong>{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</strong> (占比 <strong>{share}%</strong>)
+                    </span>
+                  </div>
+                  <Progress
+                    percent={percent}
+                    strokeColor="linear-gradient(90deg, #722ed1 0%, #fa541c 100%)"
+                    showInfo={false}
+                    status="active"
+                    strokeWidth={6}
+                    style={{ margin: 0 }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '50px 0', color: '#999', fontStyle: 'italic' }}>
+            2026年暂无任何项目的财务计收费实收数据
+          </div>
+        )}
+      </Card>
+
+      {/* 子小类签单合同明细弹出 Modal */}
+      <Modal
+        title={<span style={{ fontWeight: 'bold', color: '#1890ff', fontSize: 15 }}>📄 【{selectedSubCat}】产品小类签单合同明细列表</span>}
+        open={subCatModalVisible}
+        onCancel={() => setSubCatModalVisible(false)}
+        footer={null}
+        width={950}
+        bodyStyle={{ padding: '16px 24px' }}
+      >
+        <Table
+          dataSource={subCatTcvRecords}
+          rowKey="_id"
+          pagination={{ pageSize: 8, showSizeChanger: false }}
+          size="small"
+          bordered
+          columns={[
+            { title: '签约客户名称', dataIndex: '签约客户名称', key: '签约客户名称', width: 220 },
+            { title: '终端客户名称', dataIndex: '终端客户名称', key: '终端客户名称', width: 220 },
+            { title: '大区', dataIndex: '大区中文名称', key: '大区中文名称', width: 100 },
+            { title: '销售单元', dataIndex: '销售单元中文名称', key: '销售单元中文名称', width: 110 },
+            { title: '电路编号', dataIndex: '电路编号', key: '电路编号', width: 130 },
+            { title: '合同签署日期', dataIndex: '合同签署日期', key: '合同签署日期', width: 120 },
+            { title: '产品分类', dataIndex: '市场经分产品分类', key: '市场经分产品分类', width: 130 },
+            { 
+              title: '签单金额 (港币)', 
+              dataIndex: '签单金额(港币)', 
+              key: '签单金额(港币)',
+              align: 'right' as const,
+              width: 140,
+              render: (val: any) => `${parseFloat(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD`
+            }
+          ]}
+        />
+      </Modal>
+    </div>
+  );
+};
+
 // ============ 主组件 ============
 const KeyGlobalFamilyTree: React.FC = () => {
   const params = useParams<{ gid: string }>();
@@ -555,11 +1484,36 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   const [originalData, setOriginalData] = useState<any[]>([]);
   const [isRegionView, setIsRegionView] = useState(true);
+  const [showSites, setShowSites] = useState(false); // 是否显示营业网点，默认不显示
+
+  // 树数据过滤重连函数：若隐藏营业网点，将隐藏节点的子节点重连到最近的非 Site 祖先节点，防止树断层
+  const filterTreeData = useCallback((data: any[], displaySites: boolean) => {
+    if (displaySites) return data;
+
+    const nonSiteData = data.filter(item => item.entityTypeName !== 'Site');
+    const nonSiteIds = new Set(nonSiteData.map(item => item.id));
+    const idToNodeMap = new Map(data.map(item => [item.id, item]));
+
+    return nonSiteData.map(item => {
+      let pId = item.parentId;
+      // 循环寻找，直到祖先节点未被过滤或到达最顶层
+      while (pId && !nonSiteIds.has(pId)) {
+        const parentNode = idToNodeMap.get(pId);
+        pId = parentNode ? parentNode.parentId : '';
+      }
+      return {
+        ...item,
+        parentId: pId
+      };
+    });
+  }, []);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCompact, setIsCompact] = useState(true);
   const [isHorizontal, setIsHorizontal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('tree');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardLoading, setDashboardLoading] = useState<boolean>(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerRecord, setDrawerRecord] = useState<any>(null);
   const [tableSearchText, setTableSearchText] = useState('');
@@ -814,16 +1768,31 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const uniqueRecords = Array.from(uniqueMap.values());
       const allIds = new Set(uniqueRecords.map((r: any) => r.GID));
 
-      // Fetch CMI Contacts
+      // 获取 CMI 联系人 (分批请求以避免超长 URL 导致 403 错误)
       try {
-        const keyCmiRes = await request('/api/v1/wildcards/keyCMIContacts', {
-          method: 'GET',
-          params: {
-            query: JSON.stringify({ GID: { $in: Array.from(allIds) } }),
-            options: JSON.stringify({ limit: 10000 }),
-          },
+        const allIdsArray = Array.from(allIds);
+        const chunkSize = 150; // 每批 150 个 GID
+        const chunks = [];
+        for (let i = 0; i < allIdsArray.length; i += chunkSize) {
+          chunks.push(allIdsArray.slice(i, i + chunkSize));
+        }
+
+        const keyCmiRecords: any[] = [];
+        // 并行请求所有分批
+        const chunkPromises = chunks.map(chunk => 
+          request('/api/v1/wildcards/keyCMIContacts', {
+            method: 'GET',
+            params: {
+              query: JSON.stringify({ GID: { $in: chunk } }),
+              options: JSON.stringify({ limit: 10000 }),
+            },
+          })
+        );
+        const chunkResults = await Promise.all(chunkPromises);
+        chunkResults.forEach(res => {
+          const records = res?.results || res?.data?.results || [];
+          keyCmiRecords.push(...records);
         });
-        const keyCmiRecords = keyCmiRes.results || keyCmiRes.data?.results || [];
         
         const cmiContactIds = keyCmiRecords.map((r: any) => r.cmiContactId).filter(Boolean);
         
@@ -1189,12 +2158,29 @@ const KeyGlobalFamilyTree: React.FC = () => {
     }
   ], []);
 
+  const fetchDashboardData = useCallback(async () => {
+    if (!gid) return;
+    setDashboardLoading(true);
+    try {
+      const res = await request(`/api/v1/key-customer-overview/family-tree-dashboard-stats`, {
+        method: 'GET',
+        params: { gid },
+      });
+      setDashboardData(res || null);
+    } catch (err) {
+      console.error('获取海外家族树 Dashboard 统计数据失败:', err);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [gid]);
+
   useEffect(() => {
     fetchData();
     fetchMappingData();
-  }, [fetchData, fetchMappingData]);
+    fetchDashboardData();
+  }, [fetchData, fetchMappingData, fetchDashboardData]);
 
-  // 渲染图表
+  // 初始化/完整重建图表（含 fit 居中定位）
   const renderChart = useCallback(
     (chartData: any[]) => {
       if (chartData.length === 0 || !chartContainerRef.current) return;
@@ -1229,13 +2215,72 @@ const KeyGlobalFamilyTree: React.FC = () => {
     [originalData, openDrawer],
   );
 
-  // 树图重新渲染
+  // 仅更新图表数据并重新渲染，不执行 fit（保持当前的视口位置和展开/折叠状态不变）
+  const updateChartData = useCallback(
+    (chartData: any[]) => {
+      if (!chartRef.current || chartData.length === 0) return;
+      // 保存当前每个节点的展开状态，以便数据刷新后恢复
+      const currentData: any[] = chartRef.current.data() || [];
+      const expandedSet = new Set<string>();
+      currentData.forEach((d: any) => {
+        if (d._expanded) expandedSet.add(String(d.id));
+      });
+      // 将展开状态合并到新数据中：
+      // - 已存在的节点：保留旧展开状态
+      // - 新出现的区域/国家/城市分组节点：自动展开，确保其下的网点可见
+      // - 新出现的公司/网点节点：保持默认折叠
+      const mergedData = chartData.map((d: any) => {
+        if (expandedSet.has(String(d.id))) {
+          return { ...d, _expanded: true };
+        }
+        // 新增的分组节点（region/country/city）自动展开，保证层级结构完整可见
+        if (d._nodeType === 'region' || d._nodeType === 'country' || d._nodeType === 'city') {
+          return { ...d, _expanded: true };
+        }
+        return d;
+      });
+      chartRef.current.data(mergedData).render();
+    },
+    [],
+  );
+
+  // isChartInitialized 标记：记录图表是否已完成首次初始化
+  // 作用：Tab 切换回"家族树"时不重新调用 renderChart，保持展开/折叠和视口不变
+  const isChartInitialized = useRef(false);
+  // 记录上一次的 isRegionView 值，用于判断视图模式是否发生了真正切换
+  const prevIsRegionView = useRef(isRegionView);
+
+  // 树图初始化渲染（仅在数据首次到达或视图模式切换时执行完整重建）
   useEffect(() => {
     if (originalData.length === 0 || activeTab !== 'tree') return;
-    const chartData = isRegionView ? buildRegionData(originalData) : originalData;
-    const timer = setTimeout(() => renderChart(chartData), 100);
+    const regionViewChanged = prevIsRegionView.current !== isRegionView;
+    prevIsRegionView.current = isRegionView;
+
+    // 已初始化且视图模式未变 → Tab 切换回来，跳过重建，保持树的状态
+    if (isChartInitialized.current && !regionViewChanged) return;
+
+    const filtered = filterTreeData(originalData, showSites);
+    const chartData = isRegionView ? buildRegionData(filtered) : filtered;
+    const timer = setTimeout(() => {
+      renderChart(chartData);
+      isChartInitialized.current = true;
+    }, 100);
     return () => clearTimeout(timer);
-  }, [originalData, isRegionView, renderChart, activeTab]);
+  }, [originalData, isRegionView, renderChart, activeTab, filterTreeData]);
+
+  // 仅在 showSites 变化时动态更新树数据，不 fit 不折叠，保持视口和展开状态
+  const isFirstSiteEffect = useRef(true);
+  useEffect(() => {
+    // 首次渲染时跳过（由上方 useEffect 负责），仅响应后续 showSites 切换
+    if (isFirstSiteEffect.current) {
+      isFirstSiteEffect.current = false;
+      return;
+    }
+    if (originalData.length === 0 || activeTab !== 'tree' || !chartRef.current) return;
+    const filtered = filterTreeData(originalData, showSites);
+    const chartData = isRegionView ? buildRegionData(filtered) : filtered;
+    updateChartData(chartData);
+  }, [showSites]);
 
   const toggleRegionView = () => setIsRegionView((prev) => !prev);
 
@@ -1354,18 +2399,21 @@ const KeyGlobalFamilyTree: React.FC = () => {
     message.success(`已导出 ${cleanExport.length} 条数据`);
   }, [originalData, gid, abbr]);
 
-  const pageTitle = nameCn ? `「${nameCn}」要客海外家族树` : '要客海外家族树';
+  const pageTitle = nameCn || '';
+
+  const isDashboard = activeTab === 'dashboard';
 
   return (
     <div style={{
-      height: 'calc(100vh - 70px)',
+      height: isDashboard ? 'auto' : 'calc(100vh - 70px)',
+      minHeight: isDashboard ? 'calc(100vh - 70px)' : 'none',
       display: 'flex',
       flexDirection: 'column',
       background: '#fff',
       borderRadius: 8,
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       padding: '16px',
-      overflow: 'hidden',
+      overflow: isDashboard ? 'visible' : 'hidden',
     }}>
       {/* 覆盖 Tabs 高度样式防止 AG Grid 容器塌陷 */}
       <style>{`
@@ -1374,18 +2422,21 @@ const KeyGlobalFamilyTree: React.FC = () => {
           display: flex;
           flex-direction: column;
           min-height: 0;
+          ${isDashboard ? 'height: auto !important; overflow: visible !important;' : ''}
         }
         .ant-tabs-content {
           flex: 1;
           display: flex;
           flex-direction: column;
           min-height: 0;
+          ${isDashboard ? 'height: auto !important; overflow: visible !important;' : ''}
         }
         .ant-tabs-tabpane-active {
           display: flex !important;
           flex-direction: column;
           flex: 1;
           min-height: 0;
+          ${isDashboard ? 'height: auto !important; overflow: visible !important;' : ''}
         }
         .row-diff-only-api {
           background-color: #fff7e6 !important;
@@ -1424,6 +2475,21 @@ const KeyGlobalFamilyTree: React.FC = () => {
           style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
           items={[
             {
+              key: 'dashboard',
+              label: (
+                <span><DashboardOutlined style={{ marginRight: 6 }} />Dashboard</span>
+              ),
+              children: (
+                <DashboardTab
+                  gid={gid}
+                  originalData={originalData}
+                  loading={loading}
+                  dashboardData={dashboardData}
+                  dashboardLoading={dashboardLoading}
+                />
+              )
+            },
+            {
               key: 'tree',
               label: (
                 <span><PartitionOutlined style={{ marginRight: 6 }} />家族树</span>
@@ -1438,6 +2504,13 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}
                   >
+                    <Checkbox
+                      checked={showSites}
+                      onChange={(e) => setShowSites(e.target.checked)}
+                      style={{ marginRight: 8, fontSize: '13px' }}
+                    >
+                      显示网点
+                    </Checkbox>
                     <Input
                       placeholder="搜索节点..."
                       allowClear

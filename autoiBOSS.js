@@ -162,8 +162,103 @@
         });
     };
 
+    // --- 辅助：弹出日期范围选择框，返回 Promise<{startDate, endDate} | null> ---
+    const showDateRangeDialog = function (title) {
+        return new Promise((resolve) => {
+            // 计算默认值：开始时间 = 上个月1号，结束时间 = 今天
+            const today = new Date();
+            const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const defaultStart = fmt(lastMonth);
+            const defaultEnd = fmt(today);
+
+            // 遮罩层
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2147483646;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+
+            // 对话框主体
+            const dialog = document.createElement('div');
+            dialog.style.cssText = 'background:#1e2533;border:1px solid #3a4460;border-radius:12px;padding:28px 32px;min-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.7);font-family:system-ui,sans-serif;color:#e0e6f0;';
+
+            // 标题
+            const titleEl = document.createElement('div');
+            titleEl.style.cssText = 'font-size:16px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:8px;';
+            titleEl.innerHTML = `<span style="font-size:20px;">📅</span> ${title} — 选择时间范围`;
+
+            // 字段行辅助函数
+            const makeField = (label, id, defaultVal) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'margin-bottom:16px;';
+                const lbl = document.createElement('label');
+                lbl.setAttribute('for', id);
+                lbl.style.cssText = 'display:block;font-size:12px;color:#8a9bbf;margin-bottom:6px;font-weight:600;letter-spacing:0.5px;';
+                lbl.textContent = label;
+                const input = document.createElement('input');
+                input.type = 'date';
+                input.id = id;
+                input.value = defaultVal;
+                input.style.cssText = 'width:100%;box-sizing:border-box;background:#2a3347;border:1px solid #3a4460;border-radius:8px;padding:10px 12px;color:#e0e6f0;font-size:14px;outline:none;cursor:pointer;';
+                input.addEventListener('focus', () => { input.style.borderColor = '#4e7cff'; });
+                input.addEventListener('blur', () => { input.style.borderColor = '#3a4460'; });
+                row.appendChild(lbl);
+                row.appendChild(input);
+                return row;
+            };
+
+            const startRow = makeField('开始时间 (createDateStart)', 'iboss-start-date', defaultStart);
+            const endRow = makeField('结束时间 (createDateEnd)', 'iboss-end-date', defaultEnd);
+
+            // 按钮区域
+            const btnRow = document.createElement('div');
+            btnRow.style.cssText = 'display:flex;gap:12px;margin-top:24px;';
+
+            const btnCancel = document.createElement('button');
+            btnCancel.textContent = '取消';
+            btnCancel.style.cssText = 'flex:1;padding:10px;border:1px solid #3a4460;border-radius:8px;background:transparent;color:#8a9bbf;font-size:14px;cursor:pointer;font-weight:600;transition:all 0.2s;';
+            btnCancel.onmouseover = () => { btnCancel.style.background = '#2a3347'; };
+            btnCancel.onmouseleave = () => { btnCancel.style.background = 'transparent'; };
+
+            const btnConfirm = document.createElement('button');
+            btnConfirm.textContent = '确认同步';
+            btnConfirm.style.cssText = 'flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#28a745,#20c997);color:#fff;font-size:14px;cursor:pointer;font-weight:700;box-shadow:0 4px 12px rgba(40,167,69,0.4);transition:all 0.2s;';
+            btnConfirm.onmouseover = () => { btnConfirm.style.opacity = '0.85'; };
+            btnConfirm.onmouseleave = () => { btnConfirm.style.opacity = '1'; };
+
+            // 事件绑定
+            btnCancel.onclick = () => { overlay.remove(); resolve(null); };
+            btnConfirm.onclick = () => {
+                const startDate = document.getElementById('iboss-start-date').value;
+                const endDate = document.getElementById('iboss-end-date').value;
+                if (!startDate || !endDate) {
+                    alert('请选择完整的开始和结束时间');
+                    return;
+                }
+                overlay.remove();
+                resolve({ startDate, endDate });
+            };
+
+            btnRow.appendChild(btnCancel);
+            btnRow.appendChild(btnConfirm);
+            dialog.appendChild(titleEl);
+            dialog.appendChild(startRow);
+            dialog.appendChild(endRow);
+            dialog.appendChild(btnRow);
+            overlay.appendChild(dialog);
+            // 点击遮罩关闭
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); resolve(null); } });
+            (document.body || document.documentElement).appendChild(overlay);
+        });
+    };
+
     // --- 4. 订单列表同步 (完全对标 3.0 Payload 与 Headers) ---
-    const runQuery = function () {
+    const runQuery = async function () {
+        // 先弹出时间范围选择框
+        const dateRange = await showDateRangeDialog('🚀 仅能力出海订单');
+        if (!dateRange) return; // 用户取消
+
+        const { startDate, endDate } = dateRange;
+        console.log(`📅 同步订单时间范围: ${startDate} ~ ${endDate}`);
+
         const token = getCleanToken();
         if (!token) { alert('❌ 未找到 Token'); return; }
 
@@ -186,8 +281,8 @@
 
         const payload = {
             "aid_language": "zh-CN",
-            "formItem": { "site": "", "esopNo": "", "esopProdOrdNo": "", "esopOrderNo": "", "aid_language": "zh-CN", "input1": "", "select1": "", "customerName": "", "intentionId": "", "handleId": "", "intentionCode": "", "handleCode": "", "requireCode": "", "subProdOrdId": "", "prodOrdId": "", "handleType": "", "productId": "", "status": "", "statusIsNormal": "", "handleListStatus": "NORMAL", "createDateStart": "2026-01-01", "vpnId": "", "createDateEnd": "", "refNo": "", "aContact": "", "aContPhone": "", "aAddress": "", "aAddressDesc": "", "bContact": "", "bContPhone": "", "bAddress": "", "endCustomer": "", "createStaffName": "", "enterpriseName": "", "custId": "", "contractBelong": "", "custType": "", "isTimeout": "", "contractSigned": "", "supplierName": "", "supplierId": "", "orderType": "", "importantProject": "" },
-            "pageNum": 1, "pageSize": 500, "handleRelFlag": "", "custManagerName": "", "bandWidth": "", "bandWidthUnit": "1", "detailAddress": "", "customerName": "", "createDateStart": "2026-01-01", "createDateEnd": "", "aContact": "", "bContact": "", "aContPhone": "", "bContPhone": "", "vpnId": "", "createStaffName": "", "custId": "", "isTimeout": "", "contractSigned": "",
+            "formItem": { "site": "", "esopNo": "", "esopProdOrdNo": "", "esopOrderNo": "", "aid_language": "zh-CN", "input1": "", "select1": "", "customerName": "", "intentionId": "", "handleId": "", "intentionCode": "", "handleCode": "", "requireCode": "", "subProdOrdId": "", "prodOrdId": "", "handleType": "", "productId": "", "status": "", "statusIsNormal": "", "handleListStatus": "NORMAL", "createDateStart": startDate, "vpnId": "", "createDateEnd": endDate, "refNo": "", "aContact": "", "aContPhone": "", "aAddress": "", "aAddressDesc": "", "bContact": "", "bContPhone": "", "bAddress": "", "endCustomer": "", "createStaffName": "", "enterpriseName": "", "custId": "", "contractBelong": "", "custType": "", "isTimeout": "", "contractSigned": "", "supplierName": "", "supplierId": "", "orderType": "", "importantProject": "" },
+            "pageNum": 1, "pageSize": 500, "handleRelFlag": "", "custManagerName": "", "bandWidth": "", "bandWidthUnit": "1", "detailAddress": "", "customerName": "", "createDateStart": startDate, "createDateEnd": endDate, "aContact": "", "bContact": "", "aContPhone": "", "bContPhone": "", "vpnId": "", "createStaffName": "", "custId": "", "isTimeout": "", "contractSigned": "",
             "multipleItem": { "productIdList": { "0": "6850200002", "1": "6850200003" }, "statusList": {}, "handleTypeList": { "0": "1" }, "contractBelongList": {} },
             "supplierName": "", "supplierId": "", "intentionId": "", "ccsRelHandleFlag": "0"
         };
@@ -341,12 +436,19 @@
 
     // --- 4.3 合同列表同步 (分页引擎) ---
     const runContractQuery = async function () {
+        // 先弹出时间范围选择框
+        const dateRange = await showDateRangeDialog('📄 同步合同');
+        if (!dateRange) return; // 用户取消
+
+        const { startDate, endDate } = dateRange;
+        console.log(`📅 同步合同时间范围: ${startDate} ~ ${endDate}`);
+
         const token = getCleanToken();
         if (!token) { alert('❌ 未找到 Token'); return; }
         const pageSize = 100;
 
-        // 分页请求封装
-        const fetchContractPage = (pageNum) => {
+        // 分页请求封装（接收 createTimeStart / createTimeEnd 参数）
+        const fetchContractPage = (pageNum, createTimeStart, createTimeEnd) => {
             return new Promise((resolve, reject) => {
                 const headers = {
                     "accept": "application/json, text/plain, */*",
@@ -377,8 +479,8 @@
                     "productType": "",
                     "contractNo": "",
                     "contractName": "",
-                    "createTimeStart": "2026-01-01",
-                    "createTimeEnd": "2027-01-01",
+                    "createTimeStart": createTimeStart,
+                    "createTimeEnd": createTimeEnd,
                     "projectCode": "",
                     "projectName": "",
                     "page": { "total": 0, "pageSize": pageSize, "pageNum": pageNum, "current": pageNum },
@@ -411,7 +513,7 @@
             console.log('📡 正在请求 iBOSS 合同列表...');
 
             // 首页探测总数
-            const first = await fetchContractPage(1);
+            const first = await fetchContractPage(1, startDate, endDate);
             console.log('🔍 [DEBUG] 合同列表首页返回结构:', JSON.stringify(first.result ? { page: first.result.page, total: first.result.total, count: first.result.count, resultLen: first.result.result?.length } : first, null, 2));
             const total = first.result?.page?.total || first.result?.total || first.result?.count || first.result?.result?.length || 0;
             const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -446,7 +548,7 @@
             // 收集所有合同
             let allContracts = [];
             for (let p = 1; p <= pages; p++) {
-                const res = (p === 1) ? first : await fetchContractPage(p);
+                const res = (p === 1) ? first : await fetchContractPage(p, startDate, endDate);
                 const items = res.result?.result || [];
                 if (items.length > 0) {
                     await pushToDashboard(targetContractsUrl, `合同主表 第${p}页`, items);

@@ -16,4 +16,7 @@ router.get('/tcv-detail', auth(), overviewController.getTcvDetail);
 // 获取指定客户在指定年份下的 BR 计费明细列表
 router.get('/br-detail', auth(), overviewController.getBrDetail);
 
+// 获取指定客户海外家族树的 Dashboard 统计与明细数据
+router.get('/family-tree-dashboard-stats', auth(), overviewController.getFamilyTreeDashboardData);
+
 module.exports = router;

@@ -370,11 +370,8 @@ const GroupSyncList: React.FC = () => {
 
     const escapeCsv = (str: any) => {
       if (str === null || str === undefined) return '';
-      const stringified = String(str);
-      if (stringified.includes('"') || stringified.includes(',') || stringified.includes('\n') || stringified.includes('\r')) {
-        return `"${stringified.replace(/"/g, '""')}"`;
-      }
-      return stringified;
+      // 转换成字符串，为了防止换行符破坏 CSV 行结构，将换行符替换为空格，不额外添加双引号
+      return String(str).replace(/\r?\n/g, ' ');
     };
 
     let csv = headers.map(escapeCsv).join('€€') + '\n';

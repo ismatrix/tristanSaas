@@ -797,7 +797,7 @@ const KeyCustomerOverview: React.FC = () => {
                   <PartitionOutlined style={{ fontSize: '32px', opacity: 0.3 }} />
                 </div>
                 <div style={{ marginTop: 12, fontSize: '11px', opacity: 0.95, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 8 }}>
-                  要客关联的所有海外分支企业总数
+                  要客关联的所有海外分支企业总数 (包含营业网点数量: {quantity.siteBranchesCount || 0} 个)
                 </div>
               </Card>
             </Col>

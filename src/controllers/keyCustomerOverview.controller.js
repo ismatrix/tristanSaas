@@ -89,10 +89,12 @@ const getOverviewStats = catchAsync(async (req, res) => {
   // 分支数指 keyGlobalFamilyTree 中排除根节点的所有节点 (即 GID 不等于 ultimateGID)
   const branches = await db.collection('keyGlobalFamilyTree').find(
     { $expr: { $ne: ['$GID', '$ultimateGID'] } },
-    { projection: { GID: 1, ultimateGID: 1, cmiIndustry: 1, cmiRegion: 1, registeredCountry: 1 } }
+    { projection: { GID: 1, ultimateGID: 1, cmiIndustry: 1, cmiRegion: 1, registeredCountry: 1, entityTypeName: 1 } }
   ).toArray();
 
   const totalBranches = branches.length;
+  // 统计营业网点（Site）数量
+  const siteBranchesCount = branches.filter(br => br.entityTypeName === 'Site').length;
 
   // 初始化8大行业分支计数
   const industryBranchCount = {};
@@ -115,13 +117,15 @@ const getOverviewStats = catchAsync(async (req, res) => {
       industryBranchCount[indCode]++;
     }
 
-    // 区域与国家分支统计
-    const region = br.cmiRegion || 'Other Regions';
-    const country = br.registeredCountry || 'Unknown';
-    if (!regionCountryBranchStats[region]) {
-      regionCountryBranchStats[region] = {};
+    // 区域与国家分支统计 (排除营业网点 Site)
+    if (br.entityTypeName !== 'Site') {
+      const region = br.cmiRegion || 'Other Regions';
+      const country = br.registeredCountry || 'Unknown';
+      if (!regionCountryBranchStats[region]) {
+        regionCountryBranchStats[region] = {};
+      }
+      regionCountryBranchStats[region][country] = (regionCountryBranchStats[region][country] || 0) + 1;
     }
-    regionCountryBranchStats[region][country] = (regionCountryBranchStats[region][country] || 0) + 1;
   });
 
   // --- 3. 获取 TCV 签单数据（按行业和年份 2023-2026 统计） ---
@@ -539,6 +543,7 @@ const getOverviewStats = catchAsync(async (req, res) => {
     quantity: {
       totalCustomers,
       totalBranches,
+      siteBranchesCount,
       sourceStats: sourceCountMap,
       industryStats: formattedIndustryStats,
       regionCountryStats: regionCountryBranchStats
@@ -569,9 +574,9 @@ const getCountryBranches = catchAsync(async (req, res) => {
 
   const db = mongoose.connection.db;
 
-  // 查询该国家下的所有要客分支节点
+  // 查询该国家下的所有要客分支节点 (排除营业网点 Site)
   const records = await db.collection('keyGlobalFamilyTree').find(
-    { registeredCountry: country },
+    { registeredCountry: country, entityTypeName: { $ne: 'Site' } },
     {
       projection: {
         ultimateGID: 1,
@@ -580,7 +585,8 @@ const getCountryBranches = catchAsync(async (req, res) => {
         registeredCity: 1,
         registeredAddress: 1,
         enterpriseNature: 1,
-        isDomesticUltimate: 1
+        isDomesticUltimate: 1,
+        nationAgent: 1
       }
     }
   ).toArray();
@@ -849,9 +855,140 @@ const getBrDetail = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(list);
 });
 
+// 获取指定海外家族树 GID 对应的 Dashboard 数据接口 (符合中文注释规范)
+const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
+  const db = mongoose.connection.db;
+  const { gid } = req.query;
+  if (!gid) {
+    return res.status(httpStatus.BAD_REQUEST).send({ message: '缺少必填参数 gid' });
+  }
+
+  const gidStr = String(gid).trim();
+
+  // 1. 获取该海外客户树在 keyFamilyTreeCustMapping 表中映射的所有外部 iBOSS 客户 ID
+  const mappings = await db.collection('keyFamilyTreeCustMapping').find(
+    { ultimateGID: gidStr },
+    { projection: { extCustId: 1, mappingPath: 1 } }
+  ).toArray();
+
+  const extCustIds = mappings.map(m => m.extCustId).filter(Boolean);
+  const endCustExtIds = mappings.filter(m => m.mappingPath === 'endCustomer').map(m => m.extCustId).filter(Boolean);
+
+  // 2. A端关联转换：提取 CMI 终端客户对应的 enterpriseName
+  let enterpriseNames = [];
+  if (endCustExtIds.length > 0) {
+    const ibossCustomers = await db.collection('ibosscustomers').find(
+      { custId: { $in: endCustExtIds } },
+      { projection: { custId: 1, enterpriseName: 1 } }
+    ).toArray();
+    enterpriseNames = ibossCustomers.map(c => c.enterpriseName).filter(Boolean);
+  }
+
+  // 3. TCV 签单明细提取与清洗排重
+  const tcvQuery = { $or: [] };
+  if (extCustIds.length > 0) {
+    tcvQuery.$or.push({ '签约客户标识': { $in: extCustIds } });
+  }
+  if (enterpriseNames.length > 0) {
+    tcvQuery.$or.push({ '终端客户名称': { $in: enterpriseNames } });
+  }
+
+  let finalTcv = [];
+  if (tcvQuery.$or.length > 0) {
+    const tcvRecords = await db.collection('dmcTCV').find(tcvQuery).toArray();
+    // 过滤已注销的订单
+    let filteredTcv = tcvRecords.filter(rec => String(rec['订单状态'] || '').trim().toLowerCase() !== 'achive');
+
+    // 按照 _id 升序排序，保证重复时保留 _id 最小的记录
+    filteredTcv.sort((a, b) => String(a._id).localeCompare(String(b._id)));
+
+    // 5 字段去重
+    const uniqueMap = new Map();
+    filteredTcv.forEach(rec => {
+      const kSignDate = rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '';
+      const kStartDate = rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '';
+      const kCircuit = rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '';
+      const kStatus = rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '';
+      const kAmount = rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : '';
+      const duplicateKey = `${kSignDate}_${kStartDate}_${kCircuit}_${kStatus}_${kAmount}`;
+      if (!uniqueMap.has(duplicateKey)) {
+        uniqueMap.set(duplicateKey, rec);
+      }
+    });
+    finalTcv = Array.from(uniqueMap.values());
+  }
+
+  // --- 统计 TCV 大区、单元签单个数和总金额，以及产品大类/小类分解 ---
+  const tcvGroupMap = new Map();
+
+  finalTcv.forEach(rec => {
+    const region = rec['大区中文名称'] || rec['大区'] || '其他大区';
+    const unit = rec['销售单元中文名称'] || rec['销售单元编码'] || '其他单元';
+    const amount = parseFloat(rec['签单金额(港币)'] || 0);
+
+    const groupKey = `${region}_${unit}`;
+    if (!tcvGroupMap.has(groupKey)) {
+      tcvGroupMap.set(groupKey, {
+        region,
+        unit,
+        count: 0,
+        amount: 0
+      });
+    }
+    const g = tcvGroupMap.get(groupKey);
+    g.count += 1;
+    g.amount += amount;
+  });
+
+  const tcvGroupList = Array.from(tcvGroupMap.values());
+
+  // 4. BR 项目计收明细提取
+  const circuitIds = Array.from(new Set(finalTcv.map(r => String(r['电路编号'] || '').trim()).filter(Boolean)));
+  const brQuery = { $or: [] };
+  if (circuitIds.length > 0) {
+    brQuery.$or.push({ '电路参考编号': { $in: circuitIds } });
+  }
+  if (enterpriseNames.length > 0) {
+    brQuery.$or.push({ '终端客户名称': { $in: enterpriseNames } });
+  }
+
+  let brList = [];
+  if (brQuery.$or.length > 0) {
+    const brRecords = await db.collection('dmcBR').find(brQuery).toArray();
+    brList = brRecords.map(rec => {
+      const rawAmount = rec['拆分后港币金额｜绝对值'] !== undefined
+        ? rec['拆分后港币金额｜绝对值']
+        : (rec['拆分后港币金额|绝对值'] !== undefined
+            ? rec['拆分后港币金额|绝对值']
+            : (rec['拆分后港币金额'] || 0));
+      const amount = parseFloat(rawAmount || 0);
+
+      return {
+        _id: rec._id,
+        签约客户名称: rec['签约客户名称'] || '—',
+        终端客户名称: rec['终端客户名称'] || '—',
+        数据月份: rec['数据月份'] || '—',
+        电路参考编号: rec['电路参考编号'] || '—',
+        大区中文名称: rec['大区中文名称'] || rec['大区'] || '其他大区',
+        销售单元中文名称: rec['销售单元中文名称'] || rec['销售单元编码'] || '其他单元',
+        市场经分产品分类: rec['市场经分产品分类'] || '其他',
+        分成比例: rec['分成比例'] || 0,
+        金额: amount
+      };
+    });
+  }
+
+  res.status(httpStatus.OK).send({
+    tcvStats: tcvGroupList,
+    tcvRecords: finalTcv,
+    brStats: brList
+  });
+});
+
 module.exports = {
   getOverviewStats,
   getCountryBranches,
   getTcvDetail,
-  getBrDetail
+  getBrDetail,
+  getFamilyTreeDashboardData
 };

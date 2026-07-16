@@ -11,6 +11,17 @@ function formatDate(val) {
   return `${year}-${month}-${date}`;
 }
 
+// 将字符串规范化为首字母大写、其余小写的 Title Case 格式
+function toTitleCase(str) {
+  if (!str) return str;
+  return str.split(' ').map(word => {
+    if (!word) return '';
+    return word.replace(/[a-zA-Z]+/g, (match) => {
+      return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+    });
+  }).join(' ');
+}
+
 // 读取并清洗 Excel 数据
 function readExcelData(filePath, sheetName, stringCols) {
   console.log(`正在读取文件: ${filePath} (Sheet: ${sheetName})`);
@@ -88,8 +99,17 @@ async function runImport() {
       console.log('  成功读取 cmiRegion 映射字典');
     }
 
-    // 遍历数据并自动填充 cmiRegion 字段
+    // 遍历数据并自动填充 cmiRegion 字段，并规范化 registeredCountry 大小写
     data1.forEach((row) => {
+      const country = row.registeredCountry;
+      if (country) {
+        const isAllUpper = country === country.toUpperCase() && country !== country.toLowerCase();
+        const isAllLower = country === country.toLowerCase() && country !== country.toUpperCase();
+        if (isAllUpper || isAllLower) {
+          row.registeredCountry = toTitleCase(country);
+        }
+      }
+
       const rawCountry = row.registeredCountry || row.position || '';
       const countryKey = String(rawCountry).trim().toLowerCase();
       row.cmiRegion = regionMap[countryKey] || null;
