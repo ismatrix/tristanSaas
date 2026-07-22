@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { request, history, useModel } from '@umijs/max';
 import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip, Tabs } from 'antd';
-import { SaveOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ApartmentOutlined, DownloadOutlined, ExportOutlined, DashboardOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { SaveOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ApartmentOutlined, DownloadOutlined, ExportOutlined, DashboardOutlined, UnorderedListOutlined, PartitionOutlined } from '@ant-design/icons';
 import KeyCustomerOverview from './KeyCustomerOverview';
+import KeyCustomerBranchTab from './KeyCustomerBranchTab';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
 import { AllEnterpriseModule } from 'ag-grid-enterprise';
@@ -1032,6 +1033,15 @@ const KeyCustomerList: React.FC = () => {
                   />
                 </div>
               </div>
+            )
+          },
+          {
+            key: 'branches',
+            label: (
+              <span><PartitionOutlined style={{ marginRight: 6 }} />要客分支</span>
+            ),
+            children: (
+              <KeyCustomerBranchTab />
             )
           }
         ]}

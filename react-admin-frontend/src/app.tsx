@@ -87,7 +87,7 @@ export async function getInitialState(): Promise<{
   // 获取并构建行业要客菜单数据
   const fetchKeyCustomersMenu = async (): Promise<React.ReactNode | null> => {
     try {
-      const [customersRes, industriesRes, familyTreesRes] = await Promise.all([
+      const [customersRes, industriesRes, familyTreesRes, penetratedRes] = await Promise.all([
         requestFn('/api/v1/wildcards/keycustomer', { method: 'GET', skipErrorHandler: true }),
         requestFn('/api/v1/wildcards/industry', { method: 'GET', skipErrorHandler: true }),
         requestFn('/api/v1/wildcards/keyGlobalFamilyTree', {
@@ -98,6 +98,7 @@ export async function getInitialState(): Promise<{
           },
           skipErrorHandler: true,
         }),
+        requestFn('/api/v1/key-customer-overview/penetrated-gids', { method: 'GET', skipErrorHandler: true }),
       ]);
       const customers = customersRes?.results || customersRes?.data?.results || [];
       const industries = industriesRes?.results || industriesRes?.data?.results || [];
@@ -108,6 +109,15 @@ export async function getInitialState(): Promise<{
       familyTrees.forEach((ft: any) => {
         if (ft.ultimateGID) {
           activeGids.add(String(ft.ultimateGID).trim());
+        }
+      });
+
+      // 统计已发生交易渗透的要客 GID 集合
+      const penetratedGids = new Set<string>();
+      const penGidsArr = penetratedRes?.penetratedUltimateGids || penetratedRes?.data?.penetratedUltimateGids || [];
+      penGidsArr.forEach((g: any) => {
+        if (g) {
+          penetratedGids.add(String(g).trim());
         }
       });
 
@@ -156,10 +166,21 @@ export async function getInitialState(): Promise<{
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {grouped[code].map((c: any) => {
                     const hasTree = c.GID && activeGids.has(String(c.GID).trim());
+                    const isPenetrated = c.GID && penetratedGids.has(String(c.GID).trim());
                     const nameCn = encodeURIComponent(c.nameCn || '');
                     const abbr = encodeURIComponent(c.abbr || '');
-                    const displayColor = hasTree ? '#1677ff' : '#999';
-                    const hoverColor = hasTree ? '#ff6a00' : '#999';
+
+                    let displayColor = '#bfbfbf';
+                    let hoverColor = '#bfbfbf';
+                    if (hasTree) {
+                      if (isPenetrated) {
+                        displayColor = '#1677ff'; // 已渗透：亮蓝色
+                        hoverColor = '#ff6a00';
+                      } else {
+                        displayColor = '#595959'; // 未渗透要客：深灰色
+                        hoverColor = '#ff6a00';
+                      }
+                    }
 
                     return (
                       <div key={c._id}>

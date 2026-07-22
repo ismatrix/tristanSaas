@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Spin, Progress, Tooltip, Button, List, Drawer, Table, Tabs, Select, Modal } from 'antd';
-import { DashboardOutlined, GlobalOutlined, TransactionOutlined, ReloadOutlined, BankOutlined, ArrowUpOutlined, PartitionOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Spin, Progress, Tooltip, Button, List, Drawer, Table, Tabs, Select, Modal, Input, Pagination, message, Tag } from 'antd';
+import { DashboardOutlined, GlobalOutlined, TransactionOutlined, ReloadOutlined, BankOutlined, ArrowUpOutlined, PartitionOutlined, DownloadOutlined } from '@ant-design/icons';
 import { request } from '@umijs/max';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -35,7 +35,7 @@ const INDUSTRY_COLORS: Record<string, string> = {
 const KeyCustomerOverview: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<any>(null);
-  
+
   // 联动状态：选中的行业代码 (null 代表全部行业汇总)
   const [selectedIndustry, setSelectedIndustry] = useState<string | null>(null);
 
@@ -56,7 +56,7 @@ const KeyCustomerOverview: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const allTcvYears = Array.from({ length: 10 }, (_, i) => String(currentYear - i));
   const [tcvDisplayYears, setTcvDisplayYears] = useState<string[]>(['2024', '2025', '2026']);
-  
+
   // 被隐藏的行业代码列表
   const [hiddenIndustries, setHiddenIndustries] = useState<string[]>([]);
 
@@ -75,6 +75,8 @@ const KeyCustomerOverview: React.FC = () => {
   const [brModalData, setBrModalData] = useState<any[]>([]);
   const [brModalTitle, setBrModalTitle] = useState<string>('');
 
+
+
   // TCV 明细列定义
   const tcvGridColumns = [
     { headerName: '分析客户名称', field: '分析客户名称(规整后)', width: 180, filter: true },
@@ -89,10 +91,10 @@ const KeyCustomerOverview: React.FC = () => {
     { headerName: '合同签署日期', field: '合同签署日期', width: 120, filter: true },
     { headerName: '产品分类', field: '市场经分产品分类', width: 130, filter: true },
     { headerName: '国际业务', field: '是否国际业务收入标签', width: 100, filter: true },
-    { 
-      headerName: '签单金额 (港币)', 
-      field: '签单金额(港币)', 
-      width: 150, 
+    {
+      headerName: '签单金额 (港币)',
+      field: '签单金额(港币)',
+      width: 150,
       filter: 'agNumberColumnFilter',
       type: 'numericColumn',
       cellStyle: { textAlign: 'right' },
@@ -111,27 +113,27 @@ const KeyCustomerOverview: React.FC = () => {
     { headerName: '销售单元名称', field: '销售单元中文名称', width: 150, filter: true },
     { headerName: '产品分类', field: '市场经分产品分类', width: 130, filter: true },
     { headerName: '客户经理', field: '客户经理名称', width: 110, filter: true },
-    { 
-      headerName: '分成比例', 
-      field: '分成比例', 
-      width: 100, 
+    {
+      headerName: '分成比例',
+      field: '分成比例',
+      width: 100,
       filter: 'agNumberColumnFilter',
       valueFormatter: (params: any) => {
         const val = parseFloat(params.value || 0);
         return val.toFixed(4);
       }
     },
-    { 
-      headerName: '港币金额 (绝对值)', 
+    {
+      headerName: '港币金额 (绝对值)',
       valueGetter: (params: any) => {
         const rec = params.data || {};
         return rec['拆分后港币金额｜绝对值'] !== undefined
           ? rec['拆分后港币金额｜绝对值']
           : (rec['拆分后港币金额|绝对值'] !== undefined
-              ? rec['拆分后港币金额|绝对值']
-              : Math.abs(parseFloat(rec['拆分后港币金额'] || 0)));
+            ? rec['拆分后港币金额|绝对值']
+            : Math.abs(parseFloat(rec['拆分后港币金额'] || 0)));
       },
-      width: 160, 
+      width: 160,
       filter: 'agNumberColumnFilter',
       type: 'numericColumn',
       cellStyle: { textAlign: 'right' },
@@ -263,7 +265,7 @@ const KeyCustomerOverview: React.FC = () => {
   // 根据 ultimateGID 对数据进行要客集团中文名称分组以形成树形 Table
   const treeTableData = React.useMemo(() => {
     if (!branchData || branchData.length === 0) return [];
-    
+
     const groups: Record<string, any> = {};
     branchData.forEach(item => {
       const groupName = item.ultimateNameCn;
@@ -508,7 +510,7 @@ const KeyCustomerOverview: React.FC = () => {
         const sortedProds = Object.keys(prods)
           .map(k => ({ name: k, value: prods[k] }))
           .sort((a, b) => b.value - a.value);
-          
+
         return (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {sortedProds.map(p => {
@@ -736,7 +738,7 @@ const KeyCustomerOverview: React.FC = () => {
     <div style={{ background: '#f5f7fa', padding: '16px' }}>
 
       {/* 1. 第一行：数目统计卡片（左）与行业分布（右） */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         {/* 左侧第1列：分左右两列堆叠 4 个统计卡片 */}
         <Col xs={24} lg={12}>
           <Row gutter={[16, 16]} style={{ height: '100%' }}>
@@ -767,8 +769,15 @@ const KeyCustomerOverview: React.FC = () => {
                   <BankOutlined style={{ fontSize: '32px', opacity: 0.3 }} />
                 </div>
                 <div style={{ marginTop: 12, fontSize: '11px', opacity: 0.95, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 8 }}>
-                  <strong>来源分布：</strong>
-                  {quantity.sourceStats ? Object.keys(quantity.sourceStats).map(key => `${key}: ${quantity.sourceStats[key]}家`).join(' | ') : '无'}
+                  <div style={{ marginTop: 4 }}>
+                    <strong>要客渗透率：</strong>
+                    {quantity.penetratedCustomersCount || 0} / {quantity.totalCustomers || 0} ({quantity.customerPenetrationRate || '0.00%'})
+                  </div>
+                  {quantity.sourceStats ? Object.keys(quantity.sourceStats).map(key => (
+                    <div key={key} style={{ marginTop: 4 }}>
+                      <strong>{key}：</strong>{quantity.sourceStats[key]}家
+                    </div>
+                  )) : <div style={{ marginTop: 4 }}>无</div>}
                 </div>
               </Card>
 
@@ -797,7 +806,13 @@ const KeyCustomerOverview: React.FC = () => {
                   <PartitionOutlined style={{ fontSize: '32px', opacity: 0.3 }} />
                 </div>
                 <div style={{ marginTop: 12, fontSize: '11px', opacity: 0.95, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 8 }}>
-                  要客关联的所有海外分支企业总数 (包含营业网点数量: {quantity.siteBranchesCount || 0} 个)
+                  <div>
+                    <strong>分支渗透率：</strong>
+                    {quantity.penetratedBranchesCount || 0} / {quantity.totalBranches || 0} ({quantity.branchPenetrationRate || '0.00%'})
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    含营业网点数: {quantity.siteBranchesCount || 0} 个
+                  </div>
                 </div>
               </Card>
             </Col>
@@ -829,7 +844,8 @@ const KeyCustomerOverview: React.FC = () => {
                   <TransactionOutlined style={{ fontSize: '32px', opacity: 0.3 }} />
                 </div>
                 <div style={{ marginTop: 12, fontSize: '11px', opacity: 0.95, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 8 }}>
-                  A端+B端合计 &nbsp;|&nbsp; B端: <strong>{tcv2026BFormatted} M</strong> &nbsp;/&nbsp; A端: <strong>{tcv2026AFormatted} M</strong>
+                  <div>B端: <strong>{tcv2026BFormatted} M</strong></div>
+                  <div>A端: <strong>{tcv2026AFormatted} M</strong></div>
                 </div>
               </Card>
 
@@ -858,7 +874,8 @@ const KeyCustomerOverview: React.FC = () => {
                   <DashboardOutlined style={{ fontSize: '32px', opacity: 0.3 }} />
                 </div>
                 <div style={{ marginTop: 12, fontSize: '11px', opacity: 0.95, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 8 }}>
-                  A端+B端合计 &nbsp;|&nbsp; B端: <strong>{br2026BFormatted} M</strong> &nbsp;/&nbsp; A端: <strong>{br2026AFormatted} M</strong>
+                  <div>B端: <strong>{br2026BFormatted} M</strong> </div>
+                  <div>A端: <strong>{br2026AFormatted} M</strong></div>
                 </div>
               </Card>
             </Col>
@@ -885,11 +902,11 @@ const KeyCustomerOverview: React.FC = () => {
                           <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: INDUSTRY_COLORS[item.code] || '#ccc', marginRight: 6 }}></span>
                           {item.nameCn}
                         </span>
-                        <span style={{ color: '#666' }}>
-                          要客: <strong style={{ color: '#111' }}>{item.customerCount}</strong> 家 | 分支: <strong style={{ color: '#111' }}>{item.branchCount}</strong> 个
+                        <span style={{ color: '#666', fontSize: '11.5px' }}>
+                          要客: <strong style={{ color: '#111' }}>{item.customerCount}</strong>家 (渗透: <strong style={{ color: '#096dd9' }}>{item.customerPenetrationRate || '0.0%'}</strong>) | 分支: <strong style={{ color: '#111' }}>{item.branchCount}</strong>个 (渗透: <strong style={{ color: '#389e0d' }}>{item.branchPenetrationRate || '0.0%'}</strong>)
                         </span>
                       </div>
-                      <Tooltip title={`占总要客与分支的 ${percent.toFixed(1)}%`}>
+                      <Tooltip title={`要客渗透: ${item.penetratedCustomerCount || 0}/${item.customerCount} (${item.customerPenetrationRate || '0.0%'}) | 分支渗透: ${item.penetratedBranchCount || 0}/${item.branchCount} (${item.branchPenetrationRate || '0.0%'}) | 占比: ${percent.toFixed(1)}%`}>
                         <Progress
                           percent={parseFloat(percent.toFixed(1))}
                           strokeColor={INDUSTRY_COLORS[item.code] || '#1890ff'}

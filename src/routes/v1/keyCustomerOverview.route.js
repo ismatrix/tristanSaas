@@ -19,4 +19,10 @@ router.get('/br-detail', auth(), overviewController.getBrDetail);
 // 获取指定客户海外家族树的 Dashboard 统计与明细数据
 router.get('/family-tree-dashboard-stats', auth(), overviewController.getFamilyTreeDashboardData);
 
+// 获取所有已发生过 CMI 成交渗透的要客集团 GID 列表
+router.get('/penetrated-gids', auth(), overviewController.getPenetratedGids);
+
+// 获取 keyGlobalFamilyTree 全量分支的渗透情况列表（含历史 TCV 笔数、搜索与分页）
+router.get('/branches', auth(), overviewController.getKeyFamilyTreeBranches);
+
 module.exports = router;

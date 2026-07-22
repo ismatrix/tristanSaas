@@ -19,6 +19,7 @@ import {
   DollarOutlined,
   ProfileOutlined,
   GlobalOutlined,
+  CameraOutlined,
 } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -602,36 +603,106 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
     return originalData.filter(d => d.id !== rootNode.id && d.entityTypeName !== 'Site');
   }, [originalData, rootNode]);
 
-  // 计算海外分支的大区与国家分布
+  // 营业网点列表（排除母公司根节点，只保留 Site 营业网点）
+  const siteNodes = useMemo(() => {
+    if (!rootNode) return [];
+    return originalData.filter(d => d.id !== rootNode.id && d.entityTypeName === 'Site');
+  }, [originalData, rootNode]);
+
+  // 计算海外分支机构与网点的大区与国家分布统计
   const branchStats = useMemo(() => {
-    const stats: Record<string, { count: number; countries: Record<string, number> }> = {};
+    const stats: Record<string, { branchCount: number; siteCount: number; countries: Record<string, { branchCount: number; siteCount: number }> }> = {};
+    
+    // 初始化大区默认框架属性以防止取值 undefined
+    const DISPLAY_REGIONS_FLAT = ['Europe', 'APAC', 'Americas', 'MENA', 'STA', 'Euro-Asia', 'Mainland China', 'HKM', 'TW'];
+    DISPLAY_REGIONS_FLAT.forEach(reg => {
+      stats[reg] = { branchCount: 0, siteCount: 0, countries: {} };
+    });
+
+    // 1. 统计分支
     branchNodes.forEach(node => {
       const region = node.cmiRegion || 'Other Regions';
       const country = node.registeredCountry || node.position || 'Unknown';
       if (!stats[region]) {
-        stats[region] = { count: 0, countries: {} };
+        stats[region] = { branchCount: 0, siteCount: 0, countries: {} };
       }
-      stats[region].count += 1;
-      stats[region].countries[country] = (stats[region].countries[country] || 0) + 1;
+      stats[region].branchCount += 1;
+      if (!stats[region].countries[country]) {
+        stats[region].countries[country] = { branchCount: 0, siteCount: 0 };
+      }
+      stats[region].countries[country].branchCount += 1;
     });
+
+    // 2. 统计网点
+    siteNodes.forEach(node => {
+      const region = node.cmiRegion || 'Other Regions';
+      const country = node.registeredCountry || node.position || 'Unknown';
+      if (!stats[region]) {
+        stats[region] = { branchCount: 0, siteCount: 0, countries: {} };
+      }
+      stats[region].siteCount += 1;
+      if (!stats[region].countries[country]) {
+        stats[region].countries[country] = { branchCount: 0, siteCount: 0 };
+      }
+      stats[region].countries[country].siteCount += 1;
+    });
+
     return stats;
-  }, [branchNodes]);
+  }, [branchNodes, siteNodes]);
 
   const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
+  const [drawerType, setDrawerType] = useState<'branch' | 'site'>('branch');
+  const [selectedBrYears, setSelectedBrYears] = useState<string[]>(['2026']);
+  const [selectedTcvYears, setSelectedTcvYears] = useState<string[]>(['2024', '2025', '2026']);
 
-  // 过滤出选中国家下的分支节点列表
+  // 过滤出选中国家下的分支节点或网点节点列表
   const branchesInCountry = useMemo(() => {
     if (!selectedCountry) return [];
-    return branchNodes.filter(node => {
-      const countryVal = node.registeredCountry || node.position || '';
-      return String(countryVal).trim().toLowerCase() === selectedCountry.trim().toLowerCase();
-    });
-  }, [branchNodes, selectedCountry]);
+    if (drawerType === 'site') {
+      return siteNodes.filter(node => {
+        const countryVal = node.registeredCountry || node.position || '';
+        return String(countryVal).trim().toLowerCase() === selectedCountry.trim().toLowerCase();
+      });
+    } else {
+      return branchNodes.filter(node => {
+        const countryVal = node.registeredCountry || node.position || '';
+        return String(countryVal).trim().toLowerCase() === selectedCountry.trim().toLowerCase();
+      });
+    }
+  }, [branchNodes, siteNodes, selectedCountry, drawerType]);
 
   // --- 第四部分：历史签单大区/销售单元联动状态 ---
-  const tcvStats = dashboardData?.tcvStats || [];
   const tcvRecords = dashboardData?.tcvRecords || [];
+
+  // 动态由 tcvRecords 计算满足 selectedTcvYears 年份条件的各个国家的签单数据 (tcvStats)
+  const tcvStats = useMemo(() => {
+    const yrFiltered = tcvRecords.filter((r: any) => {
+      const signDate = String(r['合同签署日期'] || r['设置起租日期'] || '');
+      return selectedTcvYears.some(yr => signDate.startsWith(yr));
+    });
+
+    const unitMap = new Map<string, { unit: string; region: string; count: number; amount: number }>();
+    yrFiltered.forEach((r: any) => {
+      const unit = r['销售单元中文名称'] || r['销售单元编码'] || '其他单元';
+      const region = r['大区中文名称'] || r['大区'] || '其他大区';
+      const amount = parseFloat(r['签单金额(港币)'] || 0);
+
+      if (!unitMap.has(unit)) {
+        unitMap.set(unit, {
+          unit,
+          region,
+          count: 0,
+          amount: 0
+        });
+      }
+      const u = unitMap.get(unit)!;
+      u.count += 1;
+      u.amount += amount;
+    });
+
+    return Array.from(unitMap.values());
+  }, [tcvRecords, selectedTcvYears]);
 
   const tcvRegions = useMemo(() => {
     const regions = new Set<string>();
@@ -807,33 +878,64 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   }, [productStatsMerged]);
 
   // --- 第五部分：项目计收费占比统计 ---
+  // brStats: 计收费记录列表, tcvRecords: 签单合同明细列表
   const brStats = dashboardData?.brStats || [];
 
-  const br2026Records = useMemo(() => {
-    return brStats.filter((item: any) => String(item.数据月份 || '').startsWith('2026'));
-  }, [brStats]);
-
+  // 计算 2026 年的项目计收占比数据
   const brProjectStats = useMemo(() => {
-    const map = new Map<string, { circuit: string; product: string; customer: string; amount: number }>();
-    br2026Records.forEach((item: any) => {
-      const circuit = String(item.电路参考编号 || '无电路号').trim();
-      const amount = parseFloat(item.金额 || 0);
-      if (!map.has(circuit)) {
-        map.set(circuit, {
+    // 1. 过滤出 2026 年签署合同的项目记录
+    const tcv2026Records = tcvRecords.filter((r: any) => 
+      String(r['合同签署日期'] || r['设置起租日期'] || '').startsWith('2026')
+    );
+
+    // 2. 按电路编号聚合项目的 TCV 金额
+    const projectMap = new Map<string, { circuit: string; product: string; customer: string; tcvAmount: number; brAmount: number; realPercent: number }>();
+    tcv2026Records.forEach((r: any) => {
+      const circuit = String(r['电路编号'] || '无电路号').trim();
+      if (!circuit || circuit === '无电路号') return;
+      const amount = parseFloat(r['签单金额(港币)'] || 0);
+
+      if (!projectMap.has(circuit)) {
+        projectMap.set(circuit, {
           circuit,
-          product: item.市场经分产品分类 || '其他',
-          customer: item.签约客户名称 || '未知客户',
-          amount: 0
+          product: r['市场经分产品分类'] || '其他',
+          customer: r['签约客户名称'] || '未知客户',
+          tcvAmount: 0,
+          brAmount: 0,
+          realPercent: 0
         });
       }
-      map.get(circuit)!.amount += amount;
+      projectMap.get(circuit)!.tcvAmount += amount;
     });
-    const list = Array.from(map.values());
-    return list.sort((a, b) => b.amount - a.amount);
-  }, [br2026Records]);
 
-  const totalBr2026Amount = useMemo(() => {
-    return brProjectStats.reduce((sum, item) => sum + item.amount, 0);
+    // 3. 关联计收费表（brStats），统计已计收的金额合计
+    brStats.forEach((item: any) => {
+      const circuit = String(item.电路参考编号 || '').trim();
+      if (projectMap.has(circuit)) {
+        const amount = parseFloat(item.金额 || 0);
+        projectMap.get(circuit)!.brAmount += amount;
+      }
+    });
+
+    // 4. 计算占比百分比并以 TCV 金额进行降序排序
+    return Array.from(projectMap.values())
+      .map(item => {
+        const percent = item.tcvAmount > 0 ? (item.brAmount / item.tcvAmount) * 100 : 0;
+        return {
+          ...item,
+          realPercent: percent
+        };
+      })
+      .sort((a, b) => b.tcvAmount - a.tcvAmount);
+  }, [tcvRecords, brStats]);
+
+  // 2026年项目的总 TCV 与总计收金额
+  const totalTcv2026Amount = useMemo(() => {
+    return brProjectStats.reduce((sum, item) => sum + item.tcvAmount, 0);
+  }, [brProjectStats]);
+
+  const totalBrFor2026Projects = useMemo(() => {
+    return brProjectStats.reduce((sum, item) => sum + item.brAmount, 0);
   }, [brProjectStats]);
 
   const brColumns = [
@@ -887,7 +989,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                 <Descriptions.Item label="注册国家">{rootNode.registeredCountry || rootNode.position || '—'}</Descriptions.Item>
                 <Descriptions.Item label="注册城市">{rootNode.registeredCity || rootNode.city || '—'}</Descriptions.Item>
                 <Descriptions.Item label="行业分类">{rootNode.cmiIndustry || '—'}</Descriptions.Item>
-                <Descriptions.Item label="CMI 行业">{rootNode.cmccIndustry || '—'}</Descriptions.Item>
+                <Descriptions.Item label="CMCC行业">{rootNode.cmccIndustry || '—'}</Descriptions.Item>
                 <Descriptions.Item label="主营业务" span={2}>{rootNode.mainBusiness || '—'}</Descriptions.Item>
                 <Descriptions.Item label="运营状态">{rootNode.operatingStatus || '—'}</Descriptions.Item>
                 <Descriptions.Item label="建立日期">{rootNode.establishmentDate || '—'}</Descriptions.Item>
@@ -940,7 +1042,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 
       {/* 第三部分：海外分支的统计信息 */}
       <Card
-        title={<span><GlobalOutlined style={{ marginRight: 6, color: '#fa8c16' }} />海外分支机构分布 (共 {branchNodes.length} 个分支)</span>}
+        title={<span><GlobalOutlined style={{ marginRight: 6, color: '#1890ff' }} />海外分支机构分布 (共 {branchNodes.length} 个分支｜{siteNodes.length} 个网点)</span>}
         bordered={false}
         style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 16 }}
         bodyStyle={{ padding: '16px' }}
@@ -956,10 +1058,15 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                 const countryMap = (branchStats[region] && branchStats[region].countries) || {};
                 const sortedCountries = Object.keys(countryMap).map(c => ({
                   name: c,
-                  count: countryMap[c]
-                })).sort((a, b) => b.count - a.count);
+                  branchCount: countryMap[c].branchCount,
+                  siteCount: countryMap[c].siteCount
+                })).sort((a, b) => {
+                  if (b.branchCount !== a.branchCount) return b.branchCount - a.branchCount;
+                  return b.siteCount - a.siteCount;
+                });
 
-                const regionTotal = (branchStats[region] && branchStats[region].count) || 0;
+                const regionBranchTotal = (branchStats[region] && branchStats[region].branchCount) || 0;
+                const regionSiteTotal = (branchStats[region] && branchStats[region].siteCount) || 0;
 
                 return (
                   <Col key={region} xs={24} md={8} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -976,13 +1083,20 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                     }}>
                       {/* 区域标题与数量 */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid #e8e8e8', paddingBottom: 6 }}>
-                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#fa8c16' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff' }}>
                           <GlobalOutlined style={{ marginRight: 6 }} />
                           {region}
                         </span>
-                        <span style={{ background: '#fff7e6', color: '#fa8c16', padding: '1px 6px', borderRadius: 10, fontSize: '11px', fontWeight: 'bold' }}>
-                          {regionTotal} 分支
-                        </span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <span style={{ background: '#e6f7ff', color: '#1890ff', padding: '1px 6px', borderRadius: 10, fontSize: '11px', fontWeight: 'bold' }}>
+                            {regionBranchTotal} 分支
+                          </span>
+                          {regionSiteTotal > 0 && (
+                            <span style={{ background: '#fff7e6', color: '#fa8c16', padding: '1px 6px', borderRadius: 10, fontSize: '11px', fontWeight: 'bold' }}>
+                              {regionSiteTotal} 网点
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* 国家列表小标签 */}
@@ -991,29 +1105,63 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                           <span style={{ color: '#ccc', fontSize: '12px', padding: '4px 0' }}>暂无国家数据</span>
                         ) : (
                           sortedCountries.map(c => (
-                            <div
-                              key={c.name}
-                              onClick={() => {
-                                setSelectedCountry(c.name);
-                                setDrawerVisible(true);
-                              }}
-                              className="country-hover-badge"
-                              style={{
-                                background: '#fff',
-                                border: '1px solid #e8e8e8',
-                                borderRadius: '4px',
-                                padding: '3px 8px',
-                                fontSize: '11px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.01)',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              <span style={{ color: '#666', marginRight: 4 }}>{c.name}</span>
-                              <strong style={{ color: '#fa8c16' }}>{c.count}</strong>
-                            </div>
+                            <React.Fragment key={c.name}>
+                              {/* 1. 分支 Badge */}
+                              {c.branchCount > 0 && (
+                                <div
+                                  onClick={() => {
+                                    setSelectedCountry(c.name);
+                                    setDrawerType('branch');
+                                    setDrawerVisible(true);
+                                  }}
+                                  className="country-hover-badge"
+                                  style={{
+                                    background: '#fff',
+                                    border: '1px solid #e8e8e8',
+                                    borderRadius: '4px',
+                                    padding: '3px 8px',
+                                    fontSize: '11px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.01)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  <span style={{ color: '#666' }}>{c.name}</span>
+                                  <strong style={{ color: '#1890ff' }}>{c.branchCount}</strong>
+                                </div>
+                              )}
+
+                              {/* 2. 网点 Badge (背景用浅灰色 #f5f5f5/#f0f0f0) */}
+                              {c.siteCount > 0 && (
+                                <div
+                                  onClick={() => {
+                                    setSelectedCountry(c.name);
+                                    setDrawerType('site');
+                                    setDrawerVisible(true);
+                                  }}
+                                  className="country-hover-badge"
+                                  style={{
+                                    background: '#f5f5f5',
+                                    border: '1px solid #d9d9d9',
+                                    borderRadius: '4px',
+                                    padding: '3px 8px',
+                                    fontSize: '11px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.01)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  <span style={{ color: '#666' }}>{c.name}</span>
+                                  <span style={{ color: '#fa8c16', fontWeight: 'bold' }}>{c.siteCount}网点</span>
+                                </div>
+                              )}
+                            </React.Fragment>
                           ))
                         )}
                       </div>
@@ -1030,8 +1178,8 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
       <Drawer
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <GlobalOutlined style={{ color: '#fa8c16' }} />
-            <span>【{selectedCountry}】海外分支机构明细</span>
+            <GlobalOutlined style={{ color: drawerType === 'site' ? '#fa8c16' : '#1890ff' }} />
+            <span>【{selectedCountry}】海外{drawerType === 'site' ? '营业网点' : '分支机构'}明细</span>
           </div>
         }
         placement="right"
@@ -1043,7 +1191,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         <div style={{ background: '#fff', padding: '16px', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
-              分支机构列表 (共 {branchesInCountry.length} 个分支)
+              {drawerType === 'site' ? '营业网点列表' : '分支机构列表'} (共 {branchesInCountry.length} 个)
             </span>
           </div>
           <Table
@@ -1106,15 +1254,36 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
               <DollarOutlined style={{ color: '#f5222d' }} />
               分支与 CMI 历史签单统计情况
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: '#555' }}>大区选择:</span>
-              <Select
-                size="small"
-                value={selectedTcvRegion}
-                onChange={setSelectedTcvRegion}
-                style={{ width: 150 }}
-                options={tcvRegions.map(r => ({ label: r === 'All' ? '全部大区汇总' : r, value: r }))}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: '#555' }}>年份选择:</span>
+                <Select
+                  mode="multiple"
+                  size="small"
+                  value={selectedTcvYears}
+                  onChange={setSelectedTcvYears}
+                  style={{ minWidth: 120, maxWidth: 220 }}
+                  placeholder="选择年份"
+                  maxTagCount="responsive"
+                  options={[
+                    { label: '2026年', value: '2026' },
+                    { label: '2025年', value: '2025' },
+                    { label: '2024年', value: '2024' },
+                    { label: '2023年', value: '2023' },
+                    { label: '2022年', value: '2022' }
+                  ]}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: '#555' }}>大区选择:</span>
+                <Select
+                  size="small"
+                  value={selectedTcvRegion}
+                  onChange={setSelectedTcvRegion}
+                  style={{ width: 150 }}
+                  options={tcvRegions.map(r => ({ label: r === 'All' ? '全部大区汇总' : r, value: r }))}
+                />
+              </div>
             </div>
           </div>
         }
@@ -1127,7 +1296,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 'bold', color: '#666' }}>
-                  📊 销售单元近3年签单金额及数量趋势 (2024-2026)
+                  📊 销售单元{selectedTcvYears.length > 0 ? [...selectedTcvYears].sort().join(',') : '无'}年签单金额及数量趋势
                 </span>
               </div>
 
@@ -1192,17 +1361,20 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                         const val = (yearlyMaxVal / 1000000) * ratio;
                         return (
                           <g key={idx}>
-                            <line x1="45" y1={y} x2="385" y2={y} stroke="#f0f0f0" strokeDasharray="3,3" />
-                            <text x="38" y={y + 3.5} textAnchor="end" fontSize="8" fill="#aaa">{val.toFixed(2)}M</text>
+                            <line x1="40" y1={y} x2="390" y2={y} stroke="#f0f0f0" strokeDasharray="3,3" />
+                            <text x="35" y={y + 3.5} textAnchor="end" fontSize="8" fill="#aaa">{val.toFixed(2)}M</text>
                           </g>
                         );
                       })}
 
-                      {/* 按 2024, 2025, 2026 三个年份分组渲染多立柱 */}
+                      {/* 按多选年份分组渲染多立柱 */}
                       {yearlyChartData.map((yrData, yIdx) => {
-                        const groupCenterX = 90 + yIdx * 115; // 2024: 90, 2025: 205, 2026: 320
-                        const barWidth = 10;
-                        const barGap = 2;
+                        const xStart = 50;
+                        const xEnd = 380;
+                        const interval = yearlyChartData.length > 0 ? (xEnd - xStart) / yearlyChartData.length : 330;
+                        const groupCenterX = xStart + interval * yIdx + interval / 2;
+                        const barWidth = 8;
+                        const barGap = 1.5;
                         const groupWidth = topCountries.length * (barWidth + barGap) - barGap;
 
                         return (
@@ -1230,7 +1402,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                                       width={barWidth}
                                       height={barH}
                                       fill={`url(#grad-${cIdx})`}
-                                      rx="1.5"
+                                      rx="1"
                                       style={{ cursor: 'pointer', transition: 'all 0.2s' }}
                                       opacity={isAnySelected ? (isSelected ? 1 : 0.25) : 1}
                                       onClick={() => setSelectedTcvUnit(isSelected ? null : cName)}
@@ -1258,7 +1430,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       })}
 
                       {/* X 轴横基线 */}
-                      <line x1="45" y1="220" x2="385" y2="220" stroke="#ccc" strokeWidth="1" />
+                      <line x1="40" y1="220" x2="390" y2="220" stroke="#ccc" strokeWidth="1" />
                     </svg>
                   </div>
                   <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: 4 }}>
@@ -1381,13 +1553,34 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
       {/* 第五部分：项目计收占比柱状图 */}
       <Card
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: 8 }}>
-            <span>
-              <ProfileOutlined style={{ marginRight: 6, color: '#722ed1' }} />
-              各分支与 CMI 项目计收占比分布 (2026年)
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 'bold', color: '#333' }}>
-              2026年项目计费总实收: <strong style={{ color: '#722ed1' }}>{(totalBr2026Amount / 1000000).toFixed(4)}M</strong> 港币
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ProfileOutlined style={{ marginRight: 6, color: '#722ed1' }} />
+                {selectedBrYears.length > 0 ? [...selectedBrYears].sort().join(',') : '无'}年项目计收情况
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#888', fontWeight: 'normal' }}>年份过滤:</span>
+                <Select
+                  mode="multiple"
+                  size="small"
+                  value={selectedBrYears}
+                  onChange={setSelectedBrYears}
+                  style={{ minWidth: 120, maxWidth: 220 }}
+                  placeholder="选择年份"
+                  maxTagCount="responsive"
+                  options={[
+                    { label: '2026年', value: '2026' },
+                    { label: '2025年', value: '2025' },
+                    { label: '2024年', value: '2024' },
+                    { label: '2023年', value: '2023' },
+                    { label: '2022年', value: '2022' }
+                  ]}
+                />
+              </div>
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 'normal', color: '#666' }}>
+              {selectedBrYears.length > 0 ? [...selectedBrYears].sort().join(',') : '无'}年项目总签单 (TCV): <strong style={{ color: '#1890ff' }}>{(totalTcv2026Amount / 1000000).toFixed(4)}M</strong> | 已计收: <strong style={{ color: '#52c41a' }}>{(totalBrFor2026Projects / 1000000).toFixed(4)}M</strong> 港币
             </span>
           </div>
         }
@@ -1397,9 +1590,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         {brProjectStats.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '350px', overflowY: 'auto', paddingRight: 4 }}>
             {brProjectStats.map((item: any, index: number) => {
-              const maxAmount = brProjectStats[0]?.amount || 1;
-              const percent = Math.min((item.amount / maxAmount) * 100, 100);
-              const share = totalBr2026Amount > 0 ? ((item.amount / totalBr2026Amount) * 100).toFixed(2) : '0.00';
               return (
                 <div key={item.circuit} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
@@ -1407,12 +1597,12 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       {index + 1}. 电路: {item.circuit} <span style={{ color: '#999', fontSize: 11, fontWeight: 'normal' }}>({item.product} | {item.customer})</span>
                     </span>
                     <span style={{ color: '#333' }}>
-                      <strong>{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</strong> (占比 <strong>{share}%</strong>)
+                      已收 <strong>{item.brAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> / TCV <strong>{item.tcvAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</strong> (计收率: <strong style={{ color: item.realPercent >= 100 ? '#52c41a' : '#1890ff' }}>{item.realPercent.toFixed(2)}%</strong>)
                     </span>
                   </div>
                   <Progress
-                    percent={percent}
-                    strokeColor="linear-gradient(90deg, #722ed1 0%, #fa541c 100%)"
+                    percent={Math.min(item.realPercent, 100)}
+                    strokeColor={item.realPercent >= 100 ? '#52c41a' : 'linear-gradient(90deg, #722ed1 0%, #fa541c 100%)'}
                     showInfo={false}
                     status="active"
                     strokeWidth={6}
@@ -1424,7 +1614,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '50px 0', color: '#999', fontStyle: 'italic' }}>
-            2026年暂无任何项目的财务计收费实收数据
+            2026年暂无任何项目的财务计收费实收与签单关联数据
           </div>
         )}
       </Card>
@@ -1467,6 +1657,9 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   );
 };
 
+// 全局缓存已渗透的 GIDs 映射以防止 React 状态不一致引起的计算落空
+const globalPenetratedGidsMap = new Map<string, string[]>();
+
 // ============ 主组件 ============
 const KeyGlobalFamilyTree: React.FC = () => {
   const params = useParams<{ gid: string }>();
@@ -1485,6 +1678,17 @@ const KeyGlobalFamilyTree: React.FC = () => {
   const [originalData, setOriginalData] = useState<any[]>([]);
   const [isRegionView, setIsRegionView] = useState(true);
   const [showSites, setShowSites] = useState(false); // 是否显示营业网点，默认不显示
+
+  // 计算当前家族树的节点渗透率与渗透率百分比 (结合全局缓存防 React 状态不同步与防崩溃双保险计算)
+  const activeGids = (penetratedGids && Array.isArray(penetratedGids) && penetratedGids.length > 0)
+    ? penetratedGids
+    : (globalPenetratedGidsMap.get(String(gid || '')) || []);
+  const penetratedNodesCount = (!originalData || !Array.isArray(originalData) || originalData.length === 0 || activeGids.length === 0)
+    ? 0
+    : originalData.filter(d => d && activeGids.map(String).includes(String(d.id || d.GID))).length;
+  const penetrationRate = (!originalData || !Array.isArray(originalData) || originalData.length === 0)
+    ? '0.00%'
+    : ((penetratedNodesCount / originalData.length) * 100).toFixed(2) + '%';
 
   // 树数据过滤重连函数：若隐藏营业网点，将隐藏节点的子节点重连到最近的非 Site 祖先节点，防止树断层
   const filterTreeData = useCallback((data: any[], displaySites: boolean) => {
@@ -1513,6 +1717,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [penetratedGids, setPenetratedGids] = useState<string[]>([]);
   const [dashboardLoading, setDashboardLoading] = useState<boolean>(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerRecord, setDrawerRecord] = useState<any>(null);
@@ -2164,9 +2369,22 @@ const KeyGlobalFamilyTree: React.FC = () => {
     try {
       const res = await request(`/api/v1/key-customer-overview/family-tree-dashboard-stats`, {
         method: 'GET',
-        params: { gid },
+        params: { gid, _t: Date.now() },
       });
-      setDashboardData(res || null);
+      console.log('[fetchDashboardData] raw res from api:', res);
+      console.log('[fetchDashboardData] res.penetratedGids stringify:', res?.penetratedGids ? JSON.stringify(res.penetratedGids) : 'undefined');
+      console.log('[fetchDashboardData] res.data.penetratedGids stringify:', res?.data?.penetratedGids ? JSON.stringify(res.data.penetratedGids) : 'undefined');
+      const rawData = res && typeof res === 'object' && ('data' in res) && res.data && typeof res.data === 'object' && ('penetratedGids' in res.data || 'tcvRecords' in res.data)
+        ? res.data
+        : res;
+      console.log('[fetchDashboardData] chosen rawData:', rawData);
+      console.log('[fetchDashboardData] chosen rawData penetratedGids stringify:', rawData?.penetratedGids ? JSON.stringify(rawData.penetratedGids) : 'undefined');
+      setDashboardData(rawData || null);
+      const targetGids = rawData?.penetratedGids || rawData?.data?.penetratedGids || [];
+      if (gid && Array.isArray(targetGids)) {
+        globalPenetratedGidsMap.set(String(gid), targetGids.map(String));
+      }
+      setPenetratedGids(targetGids);
     } catch (err) {
       console.error('获取海外家族树 Dashboard 统计数据失败:', err);
     } finally {
@@ -2395,9 +2613,34 @@ const KeyGlobalFamilyTree: React.FC = () => {
     a.href = url;
     a.download = `${fileName}.json`;
     a.click();
-    URL.revokeObjectURL(url);
     message.success(`已导出 ${cleanExport.length} 条数据`);
   }, [originalData, gid, abbr]);
+
+  // 保存高清图片 (PNG) - 导出当前视口与当前展开状态
+  const handleSaveTreeImage = useCallback(() => {
+    if (!chartRef.current) {
+      message.warning('家族树图表尚未初始化');
+      return;
+    }
+    try {
+      const companyName = nameCn || (originalData && originalData[0] ? originalData[0].companyNameCn || originalData[0].companyNameEn : '') || '海外家族树';
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `${companyName}_海外家族树_${dateStr}`;
+
+      chartRef.current
+        .imageName(filename)
+        .exportImg({
+          full: false, // 保证导出当前视口/当前折叠展开状态
+          scale: 3,    // 3倍分辨率的高清 PNG 图
+          save: true,
+          backgroundColor: '#ffffff'
+        });
+      message.success('已启动高清 PNG 图片保存导出');
+    } catch (err) {
+      console.error('保存家族树图片失败:', err);
+      message.error('保存图片失败，请重试');
+    }
+  }, [nameCn, originalData]);
 
   const pageTitle = nameCn || '';
 
@@ -2460,8 +2703,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
             </Tag>
           )}
           {!loading && originalData.length > 0 && (
-            <Tag color="green">节点总数: {originalData.length}</Tag>
+            <Tag color="green">节点总数: {originalData.length} | 节点渗透率: {penetratedNodesCount} / {originalData.length} ({penetrationRate})</Tag>
           )}
+
         </Space>
       </div>
 
@@ -2586,6 +2830,14 @@ const KeyGlobalFamilyTree: React.FC = () => {
                         }}
                       >
                         <ApartmentOutlined style={{ fontSize: 16, color: isRegionView ? '#fff' : undefined }} />
+                      </div>
+                    </Tooltip>
+                    <Tooltip title="保存图片 (高清PNG)">
+                      <div
+                        onClick={handleSaveTreeImage}
+                        style={iconBtnStyle}
+                      >
+                        <CameraOutlined style={{ fontSize: 16 }} />
                       </div>
                     </Tooltip>
                   </div>

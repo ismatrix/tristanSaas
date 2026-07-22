@@ -130,7 +130,7 @@ const getOverviewStats = catchAsync(async (req, res) => {
 
   // --- 3. 获取 TCV 签单数据（按行业和年份 2023-2026 统计） ---
   // 获取 keyFamilyTreeCustMapping 并建立 extCustId -> ultimateGID 映射（含 mappingPath）
-  const mappings = await db.collection('keyFamilyTreeCustMapping').find({}, { projection: { extCustId: 1, ultimateGID: 1, mappingPath: 1 } }).toArray();
+  const mappings = await db.collection('keyFamilyTreeCustMapping').find({}, { projection: { GID: 1, extCustId: 1, ultimateGID: 1, mappingPath: 1 } }).toArray();
   const extCustIdToGidMap = new Map();
   const extCustIds = new Set();
 
@@ -331,6 +331,87 @@ const getOverviewStats = catchAsync(async (req, res) => {
     return { year, industry, customerName, amount: tcvCustomerSumMap_A[k] };
   });
 
+  // --- 3.5 渗透率指标统计与计算 ---
+  const signedExtCustIds = new Set();
+  finalTcvRecords.forEach(rec => {
+    if (rec['签约客户标识']) {
+      signedExtCustIds.add(String(rec['签约客户标识']).trim());
+    }
+  });
+  if (enterpriseNames_A.size > 0) {
+    const ibossCustomers = await db.collection('ibosscustomers').find(
+      { enterpriseName: { $in: Array.from(enterpriseNames_A) } },
+      { projection: { custId: 1 } }
+    ).toArray();
+    ibossCustomers.forEach(c => {
+      if (c.custId) {
+        signedExtCustIds.add(String(c.custId).trim());
+      }
+    });
+  }
+
+  const penetratedGids = new Set();
+  const penetratedUltimateGids = new Set();
+  mappings.forEach(m => {
+    const extId = m.extCustId ? String(m.extCustId).trim() : '';
+    if (extId && signedExtCustIds.has(extId)) {
+      if (m.GID) penetratedGids.add(String(m.GID).trim());
+      if (m.ultimateGID) penetratedUltimateGids.add(String(m.ultimateGID).trim());
+    }
+  });
+
+  let penetratedCustomersCount = 0;
+  keyCustomers.forEach(cust => {
+    if (cust.GID && penetratedUltimateGids.has(String(cust.GID).trim())) {
+      penetratedCustomersCount++;
+    }
+  });
+  const customerPenetrationRate = totalCustomers > 0 
+    ? ((penetratedCustomersCount / totalCustomers) * 100).toFixed(2) + '%' 
+    : '0.00%';
+
+  let penetratedBranchesCount = 0;
+  branches.forEach(br => {
+    if (br.GID && penetratedGids.has(String(br.GID).trim())) {
+      penetratedBranchesCount++;
+    }
+  });
+  const branchPenetrationRate = totalBranches > 0 
+    ? ((penetratedBranchesCount / totalBranches) * 100).toFixed(2) + '%' 
+    : '0.00%';
+
+  // --- 3.6 行业渗透数累加统计 ---
+  const industryPenetratedCustomerCount = {};
+  const industryPenetratedBranchCount = {};
+  Object.keys(INDUSTRY_NAME_MAP).forEach(ind => {
+    industryPenetratedCustomerCount[ind] = 0;
+    industryPenetratedBranchCount[ind] = 0;
+  });
+
+  keyCustomers.forEach(cust => {
+    const gidStr = cust.GID ? String(cust.GID).trim() : '';
+    if (gidStr && penetratedUltimateGids.has(gidStr)) {
+      if (cust.industryCode && industryPenetratedCustomerCount[cust.industryCode] !== undefined) {
+        industryPenetratedCustomerCount[cust.industryCode]++;
+      }
+    }
+  });
+
+  branches.forEach(br => {
+    let indCode = br.cmiIndustry;
+    if (!indCode || !INDUSTRY_NAME_MAP[indCode]) {
+      const parentGid = br.ultimateGID ? String(br.ultimateGID).trim() : '';
+      indCode = gidToIndustryMap.get(parentGid) || 'Other';
+    }
+
+    const brGidStr = br.GID ? String(br.GID).trim() : '';
+    if (brGidStr && penetratedGids.has(brGidStr)) {
+      if (indCode && industryPenetratedBranchCount[indCode] !== undefined) {
+        industryPenetratedBranchCount[indCode]++;
+      }
+    }
+  });
+
   // --- 4. 获取 2026 年计费收入数据（dmcBR）---
   const activeCircuits = Array.from(circuitToIndustryMap.keys());
   
@@ -474,11 +555,23 @@ const getOverviewStats = catchAsync(async (req, res) => {
   // 将以英文为 Key 的行业转换整理，并提供对应中文名字以便前端绘图
   const formattedIndustryStats = [];
   Object.keys(INDUSTRY_NAME_MAP).forEach(indCode => {
+    const custCount = industryCustomerCount[indCode] || 0;
+    const penCustCount = industryPenetratedCustomerCount[indCode] || 0;
+    const custPenRate = custCount > 0 ? ((penCustCount / custCount) * 100).toFixed(1) + '%' : '0.0%';
+
+    const brCount = industryBranchCount[indCode] || 0;
+    const penBrCount = industryPenetratedBranchCount[indCode] || 0;
+    const brPenRate = brCount > 0 ? ((penBrCount / brCount) * 100).toFixed(1) + '%' : '0.0%';
+
     formattedIndustryStats.push({
       code: indCode,
       nameCn: INDUSTRY_NAME_MAP[indCode],
-      customerCount: industryCustomerCount[indCode] || 0,
-      branchCount: industryBranchCount[indCode] || 0
+      customerCount: custCount,
+      penetratedCustomerCount: penCustCount,
+      customerPenetrationRate: custPenRate,
+      branchCount: brCount,
+      penetratedBranchCount: penBrCount,
+      branchPenetrationRate: brPenRate
     });
   });
 
@@ -542,7 +635,11 @@ const getOverviewStats = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({
     quantity: {
       totalCustomers,
+      penetratedCustomersCount,
+      customerPenetrationRate,
       totalBranches,
+      penetratedBranchesCount,
+      branchPenetrationRate,
       siteBranchesCount,
       sourceStats: sourceCountMap,
       industryStats: formattedIndustryStats,
@@ -865,11 +962,14 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
 
   const gidStr = String(gid).trim();
 
-  // 1. 获取该海外客户树在 keyFamilyTreeCustMapping 表中映射的所有外部 iBOSS 客户 ID
   const mappings = await db.collection('keyFamilyTreeCustMapping').find(
     { ultimateGID: gidStr },
-    { projection: { extCustId: 1, mappingPath: 1 } }
+    { projection: { GID: 1, extCustId: 1, mappingPath: 1 } }
   ).toArray();
+
+  console.log('=== [Backend stats] ===');
+  console.log('gidStr:', gidStr, 'type:', typeof gidStr);
+  console.log('mappings found:', mappings.length);
 
   const extCustIds = mappings.map(m => m.extCustId).filter(Boolean);
   const endCustExtIds = mappings.filter(m => m.mappingPath === 'endCustomer').map(m => m.extCustId).filter(Boolean);
@@ -978,10 +1078,274 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
     });
   }
 
+  // 使用与大屏（要客概览）100% 完全一致的渗透节点判定逻辑
+  const allTcv_global = await db.collection('dmcTCV').find(
+    {},
+    { projection: { '签约客户标识': 1, '终端客户名称': 1, '订单状态': 1 } }
+  ).toArray();
+
+  const filteredTcv_global = allTcv_global.filter(rec => {
+    const status = String(rec['订单状态'] || '').trim();
+    return status.toLowerCase() !== 'achive';
+  });
+
+  const signedBExtIds_global = new Set();
+  const signedAEnterpriseNames_global = new Set();
+  filteredTcv_global.forEach(rec => {
+    if (rec['签约客户标识']) signedBExtIds_global.add(String(rec['签约客户标识']).trim());
+    if (rec['终端客户名称']) signedAEnterpriseNames_global.add(String(rec['终端客户名称']).trim());
+  });
+
+  if (signedAEnterpriseNames_global.size > 0) {
+    const ibossCustomers = await db.collection('ibosscustomers').find(
+      { enterpriseName: { $in: Array.from(signedAEnterpriseNames_global) } },
+      { projection: { custId: 1 } }
+    ).toArray();
+    ibossCustomers.forEach(c => {
+      if (c.custId) signedBExtIds_global.add(String(c.custId).trim());
+    });
+  }
+
+  const penetratedGids = new Set();
+  mappings.forEach(m => {
+    const extId = m.extCustId ? String(m.extCustId).trim() : '';
+    if (extId && m.GID && signedBExtIds_global.has(extId)) {
+      penetratedGids.add(String(m.GID).trim());
+    }
+  });
+
+  console.log('penetratedGids count:', penetratedGids.size);
+
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.status(httpStatus.OK).send({
     tcvStats: tcvGroupList,
     tcvRecords: finalTcv,
-    brStats: brList
+    brStats: brList,
+    penetratedGids: Array.from(penetratedGids)
+  });
+});
+
+const getPenetratedGids = catchAsync(async (req, res) => {
+  const db = mongoose.connection.db;
+
+  const allTcv = await db.collection('dmcTCV').find(
+    {},
+    { projection: { '签约客户标识': 1, '终端客户名称': 1, '订单状态': 1 } }
+  ).toArray();
+
+  const filteredTcv = allTcv.filter(rec => {
+    const status = String(rec['订单状态'] || '').trim();
+    return status.toLowerCase() !== 'achive';
+  });
+
+  const signedBExtIds = new Set();
+  const signedAEnterpriseNames = new Set();
+  filteredTcv.forEach(rec => {
+    if (rec['签约客户标识']) signedBExtIds.add(String(rec['签约客户标识']).trim());
+    if (rec['终端客户名称']) signedAEnterpriseNames.add(String(rec['终端客户名称']).trim());
+  });
+
+  if (signedAEnterpriseNames.size > 0) {
+    const ibossCustomers = await db.collection('ibosscustomers').find(
+      { enterpriseName: { $in: Array.from(signedAEnterpriseNames) } },
+      { projection: { custId: 1 } }
+    ).toArray();
+    ibossCustomers.forEach(c => {
+      if (c.custId) signedBExtIds.add(String(c.custId).trim());
+    });
+  }
+
+  const mappings = await db.collection('keyFamilyTreeCustMapping').find(
+    { extCustId: { $in: Array.from(signedBExtIds) } },
+    { projection: { ultimateGID: 1 } }
+  ).toArray();
+
+  const penetratedUltimateGids = new Set();
+  mappings.forEach(m => {
+    if (m.ultimateGID) {
+      penetratedUltimateGids.add(String(m.ultimateGID).trim());
+    }
+  });
+
+  res.status(httpStatus.OK).send({
+    penetratedUltimateGids: Array.from(penetratedUltimateGids)
+  });
+});
+
+/**
+ * 获取 keyGlobalFamilyTree 全量分支的渗透情况（含历史 TCV 笔数统计），支持搜索、分页和全量导出
+ */
+const getKeyFamilyTreeBranches = catchAsync(async (req, res) => {
+  const db = mongoose.connection.db;
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 100;
+  const search = req.query.search ? String(req.query.search).trim() : '';
+  const exportAll = req.query.exportAll === 'true' || req.query.exportAll === '1';
+
+  // 1. 获取 keyFamilyTreeCustMapping 映射关系
+  const mappings = await db.collection('keyFamilyTreeCustMapping').find({}, { projection: { GID: 1, extCustId: 1, ultimateGID: 1, mappingPath: 1 } }).toArray();
+
+  const extCustIdToBranchGidMap = new Map();
+  const extCustIds = new Set();
+  const endCustExtIdToBranchGidMap = new Map();
+  const endCustExtIds = new Set();
+
+  mappings.forEach(m => {
+    if (m.extCustId) {
+      const extId = String(m.extCustId).trim();
+      const branchGid = m.GID ? String(m.GID).trim() : '';
+      if (branchGid) {
+        extCustIdToBranchGidMap.set(extId, branchGid);
+        extCustIds.add(extId);
+
+        if (m.mappingPath === 'endCustomer') {
+          endCustExtIdToBranchGidMap.set(extId, branchGid);
+          endCustExtIds.add(extId);
+        }
+      }
+    }
+  });
+
+  // 2. 结合 ibosscustomers 提取 A端 企名
+  const customers = await db.collection('ibosscustomers').find(
+    { custId: { $in: Array.from(endCustExtIds) } },
+    { projection: { custId: 1, enterpriseName: 1 } }
+  ).toArray();
+
+  const enterpriseNameToBranchGidMap = new Map();
+  const enterpriseNames = new Set();
+  customers.forEach(c => {
+    if (c.enterpriseName) {
+      const name = String(c.enterpriseName).trim().toLowerCase();
+      const branchGid = endCustExtIdToBranchGidMap.get(String(c.custId).trim());
+      if (name && branchGid) {
+        enterpriseNameToBranchGidMap.set(name, branchGid);
+        enterpriseNames.add(name);
+      }
+    }
+  });
+
+  // 3. 关联 dmcTCV 匹配签单（排除 Achive 并按关键维度去重）
+  const tcvRecords = await db.collection('dmcTCV').find(
+    {
+      $or: [
+        { '签约客户标识': { $in: Array.from(extCustIds) } },
+        { '终端客户名称': { $in: Array.from(enterpriseNames) } }
+      ]
+    },
+    { projection: { '签约客户标识': 1, '终端客户名称': 1, '合同签署日期': 1, '设置起租日期': 1, '电路编号': 1, '订单状态': 1, '签单金额(港币)': 1 } }
+  ).toArray();
+
+  let filteredTcv = tcvRecords.filter(rec => {
+    const status = String(rec['订单状态'] || '').trim();
+    return status.toLowerCase() !== 'achive';
+  });
+
+  filteredTcv.sort((a, b) => String(a._id).localeCompare(String(b._id)));
+
+  const uniqueTcvMap = new Map();
+  filteredTcv.forEach(rec => {
+    const kSignDate = rec['合同签署日期'] !== undefined && rec['合同签署日期'] !== null ? String(rec['合同签署日期']).trim() : '';
+    const kStartDate = rec['设置起租日期'] !== undefined && rec['设置起租日期'] !== null ? String(rec['设置起租日期']).trim() : '';
+    const kCircuit = rec['电路编号'] !== undefined && rec['电路编号'] !== null ? String(rec['电路编号']).trim() : '';
+    const kStatus = rec['订单状态'] !== undefined && rec['订单状态'] !== null ? String(rec['订单状态']).trim() : '';
+    const kAmount = rec['签单金额(港币)'] !== undefined && rec['签单金额(港币)'] !== null ? String(rec['签单金额(港币)']).trim() : '';
+
+    const duplicateKey = `${kSignDate}_${kStartDate}_${kCircuit}_${kStatus}_${kAmount}`;
+    if (!uniqueTcvMap.has(duplicateKey)) {
+      uniqueTcvMap.set(duplicateKey, rec);
+    }
+  });
+
+  const finalTcvRecords = Array.from(uniqueTcvMap.values());
+
+  const branchTcvCountMap = new Map();
+  finalTcvRecords.forEach(rec => {
+    const signId = rec['签约客户标识'] ? String(rec['签约客户标识']).trim() : '';
+    const endName = rec['终端客户名称'] ? String(rec['终端客户名称']).trim().toLowerCase() : '';
+
+    const matchedBranchGids = new Set();
+    if (signId && extCustIdToBranchGidMap.has(signId)) {
+      matchedBranchGids.add(extCustIdToBranchGidMap.get(signId));
+    }
+    if (endName && enterpriseNameToBranchGidMap.has(endName)) {
+      matchedBranchGids.add(enterpriseNameToBranchGidMap.get(endName));
+    }
+
+    matchedBranchGids.forEach(gid => {
+      branchTcvCountMap.set(gid, (branchTcvCountMap.get(gid) || 0) + 1);
+    });
+  });
+
+  // 4. 读取全量 keyGlobalFamilyTree 并拼装列表
+  const allBranches = await db.collection('keyGlobalFamilyTree').find({}).toArray();
+
+  let formattedList = allBranches.map(node => {
+    const gidStr = String(node.GID || '');
+    const rawLevel = node.treeLevel !== undefined && node.treeLevel !== null ? parseInt(node.treeLevel, 10) : 999;
+    return {
+      _id: node._id,
+      GID: gidStr,
+      ultimateGID: node.ultimateGID ? String(node.ultimateGID) : '',
+      ultimateName: node.ultimateName || node.ultimateNameCn || '',
+      companyNameCn: node.companyNameCn || '',
+      companyNameEn: node.companyNameEn || '',
+      entityTypeName: node.entityTypeName || '',
+      registeredCountry: node.registeredCountry || '',
+      treeLevel: isNaN(rawLevel) ? 999 : rawLevel,
+      tcvCount: branchTcvCountMap.get(gidStr) || 0
+    };
+  });
+
+  // 默认排序按照 ultimateName（升序），treeLevel（升序）
+  formattedList.sort((a, b) => {
+    const uComp = (a.ultimateName || '').localeCompare(b.ultimateName || '', 'zh-CN');
+    if (uComp !== 0) {
+      return uComp;
+    }
+    return a.treeLevel - b.treeLevel;
+  });
+
+  // 5. 关键词搜索过滤
+  if (search) {
+    const q = search.toLowerCase();
+    formattedList = formattedList.filter(item => {
+      return (
+        (item.GID && item.GID.toLowerCase().includes(q)) ||
+        (item.ultimateName && item.ultimateName.toLowerCase().includes(q)) ||
+        (item.companyNameCn && item.companyNameCn.toLowerCase().includes(q)) ||
+        (item.companyNameEn && item.companyNameEn.toLowerCase().includes(q)) ||
+        (item.entityTypeName && item.entityTypeName.toLowerCase().includes(q)) ||
+        (item.registeredCountry && item.registeredCountry.toLowerCase().includes(q))
+      );
+    });
+  }
+
+  // 6. 导出模式直接返回全量结果，否则返回分页结果
+  if (exportAll) {
+    return res.status(httpStatus.OK).send({
+      code: 200,
+      data: {
+        results: formattedList,
+        totalResults: formattedList.length
+      }
+    });
+  }
+
+  const totalResults = formattedList.length;
+  const totalPages = Math.ceil(totalResults / limit) || 1;
+  const startIndex = (page - 1) * limit;
+  const paginatedResults = formattedList.slice(startIndex, startIndex + limit);
+
+  res.status(httpStatus.OK).send({
+    code: 200,
+    data: {
+      results: paginatedResults,
+      page,
+      limit,
+      totalPages,
+      totalResults
+    }
   });
 });
 
@@ -990,5 +1354,7 @@ module.exports = {
   getCountryBranches,
   getTcvDetail,
   getBrDetail,
-  getFamilyTreeDashboardData
+  getFamilyTreeDashboardData,
+  getPenetratedGids,
+  getKeyFamilyTreeBranches
 };
