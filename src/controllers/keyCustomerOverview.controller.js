@@ -1106,7 +1106,70 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
     });
   }
 
+  const extCustIdToGidSetMap = new Map();
+  mappings.forEach(m => {
+    const extId = m.extCustId ? String(m.extCustId).trim() : '';
+    const nodeGid = m.GID ? String(m.GID).trim() : '';
+    if (extId && nodeGid) {
+      if (!extCustIdToGidSetMap.has(extId)) {
+        extCustIdToGidSetMap.set(extId, new Set());
+      }
+      extCustIdToGidSetMap.get(extId).add(nodeGid);
+    }
+  });
+
+  let enterpriseNameToCustIdMap = new Map();
+  if (endCustExtIds.length > 0) {
+    const ibossCustomers = await db.collection('ibosscustomers').find(
+      { custId: { $in: endCustExtIds } },
+      { projection: { custId: 1, enterpriseName: 1 } }
+    ).toArray();
+    ibossCustomers.forEach(c => {
+      if (c.enterpriseName && c.custId) {
+        enterpriseNameToCustIdMap.set(String(c.enterpriseName).trim(), String(c.custId).trim());
+      }
+    });
+  }
+
   const penetratedGids = new Set();
+  const gidToTcvMap = {};
+
+  finalTcv.forEach(rec => {
+    const matchedGids = new Set();
+    const signExtId = rec['签约客户标识'] ? String(rec['签约客户标识']).trim() : '';
+    if (signExtId && extCustIdToGidSetMap.has(signExtId)) {
+      extCustIdToGidSetMap.get(signExtId).forEach(g => matchedGids.add(g));
+    }
+
+    const endEntName = rec['终端客户名称'] ? String(rec['终端客户名称']).trim() : '';
+    if (endEntName && enterpriseNameToCustIdMap.has(endEntName)) {
+      const cId = enterpriseNameToCustIdMap.get(endEntName);
+      if (cId && extCustIdToGidSetMap.has(cId)) {
+        extCustIdToGidSetMap.get(cId).forEach(g => matchedGids.add(g));
+      }
+    }
+
+    const tcvItem = {
+      _id: rec._id,
+      签约客户名称: rec['签约客户名称'] || '—',
+      终端客户名称: rec['终端客户名称'] || '—',
+      销售单元: rec['销售单元中文名称'] || rec['销售单元编码'] || rec['销售单元'] || '—',
+      电路编号: rec['电路编号'] || rec['电路参考编号'] || '—',
+      合同签署日期: rec['合同签署日期'] || '—',
+      产品分类: rec['市场经分产品分类'] || rec['产品分类'] || '—',
+      '签单金额 (港币)': rec['签单金额(港币)'] !== undefined ? rec['签单金额(港币)'] : (rec['签单金额（港币）'] || rec['签单金额'] || 0)
+    };
+
+    matchedGids.forEach(gidNode => {
+      penetratedGids.add(gidNode);
+      if (!gidToTcvMap[gidNode]) {
+        gidToTcvMap[gidNode] = [];
+      }
+      gidToTcvMap[gidNode].push(tcvItem);
+    });
+  });
+
+  // 同时也检查一下 mappings 里的其他全局匹配关系
   mappings.forEach(m => {
     const extId = m.extCustId ? String(m.extCustId).trim() : '';
     if (extId && m.GID && signedBExtIds_global.has(extId)) {
@@ -1115,13 +1178,15 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
   });
 
   console.log('penetratedGids count:', penetratedGids.size);
+  console.log('gidToTcvMap keys count:', Object.keys(gidToTcvMap).length);
 
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.status(httpStatus.OK).send({
     tcvStats: tcvGroupList,
     tcvRecords: finalTcv,
     brStats: brList,
-    penetratedGids: Array.from(penetratedGids)
+    penetratedGids: Array.from(penetratedGids),
+    gidToTcvMap
   });
 });
 

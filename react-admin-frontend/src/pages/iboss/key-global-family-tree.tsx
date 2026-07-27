@@ -334,16 +334,19 @@ const renderNodeContent = (d: any) => {
       </div>`;
   }
 
-  // 营业网点 Site 节点的背景采用浅灰色渲染
-  const color = d.data.entityTypeName === 'Site' ? '#f0f0f0' : '#FFFFFF';
+  // 若该分支节点历史存在 TCV 项目，则节点背景用浅红色 (#fff1f0)，否则 Site 为浅灰 (#f0f0f0)，普通为白色 (#FFFFFF)
+  const hasTcv = d.data._hasTcv || false;
+  const bgColor = hasTcv ? '#fff1f0' : (d.data.entityTypeName === 'Site' ? '#f0f0f0' : '#FFFFFF');
+  // 不改变节点边框原有的颜色样式，只保留原有的 borderStyle（用以标识是否为国家代表及高亮状态）
+  const finalBorder = borderStyle;
   const showIcon = !nodeType;
 
   return `
     <div style='width:${d.width}px;height:${d.height}px;padding-top:${imageDiffVert - 2}px;padding-left:1px;padding-right:1px'>
-      <div style="font-family:'Inter',sans-serif;background-color:${color};margin-left:-1px;width:${d.width - 2}px;height:${d.height - imageDiffVert}px;border-radius:10px;border:${borderStyle};cursor:pointer;position:relative;">
+      <div style="font-family:'Inter',sans-serif;background-color:${bgColor};margin-left:-1px;width:${d.width - 2}px;height:${d.height - imageDiffVert}px;border-radius:10px;border:${finalBorder};cursor:pointer;position:relative;">
         <div style="display:flex;justify-content:flex-end;margin-top:5px;margin-right:8px;font-size:11px;color:#888;">#${d.data.id}</div>
         ${showIcon ? `
-          <div style="background-color:${color};margin-top:${-imageDiffVert - 10}px;margin-left:15px;border-radius:100px;width:50px;height:50px;"></div>
+          <div style="background-color:${bgColor};margin-top:${-imageDiffVert - 10}px;margin-left:15px;border-radius:100px;width:50px;height:50px;"></div>
           <div style="margin-top:${-imageDiffVert - 20}px;">   ${d.data.iconHtml}</div>
         ` : ''}
         <div style="font-size:13px;color:#08011E;margin-left:20px;margin-right:20px;margin-top:${showIcon ? '5' : '10'}px;line-height:1.3;white-space:normal;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:38px;" title="${d.data.name}">
@@ -359,9 +362,84 @@ const renderNodeContent = (d: any) => {
 };
 
 // ============ 详情 Drawer 组件 ============
-const DetailDrawer: React.FC<{ record: any; open: boolean; onClose: () => void }> = ({ record, open, onClose }) => {
+const DetailDrawer: React.FC<{ record: any; open: boolean; onClose: () => void; tcvList?: any[] }> = ({ record, open, onClose, tcvList = [] }) => {
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
+
+  // 定义历史 TCV 项目表格列（删除终端客户名称字段，禁用单列过滤配置）
+  const tcvColumns = useMemo(() => [
+    { headerName: '签约客户名称', field: '签约客户名称', minWidth: 150 },
+    { headerName: '销售单元', field: '销售单元', width: 120 },
+    { headerName: '电路编号', field: '电路编号', width: 120 },
+    { headerName: '合同签署日期', field: '合同签署日期', width: 120 },
+    { headerName: '产品分类', field: '产品分类', width: 110 },
+    {
+      headerName: '签单金额 (港币)',
+      field: '签单金额 (港币)',
+      width: 140,
+      type: 'numericColumn',
+      cellStyle: { textAlign: 'right' },
+      valueFormatter: (params: any) => {
+        const val = parseFloat(params.value || 0);
+        return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+    }
+  ], []);
+
+  // 去重并按照合同签署日期倒序排列
+  // 规则：根据 电路编号、合同签署日期、产品分类 相同记录只取 1 条。优先取 TCV订单类型 === 'New' 的记录，如果都为 'New' 或都不为 'New'，则取 生成订单日期 最晚的记录。
+  const sortedTcvList = useMemo(() => {
+    if (!tcvList || tcvList.length === 0) return [];
+
+    // 1. 根据电路编号、合同签署日期、产品分类进行分组
+    const grouped: Record<string, any[]> = {};
+    tcvList.forEach((item) => {
+      const key = `${item['电路编号'] || ''}_${item['合同签署日期'] || ''}_${item['产品分类'] || ''}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(item);
+    });
+
+    // 2. 在每个分组内筛选符合规则的唯一一条记录
+    const filtered = Object.values(grouped).map((items) => {
+      if (items.length <= 1) return items[0];
+
+      return [...items].sort((a, b) => {
+        const isNewA = String(a['TCV订单类型'] || '').trim() === 'New';
+        const isNewB = String(b['TCV订单类型'] || '').trim() === 'New';
+
+        // 优先保留 TCV订单类型 为 'New' 的记录
+        if (isNewA && !isNewB) return -1;
+        if (!isNewA && isNewB) return 1;
+
+        // 如果 TCV订单类型 状态一致，则取 生成订单日期 最晚的记录
+        const dateA = a['生成订单日期'] || '';
+        const dateB = b['生成订单日期'] || '';
+        return dateB.localeCompare(dateA); // 日期降序，最晚的排在前面
+      })[0];
+    });
+
+    // 3. 对去重后的结果按 合同签署日期 倒序排列
+    return filtered.sort((a, b) => {
+      const dateA = a['合同签署日期'] || '';
+      const dateB = b['合同签署日期'] || '';
+      return dateB.localeCompare(dateA);
+    });
+  }, [tcvList]);
+
+  // 计算并生成金额合计行（基于去重后的 sortedTcvList 计算）
+  const pinnedBottomRowData = useMemo(() => {
+    if (!sortedTcvList || sortedTcvList.length === 0) return [];
+    const totalAmount = sortedTcvList.reduce((sum, item) => {
+      const val = parseFloat(item['签单金额 (港币)'] || 0);
+      return sum + val;
+    }, 0);
+    return [{
+      '签约客户名称': '合计',
+      '签单金额 (港币)': totalAmount
+    }];
+  }, [sortedTcvList]);
 
   // 当抽屉打开且 record 发生变化时，根据 GID 异步加载客户联系人
   useEffect(() => {
@@ -414,11 +492,49 @@ const DetailDrawer: React.FC<{ record: any; open: boolean; onClose: () => void }
         </div>
       }
       placement="right"
-      width={520}
+      width={600}
       open={open}
       onClose={onClose}
     >
-      {/* CMI 联系人信息段落，显示在最上方，浅蓝色背景区域 */}
+      {/* TCV 历史签单项目信息段落，显示在抽屉最上方，使用 AG GRID 显示 */}
+      {tcvList && tcvList.length > 0 && (
+        <div
+          style={{
+            background: '#fff1f0',
+            border: '1px solid #ffa39e',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '16px',
+            boxShadow: '0 2px 8px rgba(255, 77, 79, 0.08)',
+          }}
+        >
+          <div style={{ fontWeight: 700, color: '#cf1322', marginBottom: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <DollarOutlined /> <span>历史 TCV 项目信息 ({tcvList.length} 笔)</span>
+          </div>
+          <div className="ag-theme-quartz" style={{ height: '240px', width: '100%', borderRadius: '6px', overflow: 'hidden' }}>
+            <AgGridReact
+              theme={themeQuartz}
+              rowData={sortedTcvList}
+              pinnedBottomRowData={pinnedBottomRowData}
+              columnDefs={tcvColumns}
+              defaultColDef={{
+                sortable: true,
+                resizable: true,
+                filter: false, // 禁用过滤
+                suppressHeaderMenuButton: true, // 隐藏更多功能按钮
+              }}
+              onGridReady={(params) => {
+                params.api.sizeColumnsToFit();
+              }}
+              onFirstDataRendered={(params) => {
+                params.api.sizeColumnsToFit();
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* CMI 联系人信息段落，浅蓝色背景区域 */}
       {record.cmiContacts && record.cmiContacts.length > 0 && (
         <div
           style={{
@@ -673,7 +789,44 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   }, [branchNodes, siteNodes, selectedCountry, drawerType]);
 
   // --- 第四部分：历史签单大区/销售单元联动状态 ---
-  const tcvRecords = dashboardData?.tcvRecords || [];
+  const rawTcvRecords = dashboardData?.tcvRecords || [];
+
+  // 按照与抽屉相同的逻辑对原始 TCV 数据源进行去重
+  // 规则：根据 电路编号、合同签署日期、产品分类 相同记录只取 1 条。优先取 TCV订单类型 === 'New' 的记录，如果都为 'New' 或都不为 'New'，则取 生成订单日期 最晚的记录。
+  const tcvRecords = useMemo(() => {
+    if (!rawTcvRecords || rawTcvRecords.length === 0) return [];
+
+    // 1. 根据电路编号、合同签署日期、产品分类进行分组
+    const grouped: Record<string, any[]> = {};
+    rawTcvRecords.forEach((item) => {
+      const key = `${item['电路编号'] || ''}_${item['合同签署日期'] || ''}_${item['产品分类'] || ''}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(item);
+    });
+
+    // 2. 在每个分组内筛选符合规则的唯一一条记录
+    const filtered = Object.values(grouped).map((items) => {
+      if (items.length <= 1) return items[0];
+
+      return [...items].sort((a, b) => {
+        const isNewA = String(a['TCV订单类型'] || '').trim() === 'New';
+        const isNewB = String(b['TCV订单类型'] || '').trim() === 'New';
+
+        // 优先保留 TCV订单类型 为 'New' 的记录
+        if (isNewA && !isNewB) return -1;
+        if (!isNewA && isNewB) return 1;
+
+        // 如果 TCV订单类型 状态一致，则取 生成订单日期 最晚的记录
+        const dateA = a['生成订单日期'] || '';
+        const dateB = b['生成订单日期'] || '';
+        return dateB.localeCompare(dateA); // 日期降序，最晚的排在前面
+      })[0];
+    });
+
+    return filtered;
+  }, [rawTcvRecords]);
 
   // 动态由 tcvRecords 计算满足 selectedTcvYears 年份条件的各个国家的签单数据 (tcvStats)
   const tcvStats = useMemo(() => {
@@ -1718,6 +1871,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [penetratedGids, setPenetratedGids] = useState<string[]>([]);
+  const [gidToTcvMap, setGidToTcvMap] = useState<Record<string, any[]>>({});
   const [dashboardLoading, setDashboardLoading] = useState<boolean>(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerRecord, setDrawerRecord] = useState<any>(null);
@@ -1945,6 +2099,8 @@ const KeyGlobalFamilyTree: React.FC = () => {
   // 获取数据
   const fetchData = useCallback(async () => {
     if (!gid) return;
+    isChartInitialized.current = false;
+    chartRef.current = null;
     setLoading(true);
     try {
       const res = await request('/api/v1/wildcards/keyGlobalFamilyTree', {
@@ -2385,6 +2541,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
         globalPenetratedGidsMap.set(String(gid), targetGids.map(String));
       }
       setPenetratedGids(targetGids);
+      setGidToTcvMap(rawData?.gidToTcvMap || {});
     } catch (err) {
       console.error('获取海外家族树 Dashboard 统计数据失败:', err);
     } finally {
@@ -2443,15 +2600,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
       currentData.forEach((d: any) => {
         if (d._expanded) expandedSet.add(String(d.id));
       });
-      // 将展开状态合并到新数据中：
-      // - 已存在的节点：保留旧展开状态
-      // - 新出现的区域/国家/城市分组节点：自动展开，确保其下的网点可见
-      // - 新出现的公司/网点节点：保持默认折叠
       const mergedData = chartData.map((d: any) => {
         if (expandedSet.has(String(d.id))) {
           return { ...d, _expanded: true };
         }
-        // 新增的分组节点（region/country/city）自动展开，保证层级结构完整可见
         if (d._nodeType === 'region' || d._nodeType === 'country' || d._nodeType === 'city') {
           return { ...d, _expanded: true };
         }
@@ -2463,9 +2615,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
   );
 
   // isChartInitialized 标记：记录图表是否已完成首次初始化
-  // 作用：Tab 切换回"家族树"时不重新调用 renderChart，保持展开/折叠和视口不变
   const isChartInitialized = useRef(false);
-  // 记录上一次的 isRegionView 值，用于判断视图模式是否发生了真正切换
   const prevIsRegionView = useRef(isRegionView);
 
   // 树图初始化渲染（仅在数据首次到达或视图模式切换时执行完整重建）
@@ -2478,27 +2628,46 @@ const KeyGlobalFamilyTree: React.FC = () => {
     if (isChartInitialized.current && !regionViewChanged) return;
 
     const filtered = filterTreeData(originalData, showSites);
-    const chartData = isRegionView ? buildRegionData(filtered) : filtered;
+    const rawChartData = isRegionView ? buildRegionData(filtered) : filtered;
+
+    const penetratedGidsSet = new Set((penetratedGids || []).map(String));
+    const chartData = rawChartData.map((d: any) => {
+      const nodeGid = String(d.id || d.GID || '').trim();
+      const hasTcv = penetratedGidsSet.has(nodeGid) || (gidToTcvMap[nodeGid] && gidToTcvMap[nodeGid].length > 0);
+      return {
+        ...d,
+        _hasTcv: hasTcv
+      };
+    });
+
     const timer = setTimeout(() => {
       renderChart(chartData);
       isChartInitialized.current = true;
     }, 100);
     return () => clearTimeout(timer);
-  }, [originalData, isRegionView, renderChart, activeTab, filterTreeData]);
+  }, [originalData, isRegionView, renderChart, activeTab, filterTreeData, penetratedGids, gidToTcvMap]);
 
   // 仅在 showSites 变化时动态更新树数据，不 fit 不折叠，保持视口和展开状态
   const isFirstSiteEffect = useRef(true);
   useEffect(() => {
-    // 首次渲染时跳过（由上方 useEffect 负责），仅响应后续 showSites 切换
     if (isFirstSiteEffect.current) {
       isFirstSiteEffect.current = false;
       return;
     }
     if (originalData.length === 0 || activeTab !== 'tree' || !chartRef.current) return;
     const filtered = filterTreeData(originalData, showSites);
-    const chartData = isRegionView ? buildRegionData(filtered) : filtered;
+    const rawChartData = isRegionView ? buildRegionData(filtered) : filtered;
+    const penetratedGidsSet = new Set((penetratedGids || []).map(String));
+    const chartData = rawChartData.map((d: any) => {
+      const nodeGid = String(d.id || d.GID || '').trim();
+      const hasTcv = penetratedGidsSet.has(nodeGid) || (gidToTcvMap[nodeGid] && gidToTcvMap[nodeGid].length > 0);
+      return {
+        ...d,
+        _hasTcv: hasTcv
+      };
+    });
     updateChartData(chartData);
-  }, [showSites]);
+  }, [showSites, penetratedGids, gidToTcvMap]);
 
   const toggleRegionView = () => setIsRegionView((prev) => !prev);
 
@@ -3013,7 +3182,12 @@ const KeyGlobalFamilyTree: React.FC = () => {
       </div>
 
       {/* 详情抽屉 */}
-      <DetailDrawer record={drawerRecord} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <DetailDrawer
+        record={drawerRecord}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        tcvList={drawerRecord ? (gidToTcvMap[String(drawerRecord.id || drawerRecord.GID || '').trim()] || []) : []}
+      />
 
       {/* CMI 联系人弹窗 */}
       <Modal

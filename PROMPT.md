@@ -5550,3 +5550,123 @@ ultimateName，companyNameCn，companyNameEn，entityTypeName，registeredCountr
   - **图标与工具栏响应式集成**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 的家族树 View (key: 'tree') 右上角浮动操作栏最后，增设了与现有 UI 圆角边框高度统一的 **相机图标按钮** (`<CameraOutlined />`)，带有 Tooltip 提示“保存图片 (高清PNG)”。
   - **当前树控件状态高清保存导出**：绑定了 `handleSaveTreeImage` 方法，调用 `d3-org-chart` 内部 `exportImg({ full: false, scale: 3, save: true })` 高精度图像转换渲染引擎，能够自动抓取包含当前展开/折叠节点、画布位移以及色彩渗透样式的真实视口卡片，生成 3 倍超高分辨率 `.png` 文件并自动下载保存。
   - **验证与上线**：前端成功重新 Build 产物并完成了 PM2 托管服务的在线重启。
+
+---
+
+## Prompt 最新
+**时间**: 2026-07-22 16:03:00
+**提示词**:
+```text
+代码同步到服务端
+```
+
+**执行总结**:
+- **本地全量修改提交推送与生产服务器 `tristan.wang:6822` 部署上线**:
+  - **Git 提交与推送**：将本地受版本控制的 8 个核心开发文件与新增组件 `KeyCustomerBranchTab.tsx` 提交 commit `be24f16` 并成功推送至 GitHub 远端 `origin/main` 仓库。
+  - **远程服务器自动部署**：使用 SSH 密钥连接生产服务器 `tristan@tristan.wang:6822`，进入项目目录 `/home/tristan/workspaces/TristanSaas` 执行了 `./deploy.sh` 部署脚本：
+    1. 成功拉取并 Hard Reset 到 GitHub 最新 `main` 分支代码；
+    2. 进入 `react-admin-frontend` 完成前端生产包环境重新编译与 Build，生成高可靠静态产物；
+    3. 平滑重启了生产服务器后端的 PM2 托管进程 `backend-api`，服务运行状态正常 (`online`)。
+  - **验证交付**：所有最新的功能更新已在 `tristan.wang` 生产部署环境成功上线并实时生效运行。
+
+---
+
+## Prompt 最新
+**时间**: 2026-07-23 10:59:00
+**提示词**:
+```text
+1、「海外家族树」菜单中点击切换公司时，“家族树” tab页面的树内容，并没有刷新成当前的公司的内容，请修复
+2、「家族树」结构中如果该分支节点历史存在TCV项目，则该节点背景用浅红色，并且在点击右侧划出抽屉信息卡中最上方区域（背景浅红色）显示项目的信息，字段包括 签约客户名称	终端客户名称  销售单元	电路编号	合同签署日期	产品分类	签单金额 (港币)
+```
+
+**执行总结**:
+- **「海外家族树」切换公司树刷新 Bug 修复 & TCV 浅红背景节点与抽屉最上方 7 字段卡片功能上线**:
+  - **切换公司树刷新 Bug 修复**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 的 `fetchData` 入口处重置了 `isChartInitialized.current = false` 与 `chartRef.current = null`，解决原先图表锁导致切换公司时家族树视图不刷新的问题。
+  - **TCV 分支节点浅红背景与高亮 Badge**：在后端 `getFamilyTreeDashboardData` 中建立了 GID 到 TCV 记录列表的穿透映射 `gidToTcvMap`；前端 `renderNodeContent` 检测到节点存在历史 TCV 签单时，卡片背景渲染为浅红色 (`#fff1f0`)，并标记鲜艳的 `TCV 签单` 徽章。
+  - **抽屉最上方浅红区域 7 大 TCV 字段展示**：在 `DetailDrawer` 抽屉的最上方引入了浅红色背景面板 (`#fff1f0`)，表格化清晰列出该节点的 7 大 TCV 项目明细：`签约客户名称`、`终端客户名称`、`销售单元`、`电路编号`、`合同签署日期`、`产品分类`、`签单金额 (港币)`。
+  - **编译与平滑上线**：重新编译构建了前端生产包，并重启了前后端 PM2 托管进程。
+
+---
+
+## Prompt 最新
+**时间**: 2026-07-23 11:24:12
+**提示词**:
+```text
+1、「家族树」视图节点上的“TCV签单” 的标识不需要，删除。
+2、不要改变节点边框原有的颜色样式，因为边框的样式标识是否为“国家代表”。 所以有签单的节点用背景样式标识即可，无需改变边框样式。
+3、节点弹出的抽屉信息卡中，历史签单使用AG GRID显示。删除“终端客户名称”字段；
+```
+
+**执行总结**:
+- **「家族树」节点 TCV 签单角标移除、保留代表边框样式及抽屉中历史签单 AG GRID 展示上线**:
+  - **移除角标**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 中彻底删除了节点内部原有的 `TCV 签单` 红色徽章 (`tcvBadge`) 逻辑。
+  - **保留原代表边框样式**：修复了原先节点上有 TCV 项目时强制覆盖边框为红色浅边框的行为，直接沿用原有的 `borderStyle`，确保“国家代表”节点的深红色边框（`1px solid #8b0000`）在签单背景下仍能正确显示，不受签单状态影响。
+  - **抽屉历史签单 AG GRID 化并剔除终端客户名称**：将详情抽屉 `DetailDrawer` 最上方的历史 TCV 项目展示由原来的 Description 列表改为使用 `AgGridReact`（theme 为 `themeQuartz`，高度 `240px`）表格展示。列定义中排除了“终端客户名称”字段，仅显示 `签约客户名称`、`销售单元`、`电路编号`、`合同签署日期`、`产品分类`、`签单金额 (港币)` 6 大核心字段，支持排序、筛选和右对齐千分位格式化金额。同时为了表格更好的显示效果，将抽屉宽度 `width` 从 `520` 拓宽至 `600`。
+
+---
+
+## Prompt 最新
+**时间**: 2026-07-23 11:27:55
+**提示词**:
+```text
+「抽屉信息卡」历史 TCV 项目信息表按照签单日期倒序，并添加签单金额合计
+```
+
+**执行总结**:
+- **抽屉历史 TCV 签单列表实现日期倒序及底部合计行功能上线**:
+  - **合同签署日期倒序**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 的 `DetailDrawer` 组件中，使用 `useMemo` 对输入的 `tcvList` 进行重新排序，根据 `合同签署日期` 进行文本倒序排列，得到最新的 `sortedTcvList` 传给 AG Grid。
+  - **签单金额合计行**：使用 AG Grid 提供的 `pinnedBottomRowData` 属性。在组件中计算 `tcvList` 中各笔签单的港币金额之和，并将其包装为合计行对象 `[{ '签约客户名称': '合计', '签单金额 (港币)': totalAmount }]` 传入 AG Grid，实现了在表格最底部固定显示 “合计” 及总签单港币金额。
+
+---
+
+## Prompt 最新
+**时间**: 2026-07-23 11:32:39
+**提示词**:
+```text
+“历史 TCV 项目信息” 的AG 表格：
+1、标题头不显示过滤、更多功能按钮
+2、每列宽自动扩展为全部显示的宽度
+```
+
+**执行总结**:
+- **抽屉历史 TCV 签单 AG Grid 禁用过滤、去除更多功能菜单及列宽自适应分配功能上线**:
+  - **标题头禁用过滤与隐藏更多功能按钮**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 的 TCV 表格列定义中，彻底删除了各字段的 `filter: true` 配置，并在 `AgGridReact` 的 `defaultColDef` 中设置 `filter: false` 禁用过滤，同时通过添加 `suppressHeaderMenuButton: true` 彻底隐去表头的 “更多功能按钮”（三点式操作选项菜单）。
+  - **列宽自适应平分自展**：在 `AgGridReact` 中配置了 `onGridReady` 与 `onFirstDataRendered` 两大事件回调，通过执行 `params.api.sizeColumnsToFit()` 引擎指令，使得表格加载完毕后能自动根据容器宽度自适应平分分配并自动撑满表格宽度，无需多余的横向滚动。
+
+---
+
+## Prompt 最新
+**时间**: 2026-07-23 17:42:38
+**提示词**:
+```text
+历史 TCV 项目信息表：需要根据电路编号、合同签署日期、产品分类相同记录只取1条。 取“TCV订单类型” = New，或者“生成订单日期”最晚的
+```
+
+**执行总结**:
+- **历史 TCV 项目去重逻辑（电路编号、合同签署日期、产品分类联合去重）上线**:
+  - **联合去重逻辑开发**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 的 `DetailDrawer` 组件中，重构了 `sortedTcvList` 的 `useMemo` 计算。
+  - **去重与优先级策略**：
+    1. 首先以 `电路编号` + `合同签署日期` + `产品分类` 为联合 key 对数据进行分组。
+    2. 对于每个分组，在多条记录里先检索 `TCV订单类型` 为 `New` 的记录；如果有多个或都不为 `New`，则按 `生成订单日期` 字段倒序排列，优先选择订单生成时间最晚的一条记录保留，其余记录予以过滤抛弃。
+    3. 将去重过滤后的唯一记录集，再次按照 `合同签署日期` 倒序排列后提供给 AG Grid 渲染。
+  - **合计行联动更新**：将金额合计行 `pinnedBottomRowData` 的计算逻辑依赖和源数据对齐更新为 `sortedTcvList`，确保底部展现的签单港币总额为去重过后的真实且对应表格行的数据累加和。
+
+---
+
+## Prompt 最新
+**时间**: 2026-07-23 17:46:55
+**提示词**:
+```text
+「海外家族树」的“Dashboard”页的 “分支与 CMI 历史签单统计情况” 也要遵循同样的逻辑。
+```
+
+**执行总结**:
+- **Dashboard 历史签单统计情况数据源去重升级上线**:
+  - **全局 TCV 数据源去重**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 中，重构了大屏视图的数据源 `tcvRecords`，将其从直接读取 `dashboardData?.tcvRecords` 调整为使用 `useMemo` 逻辑。
+  - **同样去重策略共享**：在获取原始 `rawTcvRecords` 后，直接执行与抽屉卡片 100% 相同的去重过滤策略（即通过 `电路编号` + `合同签署日期` + `产品分类` 分组，在每组内优先挑选 `TCV订单类型` 为 `New` 的记录或 `生成订单日期` 最晚的一条记录，再作为全局的 `tcvRecords` 使用）。
+  - **联动效果**：由于去重是应用在大屏原始 TCV 数据源上，这使得 Dashboard 中所有的图表分析（如年份选择图表、大区排名柱状图、大区金额及笔数合计等），以及点击柱状图弹出的小类详情弹窗等，都自动并且遵循了相同的去重逻辑，确保了大屏统计情况与抽屉项目明细的一致与统一。
+
+
+
+
+
