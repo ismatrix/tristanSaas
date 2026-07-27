@@ -5666,6 +5666,24 @@ ultimateName，companyNameCn，companyNameEn，entityTypeName，registeredCountr
   - **同样去重策略共享**：在获取原始 `rawTcvRecords` 后，直接执行与抽屉卡片 100% 相同的去重过滤策略（即通过 `电路编号` + `合同签署日期` + `产品分类` 分组，在每组内优先挑选 `TCV订单类型` 为 `New` 的记录或 `生成订单日期` 最晚的一条记录，再作为全局的 `tcvRecords` 使用）。
   - **联动效果**：由于去重是应用在大屏原始 TCV 数据源上，这使得 Dashboard 中所有的图表分析（如年份选择图表、大区排名柱状图、大区金额及笔数合计等），以及点击柱状图弹出的小类详情弹窗等，都自动并且遵循了相同的去重逻辑，确保了大屏统计情况与抽屉项目明细的一致与统一。
 
+---
+
+## Prompt 最新
+**时间**: 2026-07-27 09:32:02
+**提示词**:
+```text
+同步代码到服务端
+```
+
+**执行总结**:
+- **本地全量修改提交推送与远程 `tristan.wang:6822` 生产部署上线**:
+  - **本地 Git 提交与推送**：将本地开发的 3 个更新文件（`react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx`，`src/controllers/keyCustomerOverview.controller.js`，`PROMPT.md`）提交至本地 Git 分支（commit `c02737e`），并成功推送至 GitHub 的 `main` 远端仓库。
+  - **远程服务器自动化部署**：通过 SSH 免密密钥连接生产服务器 `tristan@tristan.wang:6822`，在 `/home/tristan/workspaces/TristanSaas` 目录下运行 `./deploy.sh` 脚本：
+    1. 成功拉取最新提交，将服务器端代码重置更新到 `c02737e`。
+    2. 进入 `react-admin-frontend` 执行 `npm run build` 重建前端静态生产文件，完成前端生产编译。
+    3. 平滑重启了生产后端的 PM2 进程 `backend-api`（运行状态为 `online`，pid `3830707`）。
+
+
 
 
 
