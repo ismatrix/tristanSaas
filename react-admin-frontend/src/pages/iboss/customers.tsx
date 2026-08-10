@@ -23,21 +23,50 @@ const IBossCustomers: React.FC = () => {
   const [exporting, setExporting] = useState<boolean>(false);
   const [globalSearch, setGlobalSearch] = useState<string>('');
 
-  // 生成全表模糊过滤条件
+  // 生成全表及全字段模糊过滤条件 (支持多词空格 AND 检索，兼容数值与字符串类型ID)
   const getQueryFilter = (keyword: string) => {
-    if (!keyword) return {};
-    const rx = { $regex: keyword, $options: 'i' };
-    return {
-      $or: [
+    if (!keyword || !keyword.trim()) return {};
+    const words = keyword.trim().split(/\s+/).filter(Boolean);
+
+    const makeSingleWordOrFilter = (word: string) => {
+      const rx = { $regex: word, $options: 'i' };
+      const num = Number(word);
+      const isNum = !isNaN(num);
+
+      const orList: any[] = [
         { custId: rx },
         { custCode: rx },
         { enterpriseName: rx },
         { registerAreaName: rx },
+        { country: rx },
+        { city: rx },
+        { commAddr: rx },
         { custIndustryName: rx },
         { customerTypeName: rx },
         { createOperName: rx },
-        { createTime: rx }
-      ]
+        { createTime: rx },
+        { certificateNum: rx },
+        { linkman: rx },
+        { linkmanPhone: rx },
+        { email: rx },
+        { remarks: rx },
+        { statusName: rx }
+      ];
+
+      if (isNum) {
+        orList.push({ custId: num });
+        orList.push({ custCode: num });
+      }
+
+      return { $or: orList };
+    };
+
+    if (words.length === 1) {
+      return makeSingleWordOrFilter(words[0]);
+    }
+
+    return {
+      $and: words.map(w => makeSingleWordOrFilter(w))
     };
   };
 
@@ -214,6 +243,7 @@ const IBossCustomers: React.FC = () => {
           rowData={rowData}
           columnDefs={colDefs}
           defaultColDef={defaultColDef}
+          quickFilterText={globalSearch}
           enableRangeSelection={true}
           rowSelection="multiple"
           suppressRowClickSelection={true}

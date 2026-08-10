@@ -56,6 +56,10 @@ const defaultRoutes = [
     path: '/key-customer-overview',
     route: require('./keyCustomerOverview.route'),
   },
+  {
+    path: '/translate',
+    route: require('./translate.route'),
+  },
 ];
 
 const devRoutes = [

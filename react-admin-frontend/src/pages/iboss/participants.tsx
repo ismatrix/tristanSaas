@@ -142,13 +142,19 @@ const IBossParticipants: React.FC = () => {
     return list.length;
   };
 
-  // 生成全表模糊过滤条件
+  // 生成全表及子对象全属性模糊过滤条件 (支持多词空格 AND 检索，兼容数值与字符串类型ID)
   const getQueryFilter = (keyword: string) => {
-    if (!keyword) return {};
-    const rx = { $regex: keyword, $options: 'i' };
-    return {
-      $or: [
+    if (!keyword || !keyword.trim()) return {};
+    const words = keyword.trim().split(/\s+/).filter(Boolean);
+
+    const makeSingleWordOrFilter = (word: string) => {
+      const rx = { $regex: word, $options: 'i' };
+      const num = Number(word);
+      const isNum = !isNaN(num);
+
+      const orList: any[] = [
         { companyBasicId: rx },
+        { companyId: rx },
         { 'detailInfo.companyBasicDTO.companyName': rx },
         { 'detailInfo.companyBasicDTO.companyEnglishName': rx },
         { 'detailInfo.companyBasicDTO.businessRegistrationNumber': rx },
@@ -158,13 +164,42 @@ const IBossParticipants: React.FC = () => {
         { 'detailInfo.companyBasicDTO.registeredCountryName': rx },
         { 'detailInfo.companyBasicDTO.addressDetail': rx },
         { 'detailInfo.companyBasicDTO.businessScopeMeaning': rx },
+        { 'detailInfo.companyBasicDTO.legalRepresentative': rx },
+        { 'detailInfo.companyBasicDTO.unifiedSocialCreditCode': rx },
+        { 'detailInfo.companyBasicDTO.taxNumber': rx },
+        { 'detailInfo.companyBasicDTO.contactPhone': rx },
+        { 'detailInfo.companyBasicDTO.email': rx },
+        { 'detailInfo.companyAddressDTOList.address': rx },
+        { 'detailInfo.companyAddressDTOList.countryName': rx },
+        { 'detailInfo.companyAddressDTOList.cityName': rx },
         { 'detailInfo.companyBankAccountDTOList.bankName': rx },
         { 'detailInfo.companyBankAccountDTOList.bankBranchName': rx },
         { 'detailInfo.companyBankAccountDTOList.bankAccountName': rx },
+        { 'detailInfo.companyBankAccountDTOList.bankAccountNumber': rx },
         { 'detailInfo.companyBankAccountDTOList.currency': rx },
         { 'detailInfo.companyContactDTOList.name': rx },
-        { 'detailInfo.companyContactDTOList.contactTypeMeaning': rx }
-      ]
+        { 'detailInfo.companyContactDTOList.contactTypeMeaning': rx },
+        { 'detailInfo.companyContactDTOList.mobilePhone': rx },
+        { 'detailInfo.companyContactDTOList.email': rx }
+      ];
+
+      // 若检索词为纯数字，兼容数据库数值类型字段匹配 (如 companyId: 80983)
+      if (isNum) {
+        orList.push({ companyBasicId: num });
+        orList.push({ companyId: num });
+        orList.push({ 'detailInfo.companyBasicDTO.companyId': num });
+        orList.push({ 'detailInfo.companyBasicDTO.companyNum': num });
+      }
+
+      return { $or: orList };
+    };
+
+    if (words.length === 1) {
+      return makeSingleWordOrFilter(words[0]);
+    }
+
+    return {
+      $and: words.map(w => makeSingleWordOrFilter(w))
     };
   };
 
@@ -346,6 +381,7 @@ const IBossParticipants: React.FC = () => {
           rowData={rowData}
           columnDefs={colDefs}
           defaultColDef={defaultColDef}
+          quickFilterText={globalSearch}
           enableRangeSelection={true}
           rowSelection="multiple"
           suppressRowClickSelection={true}

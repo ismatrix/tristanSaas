@@ -248,6 +248,14 @@ const KeyCustomerBranchTab: React.FC = () => {
           suppressRowClickSelection={true}
           animateRows={true}
           theme={themeQuartz}
+          getRowClass={(params: any) => {
+            if (!params.data) return undefined;
+            const ds = String(params.data.dataSource || params.data.data_source || params.data.source || '').trim().toUpperCase();
+            if (ds === 'CMI') {
+              return 'row-governance-manual-editing';
+            }
+            return undefined;
+          }}
         />
       </div>
 

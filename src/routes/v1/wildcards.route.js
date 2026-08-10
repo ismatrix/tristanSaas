@@ -15,6 +15,10 @@ router
   .post(auth(), validate(wildcardsValidation.bulkUpsert), wildcardsController.bulkUpsert);
 
 router
+  .route('/:collection/bulkUpsert')
+  .post(auth(), validate(wildcardsValidation.bulkUpsert), wildcardsController.bulkUpsert);
+
+router
   .route('/:collection')
   .post(auth(), validate(wildcardsValidation.createRecord), wildcardsController.createRecord)
   .get(auth(), validate(wildcardsValidation.getRecords), wildcardsController.getRecords)

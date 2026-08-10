@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { request, history, useModel } from '@umijs/max';
-import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip, Tabs } from 'antd';
+import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip, Tabs, Tag } from 'antd';
 import { SaveOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ApartmentOutlined, DownloadOutlined, ExportOutlined, DashboardOutlined, UnorderedListOutlined, PartitionOutlined } from '@ant-design/icons';
 import KeyCustomerOverview from './KeyCustomerOverview';
 import KeyCustomerBranchTab from './KeyCustomerBranchTab';
@@ -10,6 +10,113 @@ import { AllEnterpriseModule } from 'ag-grid-enterprise';
 
 // 注册 AG Grid 模块防止 #272 错误
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
+
+/**
+ * 关键词 Tag 渲染与编辑器组件
+ */
+const KeywordsCellRenderer: React.FC<{ params: any; isTristan: boolean; onMarkDirty: (id: string) => void }> = ({ params, isTristan, onMarkDirty }) => {
+  const [inputVisible, setInputVisible] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const inputRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (inputVisible) {
+      inputRef.current?.focus();
+    }
+  }, [inputVisible]);
+
+  const rawTags = params.value;
+  const tags: string[] = Array.isArray(rawTags) ? rawTags : [];
+
+  const updateKeyWords = (newTags: string[]) => {
+    // 优先更新本地 AG Grid 行数据
+    params.node.setData({
+      ...params.data,
+      keyWords: newTags
+    });
+
+    const docId = params.data?._id;
+    if (docId) {
+      onMarkDirty(String(docId));
+      message.info('关键词已更改，请点击右上角“保存变更”提交保存');
+    }
+  };
+
+  const handleClose = (removedTag: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newTags = tags.filter(t => t !== removedTag);
+    updateKeyWords(newTags);
+  };
+
+  const handleInputConfirm = () => {
+    const val = inputValue.trim();
+    if (val && !tags.includes(val)) {
+      const newTags = [...tags, val];
+      updateKeyWords(newTags);
+    }
+    setInputVisible(false);
+    setInputValue('');
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '4px',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        width: '100%',
+        minHeight: '100%',
+        padding: '2px 0'
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {tags.map((tag) => (
+        <Tag
+          key={tag}
+          color="blue"
+          closable={isTristan}
+          onClose={(e) => handleClose(tag, e)}
+          style={{ margin: 0, fontSize: '12px' }}
+        >
+          {tag}
+        </Tag>
+      ))}
+
+      {isTristan && (
+        inputVisible ? (
+          <Input
+            ref={inputRef}
+            type="text"
+            size="small"
+            style={{ width: 90, height: 22, fontSize: '12px' }}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onBlur={handleInputConfirm}
+            onPressEnter={handleInputConfirm}
+          />
+        ) : (
+          <Tag
+            onClick={() => setInputVisible(true)}
+            style={{
+              background: '#fff',
+              borderStyle: 'dashed',
+              cursor: 'pointer',
+              margin: 0,
+              fontSize: '12px',
+              color: '#1677ff',
+              borderColor: '#91c5ff'
+            }}
+          >
+            <PlusOutlined style={{ marginRight: 2 }} />
+            新增
+          </Tag>
+        )
+      )}
+    </div>
+  );
+};
 
 /**
  * 要客清单页面 —— 通过 AG Grid Enterprise 展示并编辑 keycustomer 表
@@ -328,6 +435,17 @@ const KeyCustomerList: React.FC = () => {
     });
   }, []);
 
+  // --- 脏行标记回调 ---
+  const markRowDirty = useCallback((id: string) => {
+    if (id) {
+      setDirtyIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+    }
+  }, []);
+
   // --- 默认列配置（基于 keycustomer 表结构） ---
   const baseColumns = useMemo(() => [
     { headerName: '#', valueGetter: "node.rowIndex + 1", width: 60, minWidth: 40, pinned: 'left', filter: false, sortable: false, editable: false, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true },
@@ -389,10 +507,10 @@ const KeyCustomerList: React.FC = () => {
         const gid = params.data?.GID;
         const nameCn = encodeURIComponent(params.data?.nameCn || '');
         const abbr = encodeURIComponent(params.data?.abbr || '');
-        const globalFtCount = params.data?._globalFtCount;
+        const globalFtCount = params.data?._globalFtCount ?? params.data?.globalUltimateFamilyTreeMembersCount ?? 0;
 
-        // 仅在存在 GID、数据已加载完成、且 GID 关联记录数大于 0 时渲染为超链接
-        if (gid && globalFtCount !== '__loading__' && globalFtCount != null && globalFtCount > 0) {
+        // 仅在存在 GID 且 GID 关联记录数大于 0 时渲染为超链接
+        if (gid && globalFtCount > 0) {
           return (
             <span
               style={{ color: '#1677ff', cursor: 'pointer', textDecoration: 'underline' }}
@@ -413,11 +531,12 @@ const KeyCustomerList: React.FC = () => {
       editable: false,
       filter: false,
       sortable: true,
+      valueGetter: (params: any) => {
+        return params.data?._globalFtCount ?? params.data?.globalUltimateFamilyTreeMembersCount ?? 0;
+      },
       cellRenderer: (params: any) => {
         const val = params.value;
-        if (val === '__loading__') return <span style={{ color: '#999' }}>查询中...</span>;
-        if (val == null) return '-';
-        if (val === 0) return '0';
+        if (val == null || val === 0) return '0';
         
         const gid = params.data?.GID;
         const nameCn = encodeURIComponent(params.data?.nameCn || '');
@@ -433,12 +552,27 @@ const KeyCustomerList: React.FC = () => {
         );
       },
       comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
-        const countA = nodeA.data?._globalFtCount ?? 0;
-        const countB = nodeB.data?._globalFtCount ?? 0;
+        const countA = nodeA.data?._globalFtCount ?? nodeA.data?.globalUltimateFamilyTreeMembersCount ?? 0;
+        const countB = nodeB.data?._globalFtCount ?? nodeB.data?.globalUltimateFamilyTreeMembersCount ?? 0;
         return countA - countB;
       }
     },
     { headerName: "缩写", field: "abbr", width: 150, editable: isTristan },
+    {
+      headerName: "关键词",
+      field: "keyWords",
+      width: 320,
+      editable: false,
+      filter: true,
+      cellStyle: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start'
+      },
+      cellRenderer: (params: any) => {
+        return <KeywordsCellRenderer params={params} isTristan={isTristan} onMarkDirty={markRowDirty} />;
+      }
+    },
     { headerName: "来源", field: "source", width: 160, editable: isTristan, hide: true },
     { headerName: "来源类型", field: "sourceType", width: 200, editable: isTristan, hide: true },
     { headerName: "行业编码", field: "industryCode", width: 140, editable: isTristan },
@@ -451,16 +585,9 @@ const KeyCustomerList: React.FC = () => {
       sortable: true,
       hide: true,
       valueGetter: (params: any) => {
-        const apiVal = params.data?._ftCount;
-        const webVal = params.data?._webFtCount;
-        if (apiVal === '__loading__' || webVal === '__loading__') return '__loading__';
-        const apiStr = apiVal != null ? String(apiVal) : '-';
-        const webStr = webVal != null ? String(webVal) : '-';
-        return `${apiStr}/${webStr}`;
-      },
-      valueFormatter: (p: any) => {
-        if (p.value === '__loading__') return '查询中...';
-        return p.value;
+        const apiVal = params.data?._ftCount ?? 0;
+        const webVal = params.data?._webFtCount ?? 0;
+        return `${apiVal}/${webVal}`;
       },
       comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
         const countA = nodeA.data?._ftCount ?? 0;
@@ -475,16 +602,9 @@ const KeyCustomerList: React.FC = () => {
       filter: true,
       sortable: true,
       valueGetter: (params: any) => {
-        const apiVal = params.data?._ftOverseasCount;
-        const webVal = params.data?._webFtOverseasCount;
-        if (apiVal === '__loading__' || webVal === '__loading__') return '__loading__';
-        const apiStr = apiVal != null ? String(apiVal) : '-';
-        const webStr = webVal != null ? String(webVal) : '-';
-        return `${apiStr}/${webStr}`;
-      },
-      valueFormatter: (p: any) => {
-        if (p.value === '__loading__') return '查询中...';
-        return p.value;
+        const apiVal = params.data?._ftOverseasCount ?? 0;
+        const webVal = params.data?._webFtOverseasCount ?? 0;
+        return `${apiVal}/${webVal}`;
       },
       comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
         const countA = nodeA.data?._ftOverseasCount ?? 0;
@@ -492,19 +612,17 @@ const KeyCustomerList: React.FC = () => {
         return countA - countB;
       },
       cellRenderer: (params: any) => {
-        if (params.value === '__loading__') return '查询中...';
-        const apiVal = params.data?._ftOverseasCount;
-        const webVal = params.data?._webFtOverseasCount;
-        if (apiVal == null && webVal == null) return '-';
+        const apiVal = params.data?._ftOverseasCount ?? 0;
+        const webVal = params.data?._webFtOverseasCount ?? 0;
         
         const nameCn = encodeURIComponent(params.data?.nameCn || '');
         const abbr = encodeURIComponent(params.data?.abbr || '');
         const duns = params.data?.globalUltimateDuns || '';
 
-        const apiStr = apiVal != null ? String(apiVal) : '-';
-        const webStr = webVal != null ? String(webVal) : '-';
+        const apiStr = String(apiVal);
+        const webStr = String(webVal);
 
-        const hasOverseas = (apiVal != null && apiVal > 0) || (webVal != null && webVal > 0);
+        const hasOverseas = apiVal > 0 || webVal > 0;
         if (hasOverseas) {
           return (
             <span
@@ -522,21 +640,28 @@ const KeyCustomerList: React.FC = () => {
     { headerName: "客户类型", field: "customerType", width: 120, editable: isTristan },
     { headerName: "更新时间", field: "updateAt", width: 150, editable: isTristan, hide: true },
     { headerName: "customLevel", field: "customLeval", width: 150, editable: isTristan, hide: true },
-    // 家族树统计列（异步加载，初始显示「查询中...」）
     {
       headerName: "家族树最后同步",
       field: "_ftLastSync",
-      width: 150,
+      width: 170,
       editable: false,
       filter: false,
       sortable: true,
+      valueGetter: (params: any) => {
+        return params.data?._ftLastSync || params.data?.updateAt || null;
+      },
       valueFormatter: (p: any) => {
-        if (p.value === '__loading__') return '查询中...';
-        if (!p.value) return '未同步';
-        return new Date(p.value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        if (!p.value || p.value === '未同步') return '未同步';
+        try {
+          const date = new Date(p.value);
+          if (isNaN(date.getTime())) return String(p.value);
+          return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        } catch {
+          return String(p.value);
+        }
       },
     },
-  ], [isTristan]);
+  ], [isTristan, markRowDirty]);
 
   // 「更新家族树」操作列（固定钉右）
   const actionColumn = useMemo(() => ({
@@ -639,7 +764,7 @@ const KeyCustomerList: React.FC = () => {
         Object.keys(record).forEach(key => allKeys.add(key));
       });
       allKeys.delete('_id');
-      // 排除内部统计字段（已在 baseColumns 中定义）
+      // 排除内部统计字段与自定义单元格列（已在 baseColumns 中定义）
       allKeys.delete('_ftCount');
       allKeys.delete('_ftLastSync');
       allKeys.delete('_webFtCount');
@@ -647,6 +772,7 @@ const KeyCustomerList: React.FC = () => {
       allKeys.delete('_webFtOverseasCount');
       allKeys.delete('_globalFtCount');
       allKeys.delete('globalUltimateFamilyTreeMembersCount');
+      allKeys.delete('keyWords');
 
       setDynamicColDefs((prev) => {
         // 排除操作列和导出列，始终钉在最后
@@ -664,28 +790,19 @@ const KeyCustomerList: React.FC = () => {
         return [...nonActionCols, ...newCols, actionColumn, exportColumn];
       });
 
-      // 先展示「查询中」占位符号
-      const recordsWithPlaceholder = records.map((r: any) => ({
-        ...r,
-        _ftCount: '__loading__',
-        _ftLastSync: '__loading__',
-        _webFtCount: '__loading__',
-        _ftOverseasCount: '__loading__',
-        _webFtOverseasCount: '__loading__',
-        _globalFtCount: '__loading__',
-      }));
-      setRowData(recordsWithPlaceholder);
+      // 直接使用 keycustomer 表中已经统计好的数据直接显示结果
+      setRowData(records);
       setDirtyIds(new Set()); // 重置脏标记
-
-      // 异步加载家族树统计（并行请求）
-      fetchFamilyTreeStats(records);
+      setTimeout(() => {
+        gridRef.current?.api?.autoSizeAllColumns();
+      }, 100);
     } catch (error) {
       console.error('获取要客清单失败', error);
       message.error('获取要客清单数据失败');
     } finally {
       setLoading(false);
     }
-  }, [actionColumn, exportColumn, fetchFamilyTreeStats]);
+  }, [actionColumn, exportColumn]);
 
   useEffect(() => {
     fetchData();
@@ -827,7 +944,6 @@ const KeyCustomerList: React.FC = () => {
 
   // --- 默认列属性 ---
   const defaultColDef = useMemo(() => ({
-    flex: 1,
     minWidth: 120,
     filter: true,
     sortable: true,
@@ -846,12 +962,12 @@ const KeyCustomerList: React.FC = () => {
   // --- Tab 状态控制 ---
   const [activeTab, setActiveTab] = useState<string>('overview');
 
-  // --- 监听 Tab 切换强刷 AG Grid 宽高自适应防不显示 ---
+  // --- 监听 Tab 切换强刷 AG Grid 宽高自适应自动扩展全部列宽 ---
   useEffect(() => {
     if (activeTab === 'list') {
       const timer = setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
-        gridRef.current?.api?.sizeColumnsToFit();
+        gridRef.current?.api?.autoSizeAllColumns();
       }, 150);
       return () => clearTimeout(timer);
     }
@@ -1019,7 +1135,7 @@ const KeyCustomerList: React.FC = () => {
                       return '';
                     }}
                     onFirstDataRendered={(params: any) => {
-                      params.api.autoSizeColumns(['nameEn', 'nameCn']);
+                      params.api.autoSizeAllColumns();
                     }}
                     sideBar={{ toolPanels: ['columns', 'filters'], defaultToolPanel: '' }}
                     statusBar={{

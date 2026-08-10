@@ -182,6 +182,18 @@ const updateRecordById = async (collectionName, id, updateBody) => {
 
 const deleteRecordById = async (collectionName, id) => {
   const collection = getCollection(collectionName);
+  
+  if (collectionName === 'keyGlobalFamilyTree') {
+    const record = await collection.findOne({ _id: new mongoose.Types.ObjectId(id) });
+    if (record && record.GID) {
+      const mappingCollection = getCollection('keyFamilyTreeCustMapping');
+      const hasMapping = await mappingCollection.findOne({ GID: String(record.GID) });
+      if (hasMapping) {
+        throw new ApiError(httpStatus.BAD_REQUEST, `分支节点【${record.companyNameCn || record.GID}】在已治理映射表 (keyFamilyTreeCustMapping) 中存在对应的映射记录，不允许删除！`);
+      }
+    }
+  }
+
   const result = await collection.deleteOne({ _id: new mongoose.Types.ObjectId(id) });
   
   if (result.deletedCount === 0) {
@@ -192,6 +204,24 @@ const deleteRecordById = async (collectionName, id) => {
 const deleteRecords = async (collectionName, query = {}) => {
   const collection = getCollection(collectionName);
   
+  if (collectionName === 'keyGlobalFamilyTree') {
+    let targetGids = [];
+    if (query.GID) {
+      targetGids = [String(query.GID)];
+    } else {
+      const recordsToDelete = await collection.find(query, { projection: { GID: 1 } }).toArray();
+      targetGids = recordsToDelete.map(r => String(r.GID)).filter(Boolean);
+    }
+
+    if (targetGids.length > 0) {
+      const mappingCollection = getCollection('keyFamilyTreeCustMapping');
+      const hasMapping = await mappingCollection.findOne({ GID: { $in: targetGids } });
+      if (hasMapping) {
+        throw new ApiError(httpStatus.BAD_REQUEST, `该分支节点在已治理映射表 (keyFamilyTreeCustMapping) 中存在对应的映射记录 (GID: ${hasMapping.GID})，不允许删除！`);
+      }
+    }
+  }
+
   // 支持自定义 deleteRange 条件，避开 mongoSanitize 的 $ 过滤
   if (query.deleteRange) {
     const { field, gte, lte } = query.deleteRange;
