@@ -60,6 +60,10 @@ const defaultRoutes = [
     path: '/translate',
     route: require('./translate.route'),
   },
+  {
+    path: '/data-governance-logs',
+    route: require('./dataGovernanceLog.route'),
+  },
 ];
 
 const devRoutes = [

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { useParams, useLocation, request, history } from '@umijs/max';
+import { useParams, useLocation, request, history, useModel } from '@umijs/max';
 import { Checkbox, Spin, message, Button, Input, Space, Tag, Badge, Tabs, Drawer, Descriptions, Tooltip, Modal, Table, Row, Col, Card, Progress, Select, Popconfirm } from 'antd';
 import {
   ExpandAltOutlined,
@@ -24,6 +24,7 @@ import {
   CameraOutlined,
   TranslationOutlined,
   DeleteOutlined,
+  FormOutlined,
 } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -36,6 +37,150 @@ import Flag from 'react-world-flags';
 
 // 注册 AG Grid 模块
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
+
+// HTML 实体转义还原助手函数
+const unescapeHtml = (str: string) => {
+  if (!str) return '';
+  return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+};
+
+// 预设富文本编辑颜色列表 (黑、白、红、黄、绿、蓝)
+const PRESET_COLORS = [
+  { label: '黑色', value: '#111827' },
+  { label: '白色', value: '#ffffff' },
+  { label: '红色', value: '#dc2626' },
+  { label: '黄色', value: '#eab308' },
+  { label: '绿色', value: '#16a34a' },
+  { label: '蓝色', value: '#2563eb' },
+];
+
+// 轻量级富文本编辑器 (支持粗体、斜体、文字颜色选择)
+const RichTextEditor: React.FC<{
+  value: string;
+  onChange: (val: string) => void;
+  style?: React.CSSProperties;
+}> = ({ value, onChange, style }) => {
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  // 初始化设置 innerHTML，自动反转义解码
+  useEffect(() => {
+    if (editorRef.current) {
+      const decoded = unescapeHtml(value || '');
+      if (editorRef.current.innerHTML !== decoded) {
+        editorRef.current.innerHTML = decoded;
+      }
+    }
+  }, [value]);
+
+  const execCmd = (command: string, val: string | undefined = undefined) => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    document.execCommand(command, false, val);
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+  };
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+  };
+
+  return (
+    <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px', overflow: 'hidden', ...style }}>
+      {/* 工具栏，onMouseDown 阻止焦点离开编辑区以保持文字选中选区 */}
+      <div
+        style={{ background: '#f5f5f5', borderBottom: '1px solid #d9d9d9', padding: '6px 10px', display: 'flex', gap: '8px', alignItems: 'center' }}
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        <Button
+          size="small"
+          type="text"
+          style={{ fontWeight: 'bold', minWidth: 28 }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            execCmd('bold');
+          }}
+          title="加粗 (Bold)"
+        >
+          <b>B</b>
+        </Button>
+        <Button
+          size="small"
+          type="text"
+          style={{ fontStyle: 'italic', minWidth: 28 }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            execCmd('italic');
+          }}
+          title="斜体 (Italic)"
+        >
+          <i>I</i>
+        </Button>
+        <div style={{ width: '1px', height: '16px', background: '#d9d9d9', margin: '0 4px' }} />
+        <span style={{ fontSize: '12px', color: '#666' }}>文字颜色:</span>
+        {PRESET_COLORS.map(c => (
+          <span
+            key={c.value}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              execCmd('foreColor', c.value);
+            }}
+            title={c.label}
+            style={{
+              display: 'inline-block',
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              backgroundColor: c.value,
+              cursor: 'pointer',
+              border: c.value === '#ffffff' ? '1px solid #6b7280' : '1px solid #d1d5db',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+              transition: 'transform 0.1s ease',
+            }}
+          />
+        ))}
+        {/* 自定义拾色器 */}
+        <label
+          style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer', marginLeft: 4 }}
+          title="自定义颜色"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <input
+            type="color"
+            style={{ width: 22, height: 22, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }}
+            onChange={(e) => execCmd('foreColor', e.target.value)}
+          />
+        </label>
+      </div>
+
+      {/* 可编辑区域 */}
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        onBlur={handleInput}
+        style={{
+          minHeight: '120px',
+          maxHeight: '260px',
+          overflowY: 'auto',
+          padding: '8px 12px',
+          outline: 'none',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          backgroundColor: '#fff',
+        }}
+      />
+    </div>
+  );
+};
 
 // 正则转义助手函数，用于合并多关键字正则匹配，防止 GET URL 过长导致 403 报错
 const escapeRegExp = (str: string) => {
@@ -1944,6 +2089,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
     : ((penetratedNodesCount / originalData.length) * 100).toFixed(2) + '%';
 
   // 树数据过滤重连函数：若隐藏营业网点，将隐藏节点的子节点重连到最近的非 Site 祖先节点，防止树断层
+
   const filterTreeData = useCallback((data: any[], displaySites: boolean) => {
     if (displaySites) return data;
 
@@ -2021,14 +2167,48 @@ const KeyGlobalFamilyTree: React.FC = () => {
     city: '-'
   });
 
-  // 从 originalData (keyGlobalFamilyTree 集合) 纯粹提炼 distinct 去重下拉列表 items
+  // 全量 keyGlobalFamilyTree 集合 distinct 下拉选项状态 (如全量 151 个国家等)
+  const [globalDistinctOptions, setGlobalDistinctOptions] = useState<{
+    registeredCountryOptions: { value: string; label: string }[];
+    cmiRegionOptions: { value: string; label: string }[];
+    registeredCityOptions: { value: string; label: string }[];
+    entityTypeOptions: { value: string; label: string }[];
+    enterpriseNatureOptions: { value: string; label: string }[];
+    cmiIndustryOptions: { value: string; label: string }[];
+    countryToRegionMap: Record<string, string>;
+  }>({
+    registeredCountryOptions: [],
+    cmiRegionOptions: [],
+    registeredCityOptions: [],
+    entityTypeOptions: [],
+    enterpriseNatureOptions: [],
+    cmiIndustryOptions: [],
+    countryToRegionMap: {},
+  });
+
+  const fetchGlobalDistinctOptions = useCallback(async () => {
+    try {
+      const res = await request('/api/v1/key-customer-overview/family-tree-distinct-options');
+      if (res && res.code === 200 && res.data) {
+        setGlobalDistinctOptions(res.data);
+      }
+    } catch (err) {
+      console.error('获取 keyGlobalFamilyTree 全表 distinct 下拉选项失败:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGlobalDistinctOptions();
+  }, [fetchGlobalDistinctOptions]);
+
+  // 从 keyGlobalFamilyTree 全量集合及 originalData 提炼 distinct 去重下拉列表 items
   const familyTreeOptions = useMemo(() => {
-    const entityTypes = new Set<string>();
-    const natures = new Set<string>();
-    const countries = new Set<string>();
-    const regions = new Set<string>();
-    const cities = new Set<string>();
-    const cmiIndustries = new Set<string>();
+    const entityTypes = new Set<string>((globalDistinctOptions?.entityTypeOptions || []).map(o => o.value));
+    const natures = new Set<string>((globalDistinctOptions?.enterpriseNatureOptions || []).map(o => o.value));
+    const countries = new Set<string>((globalDistinctOptions?.registeredCountryOptions || []).map(o => o.value));
+    const regions = new Set<string>((globalDistinctOptions?.cmiRegionOptions || []).map(o => o.value));
+    const cities = new Set<string>((globalDistinctOptions?.registeredCityOptions || []).map(o => o.value));
+    const cmiIndustries = new Set<string>((globalDistinctOptions?.cmiIndustryOptions || []).map(o => o.value));
 
     (originalData || []).forEach((node: any) => {
       if (node.entityTypeName && typeof node.entityTypeName === 'string' && node.entityTypeName.trim()) {
@@ -2059,7 +2239,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       registeredCityOptions: Array.from(cities).sort().map(v => ({ value: v, label: v })),
       cmiIndustryOptions: Array.from(cmiIndustries).sort().map(v => ({ value: v, label: v })),
     };
-  }, [originalData]);
+  }, [originalData, globalDistinctOptions]);
 
   // 需求3：注册城市动态派生下拉列表 (支持手工输入不在列表里的新城市)
   const dynamicCityOptions = useMemo(() => {
@@ -2105,10 +2285,123 @@ const KeyGlobalFamilyTree: React.FC = () => {
   const [savingEnterpriseCustomerIdMap, setSavingEnterpriseCustomerIdMap] = useState<Record<string, boolean>>({});
   const enterpriseCustomerGridRef = useRef<any>(null);
 
+  // 对应 Saving Map 与 Handler 的 Ref 存储，解耦 columnDefs 避免点击关联触发列计算重置
+  const savingEnterpriseCustomerIdMapRef = useRef<Record<string, boolean>>({});
+  const savingEndCustomerIdMapRef = useRef<Record<string, boolean>>({});
+  const savingCompanyIdMapRef = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    savingCompanyIdMapRef.current = savingCompanyIdMap;
+  }, [savingCompanyIdMap]);
+
+  useEffect(() => {
+    savingEndCustomerIdMapRef.current = savingEndCustomerIdMap;
+  }, [savingEndCustomerIdMap]);
+
+  useEffect(() => {
+    savingEnterpriseCustomerIdMapRef.current = savingEnterpriseCustomerIdMap;
+  }, [savingEnterpriseCustomerIdMap]);
   // 企业客户 TCV 项目 Modal 状态
   const [enterpriseTcvModalVisible, setEnterpriseTcvModalVisible] = useState<boolean>(false);
   const [selectedEnterpriseTcvList, setSelectedEnterpriseTcvList] = useState<any[]>([]);
   const [selectedEnterpriseInfo, setSelectedEnterpriseInfo] = useState<{ custId: string; enterpriseName: string } | null>(null);
+
+  // 获取当前登录用户
+  const { initialState } = useModel('@@initialState');
+
+  // 数据治理日志 (dataGovernanceLog) 状态
+  const [governanceLogsMap, setGovernanceLogsMap] = useState<Record<string, any>>({});
+  const governanceLogsMapRef = useRef<Record<string, any>>({});
+  const [annotateModalVisible, setAnnotateModalVisible] = useState<boolean>(false);
+  const [currentAnnotateRow, setCurrentAnnotateRow] = useState<any>(null);
+  const [notesContent, setNotesContent] = useState<string>('');
+  const [submittingAnnotate, setSubmittingAnnotate] = useState<boolean>(false);
+
+  // 拉取当前集团客户 (rootGID = gid) 的治理日志列表
+  const fetchGovernanceLogs = useCallback(async () => {
+    if (!gid) return;
+    try {
+      const res = await request(`/api/v1/data-governance-logs?rootGID=${gid}`);
+      if (res && res.code === 200 && Array.isArray(res.data)) {
+        const map: Record<string, any> = {};
+        res.data.forEach((log: any) => {
+          const processedLog = {
+            ...log,
+            notes: unescapeHtml(log.notes || ''),
+          };
+          if (log.companyId) {
+            map[`companyId_${log.companyId}`] = processedLog;
+          }
+          if (log.custId) {
+            map[`custId_${log.custId}`] = processedLog;
+          }
+        });
+        governanceLogsMapRef.current = map;
+        setGovernanceLogsMap(map);
+      }
+    } catch (err) {
+      console.error('获取数据治理日志失败:', err);
+    }
+  }, [gid]);
+
+  useEffect(() => {
+    fetchGovernanceLogs();
+  }, [fetchGovernanceLogs]);
+
+  // 提交标注数据治理日志 (dataGovernanceLog)
+  const handleSubmitAnnotateLog = async () => {
+    const targetCompanyId = currentAnnotateRow?.companyId ? String(currentAnnotateRow.companyId) : '';
+    const targetCustId = currentAnnotateRow?.custId ? String(currentAnnotateRow.custId) : '';
+
+    if (!targetCompanyId && !targetCustId) {
+      message.warning('无法提交标注：缺少有效标识(companyId 或 custId)');
+      return;
+    }
+    setSubmittingAnnotate(true);
+    try {
+      const staffName = (initialState as any)?.currentUser?.name || (initialState as any)?.currentUser?.username || 'admin';
+      const payload = {
+        rootGID: String(gid || ''),
+        companyId: targetCompanyId,
+        custId: targetCustId,
+        status: 'no',
+        notes: notesContent || '',
+        staff: staffName,
+      };
+
+      const res = await request('/api/v1/data-governance-logs', {
+        method: 'POST',
+        data: payload,
+      });
+
+      if (res && res.code === 200) {
+        message.success('标注保存成功！');
+        setAnnotateModalVisible(false);
+        await fetchGovernanceLogs();
+
+        // 局部刷新 AG Grid 单元格与行着色，保持当前列宽不变
+        if (endCustomerGridRef.current && endCustomerGridRef.current.api) {
+          endCustomerGridRef.current.api.refreshCells({ force: true });
+          endCustomerGridRef.current.api.redrawRows();
+        }
+        if (governanceGridRef.current && governanceGridRef.current.api) {
+          governanceGridRef.current.api.refreshCells({ force: true });
+          governanceGridRef.current.api.redrawRows();
+        }
+        if (enterpriseCustomerGridRef.current && enterpriseCustomerGridRef.current.api) {
+          enterpriseCustomerGridRef.current.api.refreshCells({ force: true });
+          enterpriseCustomerGridRef.current.api.redrawRows();
+        }
+      } else {
+        message.error(res?.message || '标注提交失败');
+      }
+    } catch (err) {
+      console.error('提交标注日志出错:', err);
+      message.error('提交标注日志出错');
+    } finally {
+      setSubmittingAnnotate(false);
+    }
+  };
 
   const isKeywordsChanged = useMemo(() => {
     const s1 = [...(selectedKeywords || [])].sort().join('||');
@@ -3850,6 +4143,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
           return item;
         });
       });
+      setTimeout(() => {
+        governanceGridRef.current?.api?.refreshCells({ force: true });
+        governanceGridRef.current?.api?.redrawRows();
+      }, 50);
     } catch (err) {
       console.error('保存手动关联失败:', err);
       message.error('保存手动关联失败，请稍后重试');
@@ -4185,6 +4482,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
           return item;
         });
       });
+      setTimeout(() => {
+        endCustomerGridRef.current?.api?.refreshCells({ force: true });
+        endCustomerGridRef.current?.api?.redrawRows();
+      }, 50);
     } catch (err) {
       console.error('保存终端客户关联失败:', err);
       message.error('保存终端客户关联失败，请稍后重试');
@@ -4472,6 +4773,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
           return item;
         });
       });
+      setTimeout(() => {
+        enterpriseCustomerGridRef.current?.api?.refreshCells({ force: true });
+        enterpriseCustomerGridRef.current?.api?.redrawRows();
+      }, 50);
     } catch (err) {
       console.error('保存企业客户关联失败:', err);
       message.error('保存企业客户关联失败，请稍后重试');
@@ -4737,9 +5042,12 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       },
       cellRenderer: (params: any) => {
-        const { companyName, companyEnglishName } = params.data || {};
+        const { companyName, companyEnglishName, companyId } = params.data || {};
         const showEn = Boolean(companyEnglishName && companyEnglishName.trim() !== '' && companyEnglishName.trim().toLowerCase() !== companyName?.trim().toLowerCase());
-        return (
+        const log = companyId ? governanceLogsMapRef.current[`companyId_${companyId}`] : null;
+        const notes = log?.notes;
+
+        const content = (
           <div style={{ padding: '4px 0', lineHeight: 1.4 }} title="💡 双击此单元格可按此参与方自动生成并新增基因树节点">
             <div style={{ fontWeight: 600, color: '#111827', fontSize: '13px' }}>
               {companyName || '-'}
@@ -4751,6 +5059,24 @@ const KeyGlobalFamilyTree: React.FC = () => {
             )}
           </div>
         );
+
+        if (notes && notes.trim()) {
+          return (
+            <Tooltip
+              title={
+                <div
+                  style={{ maxHeight: 260, overflowY: 'auto', padding: '4px' }}
+                  dangerouslySetInnerHTML={{ __html: unescapeHtml(notes) }}
+                />
+              }
+              overlayStyle={{ maxWidth: 400 }}
+            >
+              {content}
+            </Tooltip>
+          );
+        }
+
+        return content;
       }
     },
     {
@@ -4847,38 +5173,57 @@ const KeyGlobalFamilyTree: React.FC = () => {
     {
       headerName: '操作',
       field: 'actions',
-      minWidth: 150,
+      minWidth: 180,
       pinned: 'right', // 最后一列固定列
       filter: false,
       sortable: false,
-      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
       cellRenderer: (params: any) => {
         const rowData = params.data || {};
         const isManual = Boolean(rowData.isManualMapped);
         const compId = String(rowData.companyId || '');
-        const isSaving = Boolean(savingCompanyIdMap[compId]);
+        const isSaving = Boolean(savingCompanyIdMapRef.current[compId]);
         const relatedCustCount = Number(rowData.relatedCustCount || 0);
 
         // 需求4：「参与方」治理 TAB 页面，如果参与方没有对应的 cust（即参与方ID列中对应的客户数目为 0），则不允许关联，关联按钮强制为 disable 状态
         const isBtnDisabled = !isManual || relatedCustCount === 0;
 
+        const log = compId ? governanceLogsMapRef.current[`companyId_${compId}`] : null;
+        const hasNotes = Boolean(log && log.notes && log.notes.trim());
+
         return (
-          <Tooltip title={relatedCustCount === 0 ? "参与方关联客户数为 0，不允许提交关联" : undefined}>
+          <>
+            <Tooltip title={relatedCustCount === 0 ? "参与方关联客户数为 0，不允许提交关联" : undefined}>
+              <Button
+                type={isManual && relatedCustCount > 0 ? 'primary' : 'default'}
+                size="small"
+                disabled={isBtnDisabled}
+                loading={isSaving}
+                icon={<LinkOutlined />}
+                onClick={() => handleSaveManualMapping(rowData)}
+              >
+                关联
+              </Button>
+            </Tooltip>
             <Button
-              type={isManual && relatedCustCount > 0 ? 'primary' : 'default'}
+              type={hasNotes ? 'primary' : 'default'}
+              ghost={hasNotes}
               size="small"
-              disabled={isBtnDisabled}
-              loading={isSaving}
-              icon={<LinkOutlined />}
-              onClick={() => handleSaveManualMapping(rowData)}
+              icon={<FormOutlined />}
+              onClick={() => {
+                setCurrentAnnotateRow(rowData);
+                const existingLog = compId ? governanceLogsMapRef.current[`companyId_${compId}`] : null;
+                setNotesContent(unescapeHtml(existingLog?.notes || ''));
+                setAnnotateModalVisible(true);
+              }}
             >
-              关联
+              标注
             </Button>
-          </Tooltip>
+          </>
         );
       }
     }
-  ], [allBranchGids, originalData, savingCompanyIdMap, handleSaveManualMapping]);
+  ], [allBranchGids, originalData, handleSaveManualMapping]);
 
   // --- 终端客户治理工具：自定义单元格下拉选择器 ---
   const EndCustomerBranchSelectEditor = useMemo(() => {
@@ -5107,13 +5452,36 @@ const KeyGlobalFamilyTree: React.FC = () => {
       cellStyle: { display: 'flex', alignItems: 'center' },
       cellRenderer: (params: any) => {
         const name = params.value;
-        return (
+        const rowData = params.data || {};
+        const custId = rowData.custId;
+        const log = custId ? governanceLogsMapRef.current[`custId_${custId}`] : null;
+        const notes = log?.notes;
+
+        const content = (
           <div style={{ padding: '4px 0', lineHeight: 1.4 }}>
             <div style={{ fontWeight: 600, color: '#111827', fontSize: '13px' }}>
               {name || '-'}
             </div>
           </div>
         );
+
+        if (notes && notes.trim()) {
+          return (
+            <Tooltip
+              title={
+                <div
+                  style={{ maxHeight: 260, overflowY: 'auto', padding: '4px' }}
+                  dangerouslySetInnerHTML={{ __html: unescapeHtml(notes) }}
+                />
+              }
+              overlayStyle={{ maxWidth: 400 }}
+            >
+              {content}
+            </Tooltip>
+          );
+        }
+
+        return content;
       }
     },
     {
@@ -5205,32 +5573,51 @@ const KeyGlobalFamilyTree: React.FC = () => {
     {
       headerName: '操作',
       field: 'actions',
-      minWidth: 150,
+      minWidth: 160,
       pinned: 'right',
       filter: false,
       sortable: false,
-      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
       cellRenderer: (params: any) => {
         const rowData = params.data || {};
         const isManual = Boolean(rowData.isManualMapped);
         const custId = String(rowData.custId || '');
-        const isSaving = Boolean(savingEndCustomerIdMap[custId]);
+        const isSaving = Boolean(savingEndCustomerIdMapRef.current[custId]);
+
+        const log = custId ? governanceLogsMapRef.current[`custId_${custId}`] : null;
+        const hasNotes = Boolean(log && log.notes && log.notes.trim());
 
         return (
-          <Button
-            type={isManual ? 'primary' : 'default'}
-            size="small"
-            disabled={!isManual}
-            loading={isSaving}
-            icon={<LinkOutlined />}
-            onClick={() => handleSaveEndCustomerManualMapping(rowData)}
-          >
-            关联
-          </Button>
+          <>
+            <Button
+              type={isManual ? 'primary' : 'default'}
+              size="small"
+              disabled={!isManual}
+              loading={isSaving}
+              icon={<LinkOutlined />}
+              onClick={() => handleSaveEndCustomerManualMapping(rowData)}
+            >
+              关联
+            </Button>
+            <Button
+              type={hasNotes ? 'primary' : 'default'}
+              ghost={hasNotes}
+              size="small"
+              icon={<FormOutlined />}
+              onClick={() => {
+                setCurrentAnnotateRow(rowData);
+                const existingLog = custId ? governanceLogsMapRef.current[`custId_${custId}`] : null;
+                setNotesContent(unescapeHtml(existingLog?.notes || ''));
+                setAnnotateModalVisible(true);
+              }}
+            >
+              标注
+            </Button>
+          </>
         );
       }
     }
-  ], [EndCustomerBranchSelectEditor, handleSaveEndCustomerManualMapping, savingEndCustomerIdMap]);
+  ], [EndCustomerBranchSelectEditor, handleSaveEndCustomerManualMapping]);
 
   // --- 企业客户治理工具：自定义单元格下拉选择器 ---
   const EnterpriseCustomerBranchSelectEditor = useMemo(() => {
@@ -5457,13 +5844,36 @@ const KeyGlobalFamilyTree: React.FC = () => {
       cellStyle: { display: 'flex', alignItems: 'center' },
       cellRenderer: (params: any) => {
         const name = params.value;
-        return (
+        const rowData = params.data || {};
+        const custId = rowData.custId;
+        const log = custId ? governanceLogsMapRef.current[`custId_${custId}`] : null;
+        const notes = log?.notes;
+
+        const content = (
           <div style={{ padding: '4px 0', lineHeight: 1.4 }}>
             <div style={{ fontWeight: 600, color: '#111827', fontSize: '13px' }}>
               {name || '-'}
             </div>
           </div>
         );
+
+        if (notes && notes.trim()) {
+          return (
+            <Tooltip
+              title={
+                <div
+                  style={{ maxHeight: 260, overflowY: 'auto', padding: '4px' }}
+                  dangerouslySetInnerHTML={{ __html: unescapeHtml(notes) }}
+                />
+              }
+              overlayStyle={{ maxWidth: 400 }}
+            >
+              {content}
+            </Tooltip>
+          );
+        }
+
+        return content;
       }
     },
     {
@@ -5555,32 +5965,51 @@ const KeyGlobalFamilyTree: React.FC = () => {
     {
       headerName: '操作',
       field: 'actions',
-      minWidth: 150,
+      minWidth: 180,
       pinned: 'right',
       filter: false,
       sortable: false,
-      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
       cellRenderer: (params: any) => {
         const rowData = params.data || {};
         const isManual = Boolean(rowData.isManualMapped);
         const custId = String(rowData.custId || '');
-        const isSaving = Boolean(savingEnterpriseCustomerIdMap[custId]);
+        const isSaving = Boolean(savingEnterpriseCustomerIdMapRef.current[custId]);
+
+        const log = custId ? governanceLogsMapRef.current[`custId_${custId}`] : null;
+        const hasNotes = Boolean(log && log.notes && log.notes.trim());
 
         return (
-          <Button
-            type={isManual ? 'primary' : 'default'}
-            size="small"
-            disabled={!isManual}
-            loading={isSaving}
-            icon={<LinkOutlined />}
-            onClick={() => handleSaveEnterpriseCustomerManualMapping(rowData)}
-          >
-            关联
-          </Button>
+          <>
+            <Button
+              type={isManual ? 'primary' : 'default'}
+              size="small"
+              disabled={!isManual}
+              loading={isSaving}
+              icon={<LinkOutlined />}
+              onClick={() => handleSaveEnterpriseCustomerManualMapping(rowData)}
+            >
+              关联
+            </Button>
+            <Button
+              type={hasNotes ? 'primary' : 'default'}
+              ghost={hasNotes}
+              size="small"
+              icon={<FormOutlined />}
+              onClick={() => {
+                setCurrentAnnotateRow(rowData);
+                const existingLog = custId ? governanceLogsMapRef.current[`custId_${custId}`] : null;
+                setNotesContent(unescapeHtml(existingLog?.notes || ''));
+                setAnnotateModalVisible(true);
+              }}
+            >
+              标注
+            </Button>
+          </>
         );
       }
     }
-  ], [EnterpriseCustomerBranchSelectEditor, handleSaveEnterpriseCustomerManualMapping, savingEnterpriseCustomerIdMap]);
+  ], [EnterpriseCustomerBranchSelectEditor, handleSaveEnterpriseCustomerManualMapping]);
 
   const fetchDashboardData = useCallback(async () => {
     if (!gid) return;
@@ -5970,6 +6399,14 @@ const KeyGlobalFamilyTree: React.FC = () => {
         .row-diff-only-api:hover,
         .row-diff-only-api:hover .ag-cell {
           background-color: #ffd8bf !important;
+        }
+        .row-governance-status-no,
+        .row-governance-status-no .ag-cell {
+          background-color: #d1d5db !important; /* 灰色背景 */
+        }
+        .row-governance-status-no:hover,
+        .row-governance-status-no:hover .ag-cell {
+          background-color: #9ca3af !important; /* 悬浮加深灰色 */
         }
         .row-governance-manual-editing,
         .row-governance-manual-editing .ag-cell {
@@ -6415,7 +6852,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       onCellValueChanged={() => { }}
                       getRowClass={(params: any) => {
                         const d = params.data || {};
-                        // 需求：如果 "method" = "manual" (或 mappingPath 包含 manual / isManualMapped 人工修改)，使用浅红色背景标识行
+                        const log = d.companyId ? governanceLogsMapRef.current[`companyId_${d.companyId}`] : null;
+                        if (log && log.status === 'no') {
+                          return 'row-governance-status-no';
+                        }
                         if (
                           d.method === 'manual' ||
                           d.mappingPath === 'manual' ||
@@ -6523,7 +6963,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       onCellValueChanged={() => { }}
                       getRowClass={(params: any) => {
                         const d = params.data || {};
-                        // 需求：如果 "method" = "manual" (或 mappingPath 包含 manual / isManualMapped 人工修改)，使用浅红色背景标识行
+                        const log = d.custId ? governanceLogsMapRef.current[`custId_${d.custId}`] : null;
+                        if (log && log.status === 'no') {
+                          return 'row-governance-status-no';
+                        }
                         if (
                           d.method === 'manual' ||
                           d.mappingPath === 'manual' ||
@@ -6539,9 +6982,6 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       }}
                       autoSizeStrategy={{ type: 'fitCellContents' }}
                       onFirstDataRendered={(params) => {
-                        params.api.autoSizeAllColumns();
-                      }}
-                      onRowDataUpdated={(params) => {
                         params.api.autoSizeAllColumns();
                       }}
                       sideBar={{ toolPanels: ['columns', 'filters'], defaultToolPanel: '' }}
@@ -6636,7 +7076,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       onCellValueChanged={() => { }}
                       getRowClass={(params: any) => {
                         const d = params.data || {};
-                        // 需求：如果 "method" = "manual" (或 mappingPath 包含 manual / isManualMapped 人工修改)，使用浅红色背景标识行
+                        const log = d.custId ? governanceLogsMapRef.current[`custId_${d.custId}`] : null;
+                        if (log && log.status === 'no') {
+                          return 'row-governance-status-no';
+                        }
                         if (
                           d.method === 'manual' ||
                           d.mappingPath === 'manual' ||
@@ -6652,9 +7095,6 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       }}
                       autoSizeStrategy={{ type: 'fitCellContents' }}
                       onFirstDataRendered={(params) => {
-                        params.api.autoSizeAllColumns();
-                      }}
-                      onRowDataUpdated={(params) => {
                         params.api.autoSizeAllColumns();
                       }}
                       sideBar={{ toolPanels: ['columns', 'filters'], defaultToolPanel: '' }}
@@ -7175,7 +7615,8 @@ const KeyGlobalFamilyTree: React.FC = () => {
                   style={{ width: '100%' }}
                   value={addNodeFormData.registeredCountry || undefined}
                   onChange={(val) => {
-                    const reg = getRegion(val);
+                    const inferredReg = globalDistinctOptions.countryToRegionMap[val];
+                    const reg = inferredReg || getRegion(val);
                     updateAddNodeFormData((prev: any) => ({ ...prev, registeredCountry: val, cmiRegion: reg }));
                   }}
                   options={familyTreeOptions.registeredCountryOptions}
@@ -7327,6 +7768,40 @@ const KeyGlobalFamilyTree: React.FC = () => {
             </Row>
           </Card>
         </div>
+      </Modal>
+
+      {/* 终端客户治理：标注日志 Modal (支持富文本) */}
+      <Modal
+        title="标注数据治理日志"
+        open={annotateModalVisible}
+        onOk={handleSubmitAnnotateLog}
+        confirmLoading={submittingAnnotate}
+        onCancel={() => setAnnotateModalVisible(false)}
+        width={560}
+        destroyOnClose
+        okText="标注提交"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 12 }}>
+          {currentAnnotateRow?.companyId ? (
+            <span style={{ color: '#666', fontSize: '13px' }}>
+              参与方标识 (companyId): <strong style={{ color: '#1677ff' }}>{currentAnnotateRow?.companyId}</strong>
+            </span>
+          ) : (
+            <span style={{ color: '#666', fontSize: '13px' }}>
+              客户标识 (custId): <strong style={{ color: '#1677ff' }}>{currentAnnotateRow?.custId}</strong>
+            </span>
+          )}
+          {(currentAnnotateRow?.enterpriseName || currentAnnotateRow?.companyName) && (
+            <span style={{ marginLeft: 16, color: '#666', fontSize: '13px' }}>
+              企业名称: <strong>{currentAnnotateRow?.enterpriseName || currentAnnotateRow?.companyName}</strong>
+            </span>
+          )}
+        </div>
+        <RichTextEditor
+          value={notesContent}
+          onChange={(val) => setNotesContent(val)}
+        />
       </Modal>
     </div>
   );

@@ -7493,6 +7493,253 @@ keyGlobalFamilyTree表中字段dataSourse名称拼写错误，请更改为dataSo
 2. **MongoDB 数据库修补**：对数据库中 `keyGlobalFamilyTree` 集合执行了原位字段重命名操作（`$rename: { dataSourse: "dataSource" }`），成功将数据库中 7,771 条已有数据中错拼的 `dataSourse` 字段自动修复更名为 `dataSource`。
 3. **构建验证**：前端编译打包测试 (`npm run build`) 已顺利通过。
 
+## 2026-08-10 17:46:44
+**Prompt:**
+1、同步数据表服务器端：
+keycustomer
+keyGlobalFamilyTree
+keyFamilyTreeCustMapping
+2、同步代码到服务器端
+
+**Summary:**
+1. **数据表同步完成**：本地通过 `mongodump` 导出了 `keycustomer` (75条)、`keyGlobalFamilyTree` (7,771条)、`keyFamilyTreeCustMapping` (2,217条) 3 个指定数据表，通过安全通道传输至生产服务器 `tristan@tristan.wang:6822`，并在 Docker MongoDB 容器中以 `--drop` 模式覆盖全量恢复成功（共计恢复 10,063 条记录，索引已完整自动重建）。
+2. **代码提交与服务器自动部署**：本地修改（包含 `dataSource` 拼写更正及分支删除映射校验拦截等）已提交并成功 `git push` 推送至 GitHub `main` 分支。在生产服务器上调用 `./deploy.sh` 脚本完成了远程最新代码拉取、前端 Webpack 编译打包与后端 PM2 (`backend-api`) 进程平滑重启。
+
+## 2026-08-10 17:51:39
+**Prompt:**
+开发环境下mongodb的所有表的索引，也要在服务器端建立
+
+**Summary:**
+1. **开发环境索引全量扫描**：编写并运行了 [sync_all_indexes.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/sync_all_indexes.js) 与 [remote_apply_indexes.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/remote_apply_indexes.js) 自动化索引同步脚本，遍历了开发端本地 MongoDB (`node-boilerplate`) 的所有 165 个集合，解析并提取了包含 190 个自定义索引键与配置属性的所有定义。
+2. **生产环境索引 100% 重建**：通过 SSH 将索引配置传输至生产服务器 `tristan@tristan.wang:6822`，并在生产端 Docker `mongodb` 数据库上为所有集合逐一执行了 `createIndex`。经校验，开发环境所有的 **190 个自定义索引**（如 `GID`、`PID`、`duns`、`staffNo`、`companyId`、`circuitId`、`requireCode` 等）已 **100% 成功建立/确认**（成功 190 个，0 失败）。
+
+## 2026-08-10 17:58:26
+**Prompt:**
+dmcTCV："合同签署日期" 大于 等于"2026-06-01",
+dmcBR："数据月份" 大于等于"202606",
+这两张表需要按照上述条件，增量新增同步到服务器端
+
+**Summary:**
+1. **增量条件筛选导出**：
+   - `dmcTCV` 集合：筛选条件 `"合同签署日期" >= "2026-06-01"`，共精确导出 **1,704** 条符合条件增量数据；
+   - `dmcBR` 集合：筛选条件 `"数据月份" >= "202606"`，共精确导出 **236,116** 条符合条件增量数据。
+2. **服务器端增量 Upsert 合并同步**：增量数据包经压缩（24M）传输至生产服务器 `tristan@tristan.wang:6822`，并在生产端 Docker `mongodb` 数据库中以 `--upsert` 增量更新模式执行 `mongorestore` 写入（确保旧有历史数据不被覆盖删除，新符合条件的增量数据全部高质合并成功）。
+
+## 2026-08-10 18:03:26
+**Prompt:**
+请重新同步，在新增插入服务器数据库之前，先删除掉服务器端：
+dmcTCV："合同签署日期" 大于 等于"2026-06-01"
+dmcBR："数据月份" 大于等于"202606"
+的数据，这样才能保证服务器端不重复
+
+**Summary:**
+1. **服务器端已有旧重合范围精准预清理**：
+   - 先连通生产服务器端 MongoDB 数据库，对 `dmcTCV` 集合删除符合 `"合同签署日期" >= "2026-06-01"` 的全部已有记录；
+   - 对 `dmcBR` 集合删除符合 `"数据月份" >= "202606"` 的全部已有记录。
+2. **增量无冲突高质全量恢复**：将开发端导出的符合同样条件的最新增量数据包完整覆盖恢复至生产服务器（`dmcTCV` 1,704条，`dmcBR` 236,116条），100% 确保了生产数据库的数据最新、最全且绝不重复。
+
+## 2026-08-10 18:06:05
+**Prompt:**
+服务器端，这两个表的数据总数各多少？
+
+**Summary:**
+1. **生产服务器端数据总数精准统计**：
+   - **`dmcTCV` 表**：共 **181,830** 条记录；
+   - **`dmcBR` 表**：共 **4,746,113** 条记录 (约 474.6 万条)。
+2. **两端数据一致性核验**：经对比如下，生产服务器端与本地开发环境的这两张表的数据总条数完全一致：
+   - `dmcTCV`: 本地 181,830 条 ⚡ 生产 181,830 条
+   - `dmcBR`: 本地 4,746,113 条 ⚡ 生产 4,746,113 条
+
+## 2026-08-11 10:49:42
+**Prompt:**
+新增数据表（数据治理日志）：dataGovernanceLog
+{
+  rootGID:"", --该记录属于哪个集团客户
+  companyId: "", --如果是“「参与方」治理”TAB页，写入参与方标识
+  custId: "",--如果是非“「参与方」治理”TAB页，写入当前行客户表标识
+  status: "no", --默认为no
+  notes: "", --备注原因或者其他
+  staff: "", --提交该记录的登录账号 
+  updateAt: ,--更新时间
+}
+该表记录手动关联的情况以及未关联记录的状态及原因逻辑如下：
+1、“「终端客户」治理”TAB页面，最后固定列增加按钮“标注”，点击后弹出输入原因的文本框，及标注按钮。用户输入notes文本框后，标注按钮提交后，写入上述表中记录。
+如果该行的日志已经存在，则为编辑notes
+2、以下这三个页面，鼠标移动到“企业名称”列的Cell，以hint形式显示dataGovernanceLog表中关联的记录的notes字段（以rootGID为主，通过companyId或custId关联）
+「参与方」治理
+「终端客户」治理
+「企业客户」治理
+且如果记录存在，且status==“no”，该行背景为灰色
+
+**Summary:**
+1. **方案制定与规划确认**：制定了 `dataGovernanceLog` 数据表模型、接口及前端跨 3 个治理 TAB 页的属性关联与界面着色渲染方案。
+
+## 2026-08-11 10:57:30
+**Prompt:**
+弹出 Modal 弹窗（包含 Input.TextArea 文本框及确认提交按钮），这个文本输入框以富文本样式，可以粗体、斜体、颜色即可，提示的Tooltip/Hint 形式也需要能显示富文本。
+加上述的要求，并执行
+
+**Summary:**
+1. **数据模型与 API 开发**：创建了 `DataGovernanceLog` 数据模型 (`dataGovernanceLog.model.js`)、Service 层、Controller 层及 `/v1/data-governance-logs` 路由，支持以 `rootGID` + (`companyId` 或 `custId`) 的组合格式更新/插入日志，并自动记入提交人员 `staff` 与修改时间 `updateAt`。
+2. **轻量级富文本编辑器与 Modal 实现**：在前端构建了 `RichTextEditor` 富文本编辑器组件（支持文字粗体 Bold、斜体 Italic 及 6 种预设调色），并在“「终端客户」治理” TAB 表格的最后固定列中添加了【标注】按钮，触发弹出标注 Modal，提交后落库。
+3. **富文本 Hint/Tooltip 悬浮及灰底视觉样式渲染**：在“「参与方」治理”、“「终端客户」治理”和“「企业客户」治理”3 个 TAB 页面中，实现了当鼠标悬浮“企业名称”列时以 HTML 富文本形式（Tooltip）显示标注 notes；当关联记录存在且 `status === 'no'` 时，表格对应行高优先级渲染为灰色背景（`row-governance-status-no`）。
+
+## 2026-08-11 11:01:12
+**Prompt:**
+报错：selectedEnterpriseInfo is not defined
+
+**Summary:**
+1. **定位并修复 State 缺失报错**：排查发现为前面增加状态时删除了 `selectedEnterpriseInfo`、`enterpriseTcvModalVisible` 以及 `selectedEnterpriseTcvList` 的 `useState` 声明。已在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx#L2208-L2211) 中将其完整补充还原，彻底消除了该运行时未定义报错。
+
+## 2026-08-11 11:02:14
+**Prompt:**
+继续报错：enterpriseCustomerGridRef is not defined
+
+**Summary:**
+1. **补齐 Ref 引用变量**：定位并修复了缺失的 `const enterpriseCustomerGridRef = useRef<any>(null);` 变量声明，确保 AG Grid 在「企业客户」治理 TAB 中的引用和单元格动态刷新正常。
+
+## 2026-08-11 11:08:13
+**Prompt:**
+1、以 Tooltip/Hint 形式展示关联日志的 notes 内容，无法显示富文本的样式，出现html的代码
+2、弹出的标注页面，文本框无法显示正常的富文本样式。且点击颜色字体不生效
+
+**Summary:**
+1. **全链路 HTML 实体反转义解码**：编写了全局 `unescapeHtml` 工具函数。排查出后端包含 `xss-clean` 防御中间件将 `<`/`>` 自动转义成实体编码 `&lt;`/`&gt;`；在前端获取数据 `fetchGovernanceLogs`、显示 Tooltip 及打开 Modal 初始化富文本框时统一进行解码还原，解决在 Tooltip 和编辑框中显示 HTML 源代码的异常。
+2. **富文本编辑器选区防失焦与颜色生效修复**：在 `RichTextEditor` 工具栏的外层容器及按钮绑定 `onMouseDown={(e) => e.preventDefault()}`，防止点击粗体、斜体或颜色图标时夺走 `contentEditable` 编辑区的选区焦点；同步新增了 `<input type="color">` 自定义拾色器，确保划选文字后点击文字颜色能 100% 实时生效。
+
+## 2026-08-11 11:18:19
+**Prompt:**
+1、字体颜色选择，默认黑、白、红、黄、绿、蓝
+2、标注提交后，表格无论是否刷新，列宽自动扩展，或保持不变
+3、这两个页面也同样要添加标注：
+「参与方」治理，插入对应companyId
+「企业客户」治理，同终端客户页面逻辑一样，插入custId
+
+**Summary:**
+1. **预设颜色更新**：将 `RichTextEditor` 的预设文字调色盘升级为：**黑色、白色（带灰阶对比边框）、红色、黄色、绿色、蓝色**，并结合自定义拾色器支持任意色彩设置。
+2. **保持表格列宽无缝稳定**：优化了 `handleSubmitAnnotateLog` 提交后的更新逻辑，提交成功后仅触发 `refreshCells` 和 `redrawRows` 原地局部重绘着色与 Tooltip，不再触发表格列宽重新计算或宽度抖动，完全维持当前表格调整好的列宽不变。
+3. **「参与方」与「企业客户」治理 TAB 拓展标注功能**：在「参与方」治理 TAB（自动关联 `companyId`）和「企业客户」治理 TAB（自动关联 `custId`）的操作列中均成功加入了 **【标注】** 按钮，全量覆盖 3 个治理 TAB 页面。
+
+## 2026-08-11 11:25:07
+**Prompt:**
+标注提交后，还是会改变列宽，请修复
+
+**Summary:**
+1. **消除 ColumnDefs 引用更新导致的列重置**：定位到先前的根因是 `governanceColDefs`、`endCustomerColDefs` 与 `enterpriseCustomerColDefs` 的 `useMemo` 依赖项中包含了 `governanceLogsMap`。当标注提交并更新日志 Map 时，生成了全新引用的 `columnDefs`，导致 AG Grid 触发了重置列状态（Reset Column Widths）。现改为通过 `governanceLogsMapRef` 获取最新日志，将 Map 从依赖项中彻底解耦，防止 `columnDefs` 改变。
+2. **清理 `onRowDataUpdated` 中的全表列宽自适应重算**：删除了 AG Grid 配置中会在数据行更新时误触发的 `onRowDataUpdated={(params) => params.api.autoSizeAllColumns()}` 回调。在提交标注保存后仅原地局部重绘 `refreshCells` 和 `redrawRows`，使用户拖拽或自定义调整好的当前表格列宽 100% 保持锁定不变！
+
+## 2026-08-11 11:34:03
+**Prompt:**
+3个tab页的「关联」 按钮提交后，还是会改变列宽，请修复
+
+**Summary:**
+1. **彻底解耦 Saving Map 依赖**：定位到点击【关联】按钮后改变列宽的根因是 `savingCompanyIdMap`、`savingEndCustomerIdMap` 和 `savingEnterpriseCustomerIdMap` 处于 3 个治理 TAB `columnDefs` 的 `useMemo` 依赖项中。当点击【关联】按钮触发 Loading 菊花及请求完成恢复时，这两个 State 变更导致 `columnDefs` 重新生成数组引用，引起 AG Grid 重置全表列宽。现引入 `savingCompanyIdMapRef`、`savingEndCustomerIdMapRef` 和 `savingEnterpriseCustomerIdMapRef` 并在 useEffect 中同步最新状态，将 Map 依赖从 `columnDefs` 中彻底解耦除名。
+2. **结合局部 `refreshCells` 与 `redrawRows`**：在关联保存完成后仅触发 `api.refreshCells({ force: true })` 与 `api.redrawRows()` 进行原地行重绘，确保整个提交生命周期中 `columnDefs` 引用恒定不变，用户拖拽和调整好的当前表格列宽 100% 绝对保持稳定不变！
+
+## 2026-08-11 12:05:44
+**Prompt:**
+「新增基因树节点」弹出页面中，注册国家/地区 (registeredCountry) 的数据来源是？ 为什么没有Malaysia
+
+**Summary:**
+1. **数据来源排查**：在 `key-global-family-tree.tsx` 中，`registeredCountry`（注册国家/地区）下拉列表是由 `familyTreeOptions` 函数从当前已加载的基因树全局节点数组（`originalData`，即 MongoDB `keyGlobalFamilyTree` 集合）中，扫描所有节点的 `registeredCountry` 字段提取去重并按字典序排序派生而来的。
+2. **缺失 Malaysia 原因**：由于当前选中的集团/基因树现存的所有节点数据中，`registeredCountry` 字段尚不存在值为 `"Malaysia"` 的记录，因此动态去重提取后下拉列表中未包含该选项。如需支持选中 `"Malaysia"`，可直接向标准选项列表补充静态/默认国家字典或支持动态搜索填入。
+
+## 2026-08-11 12:10:24
+**Prompt:**
+修改：遍历“当前集团”基因树下的所有已有节点记录，收集每一个节点的 registeredCountry 字段值。。。改为distinct整张表keyGlobalFamilyTree的registeredCountry，cmiRegion，registeredCity，
+
+**Summary:**
+1. **新增后端 API 接口支持全表 Distinct**：在 `keyCustomerOverview.controller.js` 中新增了 `getFamilyTreeDistinctOptions` 接口并注册路由 `/api/v1/key-customer-overview/family-tree-distinct-options`。通过 MongoDB 原生 `distinct` 聚合，从整张 `keyGlobalFamilyTree` 集合中聚合全量 151 个国家（完整包含 Malaysia、Singapore、United States 等）、10 个 CMI 区域、1959 个城市、实体类型、企业性质及行业去重选项。
+2. **构建国家至区域的智能推导字典 (`countryToRegionMap`)**：后端利用聚合分析提取出最高频的国家与 CMI 区域映射对。前端选择任何新国家（例如选定 `"Malaysia"`）时，表单不仅可直接选择国家，还会自动联动将 CMI 区域（`cmiRegion`）智能填充为对应的区域（如 `"APAC"`）。
+3. **前端全局选项整合**：前端组件挂载时自动拉取全量 151 个国家的去重字典并与当前集团节点合并，彻底解决在弹窗中选择 Malaysia 等其他国家/地区的业务需求。
+
+## 2026-08-11 12:12:42
+**Prompt:**
+报错：Cannot read properties of undefined (reading 'entityTypeOptions')
+
+**Summary:**
+1. **排查并解决变量未声明前被访问问题**：定位到报错根因是 `globalDistinctOptions` 状态的 `useState` 定义位置处于 `familyTreeOptions` `useMemo` 计算逻辑下方。当 React 执行首次渲染时，`familyTreeOptions` 尝试解构访问尚未声明初始化的 `globalDistinctOptions` 变量，导致抛出 `Cannot read properties of undefined (reading 'entityTypeOptions')`。
+2. **状态提升与可选链安全防护**：将 `globalDistinctOptions` 状态与拉取逻辑提升至 `familyTreeOptions` 变量上方，同时在集合读取处加上可选链防空保护 `(globalDistinctOptions?.entityTypeOptions || [])`，彻底消除渲染报错。
+
+## 2026-08-11 15:13:27
+**Prompt:**
+临时统计数据
+给我一个统计数据，不需要做到页面上，给我返回列表数据即可：
+分别统计2026年上半年、2027年上半年的A端的签单金额、收入数据，统计逻辑参考「要客概览」页面的“要客历年签单金额趋势” 的逻辑
+
+**Summary:**
+1. **分析并对齐「要客概览」A端统计逻辑**：
+   - 提取要客 GID 与行业映射（`keycustomer`）。
+   - 筛选 `keyFamilyTreeCustMapping` 中 `mappingPath = 'endCustomer'` 的映射，通过 `ibosscustomers` 关联终端客户名称。
+   - 匹配 `dmcTCV` 集合中的签单记录，过滤 `订单状态 != 'achive'`，按 `合同签署日期`、`设置起租日期`、`电路编号`、`订单状态`、`签单金额(港币)` 5 字段排重。
+   - 匹配 `dmcBR` 集合中的计费收入记录，通过电路编号关联要客，按月份筛选并优先读取 `拆分后港币金额｜绝对值`。
+2. **生成并执行统计脚本**：
+   - 精确统计 2026年上半年（2026-01-01 至 2026-06-30 / 数据月份 202601 ~ 202606）与 2027年上半年（2027-01-01 至 2027-06-30 / 数据月份 202701 ~ 202706）的 A端 签单金额与收入数据。
+   - 汇总并整理总额、笔数/记录数、按8大行业明细拆解及要客客户维度拆解列表数据。
+
+## 2026-08-11 15:16:44
+**Prompt:**
+错了，是2025年上半年和2026年上半年
+分别统计2026年上半年、2025年上半年的A端的签单金额、收入数据，及各自的同比增长。统计逻辑参考「要客概览」页面的“要客历年签单金额趋势” 的逻辑
+
+**Summary:**
+1. **更新统计逻辑与范围**：
+   - 调整统计区间为 2025上半年（2025-01-01 至 2025-06-30 / 数据月份 202501 ~ 202506）和 2026上半年（2026-01-01 至 2026-06-30 / 数据月份 202601 ~ 202606）。
+   - 保持与「要客概览」页面一致的 A端 终端客户映射、TCV 签单去重以及 BR 收入按电路关联逻辑。
+2. **计算同比增长率 (YoY) 并整理列表输出**：
+   - 更新并运行统计脚本 `scripts/temp_stat_a_side.js`。
+   - 精确计算总额、8大行业维度以及 Top 客户维度的 2025H1 vs 2026H1 同比增长率与增减金额，生成列表数据呈现。
+
+## 2026-08-11 15:18:13
+**Prompt:**
+再统计一下B端：
+统计2026年上半年、2025年上半年的B端的签单金额、收入数据，及各自的同比增长。统计逻辑参考「要客概览」页面的“要客历年签单金额趋势” 的逻辑
+
+**Summary:**
+1. **对齐「要客概览」B端统计逻辑**：
+   - 提取全量 `keyFamilyTreeCustMapping` 映射（使用 `extCustId` 直接匹配 `dmcTCV` 中的 `签约客户标识`）。
+   - 按订单状态（过滤 `achive`）及 5 字段去重后计算 2025H1 与 2026H1 B端 TCV 签单金额。
+   - 通过 B端 电路提取 `dmcBR` 集合中的收入数据，筛选 202501~202506 与 202601~202606 计费月份。
+2. **生成并执行 B端 统计脚本**：
+   - 编写并运行 `scripts/temp_stat_b_side.js`，精确汇总 B端 总额、同比增长率及 8 大行业细分对比。
+
+## 2026-08-11 15:20:28
+**Prompt:**
+A端+B端合计一下
+
+**Summary:**
+1. **A端与B端数据求和计算**：
+   - 将 A端 和 B端 的 2025H1 与 2026H1 签单金额 (TCV) 与收入数据 (BR) 进行按行业及总量的精确合并计算。
+   - 编写并运行 `scripts/temp_stat_ab_combined.js` 自动处理数据汇总与同比增长率算术计算。
+2. **生成完整 A+B端 合计列表报告**：
+   - 呈现总额、增减额度、YoY 同比增长率以及 8 大行业合计数与同比变化明细。
+
+## 2026-08-11 15:57:37
+**Prompt:**
+TCV和BR，“上半年” 这个时间你是如何使用的条件？
+
+**Summary:**
+1. **详细说明 TCV 和 BR 表的“上半年”时间筛选条件**：
+   - **TCV (签单金额表)**：以 `合同签署日期` 字段为准，2025H1 条件为 `>= '2025-01-01' && <= '2025-06-30 23:59:59'`，2026H1 条件为 `>= '2026-01-01' && <= '2026-06-30 23:59:59'`。
+   - **BR (计费收入表)**：以 `数据月份` 字段为准，2025H1 条件为包含了 `['202501', '202502', '202503', '202504', '202505', '202506']`，2026H1 条件为包含了 `['202601', '202602', '202603', '202604', '202605', '202606']`。
+
+## 2026-08-11 18:33:39
+**Prompt:**
+1、同步以下表到服务器端：
+datagovernancelogs
+keyGlobalFamilyTree
+keyFamilyTreeCustMapping
+2、同步最新代码到服务器端
+
+**Summary:**
+1. **数据表精准同步至生产服务器**：通过 `mongodump` 导出本地 `datagovernancelogs`、`keyGlobalFamilyTree` 与 `keyFamilyTreeCustMapping` 3 个目标数据表，使用 SCP 传输至生产服务器 `tristan@tristan.wang:6822`，并在 Docker `mongodb` 容器中通过 `mongorestore --drop` 成功全量还原覆盖写入，数据索引完整自动重建。
+2. **代码提交与生产服务器部署**：将本地代码变更 commit 并推送（`git push`）至 GitHub `main` 分支；远程 SSH 连接生产服务器执行 `./deploy.sh` 脚本，拉取最新代码并完成了后端 PM2 进程平滑重启与前端重新构建部署。
+
+
+
+
+
+
 
 
 

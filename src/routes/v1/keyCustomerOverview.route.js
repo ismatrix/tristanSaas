@@ -22,6 +22,9 @@ router.get('/family-tree-dashboard-stats', auth(), overviewController.getFamilyT
 // 获取所有已发生过 CMI 成交渗透的要客集团 GID 列表
 router.get('/penetrated-gids', auth(), overviewController.getPenetratedGids);
 
+// 获取 keyGlobalFamilyTree 全表 distinct 去重下拉数据 (国家、区域、城市等)
+router.get('/family-tree-distinct-options', auth(), overviewController.getFamilyTreeDistinctOptions);
+
 // 获取 keyGlobalFamilyTree 全量分支的渗透情况列表（含历史 TCV 笔数、搜索与分页）
 router.get('/branches', auth(), overviewController.getKeyFamilyTreeBranches);
 

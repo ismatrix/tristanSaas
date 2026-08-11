@@ -1414,6 +1414,53 @@ const getKeyFamilyTreeBranches = catchAsync(async (req, res) => {
   });
 });
 
+const getFamilyTreeDistinctOptions = catchAsync(async (req, res) => {
+  const db = mongoose.connection.db;
+  const collection = db.collection('keyGlobalFamilyTree');
+
+  const [countries, regions, cities, entityTypes, natures, cmiIndustries, countryRegionPairs] = await Promise.all([
+    collection.distinct('registeredCountry', { registeredCountry: { $ne: null, $ne: '' } }),
+    collection.distinct('cmiRegion', { cmiRegion: { $ne: null, $ne: '' } }),
+    collection.distinct('registeredCity', { registeredCity: { $ne: null, $ne: '' } }),
+    collection.distinct('entityTypeName', { entityTypeName: { $ne: null, $ne: '' } }),
+    collection.distinct('enterpriseNature', { enterpriseNature: { $ne: null, $ne: '' } }),
+    collection.distinct('cmiIndustry', { cmiIndustry: { $ne: null, $ne: '' } }),
+    collection.aggregate([
+      { $match: { registeredCountry: { $ne: null, $ne: '' }, cmiRegion: { $ne: null, $ne: '' } } },
+      { $group: { _id: { country: '$registeredCountry', region: '$cmiRegion' }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]).toArray()
+  ]);
+
+  // 构建国家到 CMI 区域的智能推导字典
+  const countryToRegionMap = {};
+  countryRegionPairs.forEach(pair => {
+    const country = pair._id?.country;
+    const region = pair._id?.region;
+    if (country && region && !countryToRegionMap[country]) {
+      countryToRegionMap[country] = region;
+    }
+  });
+
+  const cleanAndSort = (arr) => {
+    if (!Array.isArray(arr)) return [];
+    return Array.from(new Set(arr.filter(v => v && typeof v === 'string' && v.trim()).map(v => v.trim()))).sort((a, b) => a.localeCompare(b, 'en-US'));
+  };
+
+  res.send({
+    code: 200,
+    data: {
+      registeredCountryOptions: cleanAndSort(countries).map(v => ({ value: v, label: v })),
+      cmiRegionOptions: cleanAndSort(regions).map(v => ({ value: v, label: v })),
+      registeredCityOptions: cleanAndSort(cities).map(v => ({ value: v, label: v })),
+      entityTypeOptions: cleanAndSort(entityTypes).map(v => ({ value: v, label: v })),
+      enterpriseNatureOptions: cleanAndSort(natures).map(v => ({ value: v, label: v })),
+      cmiIndustryOptions: cleanAndSort(cmiIndustries).map(v => ({ value: v, label: v })),
+      countryToRegionMap
+    }
+  });
+});
+
 module.exports = {
   getOverviewStats,
   getCountryBranches,
@@ -1421,5 +1468,6 @@ module.exports = {
   getBrDetail,
   getFamilyTreeDashboardData,
   getPenetratedGids,
-  getKeyFamilyTreeBranches
+  getKeyFamilyTreeBranches,
+  getFamilyTreeDistinctOptions
 };
