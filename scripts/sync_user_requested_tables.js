@@ -21,7 +21,7 @@ const CONFIG = {
 };
 
 const TARGET_COLLECTIONS = [
-  'datagovernancelogs',
+  'keycustomer',
   'keyGlobalFamilyTree',
   'keyFamilyTreeCustMapping'
 ];

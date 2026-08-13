@@ -7735,6 +7735,58 @@ keyFamilyTreeCustMapping
 1. **数据表精准同步至生产服务器**：通过 `mongodump` 导出本地 `datagovernancelogs`、`keyGlobalFamilyTree` 与 `keyFamilyTreeCustMapping` 3 个目标数据表，使用 SCP 传输至生产服务器 `tristan@tristan.wang:6822`，并在 Docker `mongodb` 容器中通过 `mongorestore --drop` 成功全量还原覆盖写入，数据索引完整自动重建。
 2. **代码提交与生产服务器部署**：将本地代码变更 commit 并推送（`git push`）至 GitHub `main` 分支；远程 SSH 连接生产服务器执行 `./deploy.sh` 脚本，拉取最新代码并完成了后端 PM2 进程平滑重启与前端重新构建部署。
 
+## 2026-08-12 09:10:53
+**Prompt:**
+「参与方」治理
+「终端客户」治理
+「企业客户」治理
+三个页面点击标注弹出的信息框中，焦点默认在文本输入框上
+
+**Summary:**
+1. **自动焦点聚集与光标定位优化**：在 `RichTextEditor` 富文本组件中新增 `autoFocus` 聚焦逻辑，当 Modal 弹出时自动触发 `editorRef.current.focus()`，并通过 Selection/Range 选区 API 将光标准确定位至文本输入框末尾，提升交互体验。
+2. **Modal 焦点拦截配置**：将标注 Modal 的 `autoFocusButton` 设为 `null`，禁止 Modal 弹窗抢夺默认焦点至按钮上，确保焦点始终保持在文本输入框中。
+
+## 2026-08-12 09:52:07
+**Prompt:**
+这三个页面，对已有标注的编辑，弹出信息框上增加“删除标注” 的按钮和功能
+
+**Summary:**
+1. **新增后端删除治理日志 API**：在 `dataGovernanceLog` 的 Service、Controller 与 Route 中增加 `DELETE /api/v1/data-governance-logs` 彻底物理删除标注日志接口。
+2. **前端已有标注弹出框支持一键“删除标注”**：
+   - 智能识别当前行是否属于已有标注（`hasExistingNotes`）。
+   - 在标注弹窗 Modal 底部增加带危险确认气泡（`<Popconfirm>`）的“删除标注”按钮。
+   - 删除成功后实时更新治理日志状态映射、清除输入框内容并同步触发 3 个治理 AG Grid 表格单元格和按钮状态刷新。
+
+## 2026-08-12 10:02:02
+**Prompt:**
+“「参与方」治理” 页面，如果提交了关联之后，“「终端客户」治理”  和“「企业客户」治理” 页面 需要自动刷新数据
+
+**Summary:**
+1. **跨治理页面联动刷新数据**：在「参与方」治理提交手动关联函数 `handleSaveManualMapping` 中，当写入 `keyFamilyTreeCustMapping` 成功后，自动触发调用 `fetchEndCustomerGovernanceData()` 与 `fetchEnterpriseCustomerGovernanceData()` 重新获取并刷洗「终端客户」治理和「企业客户」治理页面与表格的数据，确保多页面数据实时同步。
+
+## 2026-08-12 14:11:20
+**Prompt:**
+「参与方」治理
+「终端客户」治理
+「企业客户」治理
+这三个页面，有标注的行，背景使用浅灰色
+
+**Summary:**
+1. **新增有标注行 CSS 样式规则**：在 `key-global-family-tree.tsx` 的全局样式块中增加 `.row-governance-annotated` 样式规则，定义背景色为浅灰色 `#f3f4f6`（悬浮为 `#e5e7eb`）。
+2. **三个治理表格行样式逻辑联动**：在「参与方」治理、「终端客户」治理与「企业客户」治理三个表格的 `getRowClass` 中，优先检查 `governanceLogsMapRef` 是否存在标注（`log?.notes` 非空），若有则应用 `'row-governance-annotated'` 浅灰色背景样式。
+
+## 2026-08-13 09:45:00
+**Prompt:**
+1、同步数据表服务器端：
+keycustomer
+keyGlobalFamilyTree
+keyFamilyTreeCustMapping
+2、同步代码到服务器端
+
+**Summary:**
+1. **数据表精准同步至生产服务器**：通过 `mongodump` 导出本地 `keycustomer`、`keyGlobalFamilyTree` 与 `keyFamilyTreeCustMapping` 3 个目标数据表，使用 SCP 传输至生产服务器 `tristan@tristan.wang:6822`，并在 Docker `mongodb` 容器中通过 `mongorestore --drop` 成功覆盖全量还原，数据索引完整自动重建。
+2. **代码提交与生产服务器部署**：将本地代码变更 commit 并推送（`git push`）至 GitHub `main` 分支；远程 SSH 连接生产服务器执行 `./deploy.sh` 脚本，拉取最新代码并完成了后端 PM2 进程平滑重启与前端 Webpack 打包编译部署。
+
 
 
 

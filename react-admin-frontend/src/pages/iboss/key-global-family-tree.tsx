@@ -64,7 +64,8 @@ const RichTextEditor: React.FC<{
   value: string;
   onChange: (val: string) => void;
   style?: React.CSSProperties;
-}> = ({ value, onChange, style }) => {
+  autoFocus?: boolean;
+}> = ({ value, onChange, style, autoFocus = true }) => {
   const editorRef = useRef<HTMLDivElement>(null);
 
   // 初始化设置 innerHTML，自动反转义解码
@@ -76,6 +77,29 @@ const RichTextEditor: React.FC<{
       }
     }
   }, [value]);
+
+  // 当 autoFocus 为 true 时，弹窗打开后自动聚焦可编辑文本框，并将光标移至文末
+  useEffect(() => {
+    if (autoFocus && editorRef.current) {
+      const timer = setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus();
+        try {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(editorRef.current);
+          range.collapse(false);
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocus]);
 
   const execCmd = (command: string, val: string | undefined = undefined) => {
     if (editorRef.current) {
@@ -2403,6 +2427,71 @@ const KeyGlobalFamilyTree: React.FC = () => {
     }
   };
 
+  // 删除标注数据治理日志
+  const handleDeleteAnnotateLog = async () => {
+    const targetCompanyId = currentAnnotateRow?.companyId ? String(currentAnnotateRow.companyId) : '';
+    const targetCustId = currentAnnotateRow?.custId ? String(currentAnnotateRow.custId) : '';
+
+    if (!targetCompanyId && !targetCustId) {
+      message.warning('无法删除标注：缺少有效标识(companyId 或 custId)');
+      return;
+    }
+    setSubmittingAnnotate(true);
+    try {
+      const res = await request('/api/v1/data-governance-logs', {
+        method: 'DELETE',
+        data: {
+          rootGID: String(gid || ''),
+          companyId: targetCompanyId,
+          custId: targetCustId,
+        },
+      });
+
+      if (res && res.code === 200) {
+        message.success('标注已成功删除！');
+        setNotesContent('');
+        setAnnotateModalVisible(false);
+        await fetchGovernanceLogs();
+
+        // 局部刷新 3 个 AG Grid 单元格与行着色，保持当前列宽不变
+        if (endCustomerGridRef.current && endCustomerGridRef.current.api) {
+          endCustomerGridRef.current.api.refreshCells({ force: true });
+          endCustomerGridRef.current.api.redrawRows();
+        }
+        if (governanceGridRef.current && governanceGridRef.current.api) {
+          governanceGridRef.current.api.refreshCells({ force: true });
+          governanceGridRef.current.api.redrawRows();
+        }
+        if (enterpriseCustomerGridRef.current && enterpriseCustomerGridRef.current.api) {
+          enterpriseCustomerGridRef.current.api.refreshCells({ force: true });
+          enterpriseCustomerGridRef.current.api.redrawRows();
+        }
+      } else {
+        message.error(res?.message || '删除标注失败');
+      }
+    } catch (err) {
+      console.error('删除标注日志出错:', err);
+      message.error('删除标注日志出错');
+    } finally {
+      setSubmittingAnnotate(false);
+    }
+  };
+
+  const currentExistingLog = useMemo(() => {
+    if (!currentAnnotateRow) return null;
+    const compId = currentAnnotateRow.companyId ? String(currentAnnotateRow.companyId) : '';
+    const custId = currentAnnotateRow.custId ? String(currentAnnotateRow.custId) : '';
+    if (compId && governanceLogsMap[`companyId_${compId}`]) {
+      return governanceLogsMap[`companyId_${compId}`];
+    }
+    if (custId && governanceLogsMap[`custId_${custId}`]) {
+      return governanceLogsMap[`custId_${custId}`];
+    }
+    return null;
+  }, [currentAnnotateRow, governanceLogsMap]);
+
+  const hasExistingNotes = !!(currentExistingLog?.notes && currentExistingLog.notes.trim() !== '');
+
   const isKeywordsChanged = useMemo(() => {
     const s1 = [...(selectedKeywords || [])].sort().join('||');
     const s2 = [...(savedKeywords || [])].sort().join('||');
@@ -4072,88 +4161,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       setSubmittingAddNode(false);
     }
   }, [addNodeFormData, targetParticipantRow, handleSelectMappedNode, formValidationStatus]);
-  const handleSaveManualMapping = useCallback(async (rowRecord: any) => {
-    if (!rowRecord || !rowRecord.companyId || !rowRecord.mappedGid) {
-      message.warning('无法提交：缺少参与方标识或映射节点 GID');
-      return;
-    }
 
-    const companyId = String(rowRecord.companyId);
-    const selectedGid = String(rowRecord.mappedGid);
-    const ultimateGid = String(gid || rowRecord.ultimateGID || selectedGid);
-
-    setSavingCompanyIdMap(prev => ({ ...prev, [companyId]: true }));
-
-    try {
-      // 1. 查询 excelParticipantCustMapping，找到该 companyId 关联的 extCustId 列表
-      const partRes = await request('/api/v1/wildcards/excelParticipantCustMapping', {
-        method: 'GET',
-        params: {
-          query: JSON.stringify({ companyId }),
-          options: JSON.stringify({ limit: 1000 })
-        }
-      });
-
-      const partList = partRes.results || partRes.data?.results || [];
-      let extCustIds: string[] = partList
-        .map((r: any) => String(r.extCustId || ''))
-        .filter(Boolean);
-
-      extCustIds = Array.from(new Set(extCustIds));
-
-      // 若未关联出 extCustId，兜底使用 companyId 自身
-      if (extCustIds.length === 0) {
-        extCustIds = [companyId];
-      }
-
-      // 2. 遍历 extCustIds，生成并插入多条记录到 keyFamilyTreeCustMapping
-      let successCount = 0;
-      for (const extCustId of extCustIds) {
-        const payload = {
-          ultimateGID: ultimateGid,
-          GID: selectedGid,
-          extCustId: extCustId,
-          mappingPath: 'participant',
-          method: 'manual',
-          companyId: companyId,
-          createdAt: new Date().toISOString()
-        };
-
-        await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
-          method: 'POST',
-          data: payload
-        });
-        successCount++;
-      }
-
-      message.success(`关联成功！已成功向 keyFamilyTreeCustMapping 保存 ${successCount} 条手动关联数据`);
-
-      // 3. 更新前端行数据状态
-      setGovernanceRowData(prevData => {
-        return prevData.map(item => {
-          if (item.companyId === companyId) {
-            return {
-              ...item,
-              isManualMapped: false,
-              isMapped: true,
-              mappingPath: 'participant',
-              method: 'manual'
-            };
-          }
-          return item;
-        });
-      });
-      setTimeout(() => {
-        governanceGridRef.current?.api?.refreshCells({ force: true });
-        governanceGridRef.current?.api?.redrawRows();
-      }, 50);
-    } catch (err) {
-      console.error('保存手动关联失败:', err);
-      message.error('保存手动关联失败，请稍后重试');
-    } finally {
-      setSavingCompanyIdMap(prev => ({ ...prev, [companyId]: false }));
-    }
-  }, [gid]);
 
 
 
@@ -4815,6 +4823,94 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
     message.success(`已为企业客户【${rowRecord.enterpriseName || rowRecord.custId}】选中节点: ${cnName} (#${selectedGid})，请点击最右侧“关联”按钮提交落库`);
   }, [originalData]);
+
+  // --- 参与方治理：提交手动映射关联，成功后自动连带刷新终端客户治理与企业客户治理数据 ---
+  const handleSaveManualMapping = useCallback(async (rowRecord: any) => {
+    if (!rowRecord || !rowRecord.companyId || !rowRecord.mappedGid) {
+      message.warning('无法提交：缺少参与方标识或映射节点 GID');
+      return;
+    }
+
+    const companyId = String(rowRecord.companyId);
+    const selectedGid = String(rowRecord.mappedGid);
+    const ultimateGid = String(gid || rowRecord.ultimateGID || selectedGid);
+
+    setSavingCompanyIdMap(prev => ({ ...prev, [companyId]: true }));
+
+    try {
+      // 1. 查询 excelParticipantCustMapping，找到该 companyId 关联的 extCustId 列表
+      const partRes = await request('/api/v1/wildcards/excelParticipantCustMapping', {
+        method: 'GET',
+        params: {
+          query: JSON.stringify({ companyId }),
+          options: JSON.stringify({ limit: 1000 })
+        }
+      });
+
+      const partList = partRes.results || partRes.data?.results || [];
+      let extCustIds: string[] = partList
+        .map((r: any) => String(r.extCustId || ''))
+        .filter(Boolean);
+
+      extCustIds = Array.from(new Set(extCustIds));
+
+      // 若未关联出 extCustId，兜底使用 companyId 自身
+      if (extCustIds.length === 0) {
+        extCustIds = [companyId];
+      }
+
+      // 2. 遍历 extCustIds，生成并插入多条记录到 keyFamilyTreeCustMapping
+      let successCount = 0;
+      for (const extCustId of extCustIds) {
+        const payload = {
+          ultimateGID: ultimateGid,
+          GID: selectedGid,
+          extCustId: extCustId,
+          mappingPath: 'participant',
+          method: 'manual',
+          companyId: companyId,
+          createdAt: new Date().toISOString()
+        };
+
+        await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
+          method: 'POST',
+          data: payload
+        });
+        successCount++;
+      }
+
+      message.success(`关联成功！已成功向 keyFamilyTreeCustMapping 保存 ${successCount} 条手动关联数据`);
+
+      // 3. 更新前端当前参与方行数据状态
+      setGovernanceRowData(prevData => {
+        return prevData.map(item => {
+          if (item.companyId === companyId) {
+            return {
+              ...item,
+              isManualMapped: false,
+              isMapped: true,
+              mappingPath: 'participant',
+              method: 'manual'
+            };
+          }
+          return item;
+        });
+      });
+      setTimeout(() => {
+        governanceGridRef.current?.api?.refreshCells({ force: true });
+        governanceGridRef.current?.api?.redrawRows();
+      }, 50);
+
+      // 4. 自动重新拉取并刷洗「终端客户」治理与「企业客户」治理页面数据
+      fetchEndCustomerGovernanceData();
+      fetchEnterpriseCustomerGovernanceData();
+    } catch (err) {
+      console.error('保存手动关联失败:', err);
+      message.error('保存手动关联失败，请稍后重试');
+    } finally {
+      setSavingCompanyIdMap(prev => ({ ...prev, [companyId]: false }));
+    }
+  }, [gid, fetchEndCustomerGovernanceData, fetchEnterpriseCustomerGovernanceData]);
 
 
 
@@ -6400,6 +6496,14 @@ const KeyGlobalFamilyTree: React.FC = () => {
         .row-diff-only-api:hover .ag-cell {
           background-color: #ffd8bf !important;
         }
+        .row-governance-annotated,
+        .row-governance-annotated .ag-cell {
+          background-color: #f3f4f6 !important; /* 有标注的行：浅灰色背景 */
+        }
+        .row-governance-annotated:hover,
+        .row-governance-annotated:hover .ag-cell {
+          background-color: #e5e7eb !important; /* 有标注的行悬浮：稍加深浅灰色 */
+        }
         .row-governance-status-no,
         .row-governance-status-no .ag-cell {
           background-color: #d1d5db !important; /* 灰色背景 */
@@ -6852,7 +6956,11 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       onCellValueChanged={() => { }}
                       getRowClass={(params: any) => {
                         const d = params.data || {};
-                        const log = d.companyId ? governanceLogsMapRef.current[`companyId_${d.companyId}`] : null;
+                        const log = (d.companyId && governanceLogsMapRef.current[`companyId_${d.companyId}`]) ||
+                                    (d.custId && governanceLogsMapRef.current[`custId_${d.custId}`]);
+                        if (log && log.notes && log.notes.trim() !== '') {
+                          return 'row-governance-annotated';
+                        }
                         if (log && log.status === 'no') {
                           return 'row-governance-status-no';
                         }
@@ -6963,7 +7071,11 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       onCellValueChanged={() => { }}
                       getRowClass={(params: any) => {
                         const d = params.data || {};
-                        const log = d.custId ? governanceLogsMapRef.current[`custId_${d.custId}`] : null;
+                        const log = (d.companyId && governanceLogsMapRef.current[`companyId_${d.companyId}`]) ||
+                                    (d.custId && governanceLogsMapRef.current[`custId_${d.custId}`]);
+                        if (log && log.notes && log.notes.trim() !== '') {
+                          return 'row-governance-annotated';
+                        }
                         if (log && log.status === 'no') {
                           return 'row-governance-status-no';
                         }
@@ -7076,7 +7188,11 @@ const KeyGlobalFamilyTree: React.FC = () => {
                       onCellValueChanged={() => { }}
                       getRowClass={(params: any) => {
                         const d = params.data || {};
-                        const log = d.custId ? governanceLogsMapRef.current[`custId_${d.custId}`] : null;
+                        const log = (d.companyId && governanceLogsMapRef.current[`companyId_${d.companyId}`]) ||
+                                    (d.custId && governanceLogsMapRef.current[`custId_${d.custId}`]);
+                        if (log && log.notes && log.notes.trim() !== '') {
+                          return 'row-governance-annotated';
+                        }
                         if (log && log.status === 'no') {
                           return 'row-governance-status-no';
                         }
@@ -7779,8 +7895,35 @@ const KeyGlobalFamilyTree: React.FC = () => {
         onCancel={() => setAnnotateModalVisible(false)}
         width={560}
         destroyOnClose
-        okText="标注提交"
-        cancelText="取消"
+        autoFocusButton={null}
+        footer={[
+          <div key="footer-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div>
+              {hasExistingNotes && (
+                <Popconfirm
+                  title="确定要删除该标注信息吗？"
+                  description="删除后标注数据将清空并恢复默认未标注状态。"
+                  okText="确定删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={handleDeleteAnnotateLog}
+                >
+                  <Button danger icon={<DeleteOutlined />} loading={submittingAnnotate}>
+                    删除标注
+                  </Button>
+                </Popconfirm>
+              )}
+            </div>
+            <Space>
+              <Button onClick={() => setAnnotateModalVisible(false)}>
+                取消
+              </Button>
+              <Button type="primary" loading={submittingAnnotate} onClick={handleSubmitAnnotateLog}>
+                标注提交
+              </Button>
+            </Space>
+          </div>
+        ]}
       >
         <div style={{ marginBottom: 12 }}>
           {currentAnnotateRow?.companyId ? (
@@ -7799,6 +7942,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
           )}
         </div>
         <RichTextEditor
+          autoFocus={annotateModalVisible}
           value={notesContent}
           onChange={(val) => setNotesContent(val)}
         />

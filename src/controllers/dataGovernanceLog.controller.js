@@ -25,7 +25,22 @@ const getGovernanceLogs = catchAsync(async (req, res) => {
   });
 });
 
+const deleteGovernanceLog = catchAsync(async (req, res) => {
+  const filter = {
+    rootGID: req.body?.rootGID || req.query.rootGID,
+    companyId: req.body?.companyId || req.query.companyId,
+    custId: req.body?.custId || req.query.custId,
+  };
+  const result = await dataGovernanceLogService.deleteLog(filter);
+  res.status(httpStatus.OK).send({
+    code: 200,
+    message: '删除治理日志成功',
+    data: result,
+  });
+});
+
 module.exports = {
   upsertGovernanceLog,
   getGovernanceLogs,
+  deleteGovernanceLog,
 };

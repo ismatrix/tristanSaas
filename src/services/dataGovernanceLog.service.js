@@ -59,7 +59,33 @@ const getLogsByFilter = async (filter) => {
   return logs;
 };
 
+/**
+ * 删除一条治理日志记录
+ * @param {Object} filterBody
+ * @returns {Promise<Object>}
+ */
+const deleteLog = async (filterBody) => {
+  const { rootGID, companyId = '', custId = '' } = filterBody;
+
+  if (!rootGID) {
+    throw new Error('rootGID 不能为空');
+  }
+
+  const filter = { rootGID };
+  if (companyId && companyId.trim() !== '') {
+    filter.companyId = companyId.trim();
+  } else if (custId && custId.trim() !== '') {
+    filter.custId = custId.trim();
+  } else {
+    throw new Error('companyId 或 custId 必须至少填入一项');
+  }
+
+  const result = await DataGovernanceLog.deleteMany(filter);
+  return result;
+};
+
 module.exports = {
   upsertLog,
   getLogsByFilter,
+  deleteLog,
 };
