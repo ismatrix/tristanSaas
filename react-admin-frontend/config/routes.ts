@@ -86,11 +86,24 @@ export default [
   },
   {
     path: '/keycustomer',
-    name: '海外家族树',
+    name: '139国际要客',
     icon: 'CrownOutlined',
     routes: [
       {
         path: '/keycustomer/:id',
+        name: '公司详情',
+        hideInMenu: true,
+        component: './KeyCustomer/Detail',
+      },
+    ],
+  },
+  {
+    path: '/cmi-keycustomer',
+    name: 'CMI国际要客',
+    icon: 'CrownOutlined',
+    routes: [
+      {
+        path: '/cmi-keycustomer/:id',
         name: '公司详情',
         hideInMenu: true,
         component: './KeyCustomer/Detail',

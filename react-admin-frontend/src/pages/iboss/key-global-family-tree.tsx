@@ -3360,9 +3360,14 @@ const KeyGlobalFamilyTree: React.FC = () => {
   // --- 治理比对工具：数据获取与匹配映射 ---
   const fetchGovernanceData = useCallback(async (overrideKeywords?: string[]) => {
     if (!gid) return;
+    const kwList = overrideKeywords !== undefined ? overrideKeywords : selectedKeywords;
+    if (!kwList || kwList.length === 0) {
+      setGovernanceData([]);
+      setGovernanceLoading(false);
+      return;
+    }
     setGovernanceLoading(true);
     try {
-      const kwList = overrideKeywords || selectedKeywords;
       // 节点信息字典映射
       const nodeMap = new Map<string, any>();
       originalData.forEach(d => {
@@ -3375,13 +3380,13 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const custMappingRes = await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
         method: 'GET',
         params: { options: JSON.stringify({ limit: 50000 }) }
-      });
+      }).catch(() => ({ results: [] }));
       const custMappingRecords = custMappingRes.results || custMappingRes.data?.results || [];
 
       const partMappingRes = await request('/api/v1/wildcards/excelParticipantCustMapping', {
         method: 'GET',
         params: { options: JSON.stringify({ limit: 50000 }) }
-      });
+      }).catch(() => ({ results: [] }));
       const partMappingRecords = partMappingRes.results || partMappingRes.data?.results || [];
 
       const extCustToGidMap = new Map<string, string>();
@@ -3442,21 +3447,23 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       });
 
-      // 构建模糊正则检索 $or 选项 (合并多关键字正则，防止 URL 超长引发 403)
-      let queryObj = {};
-      if (kwList && kwList.length > 0) {
-        const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
-        if (pattern) {
-          const rx = { $regex: pattern, $options: 'i' };
-          queryObj = {
-            $or: [
-              { companyName: rx },
-              { companyEnglishName: rx },
-              { 'detailInfo.companyBasicDTO.companyName': rx },
-              { 'detailInfo.companyBasicDTO.companyEnglishName': rx }
-            ]
-          };
-        }
+      // 构建模糊正则检索 $or 选项 (合并多关键字正则，防止 URL 超长引发 403/431)
+      let queryObj: any = {};
+      const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
+      if (pattern) {
+        const rx = { $regex: pattern, $options: 'i' };
+        queryObj = {
+          $or: [
+            { companyName: rx },
+            { companyEnglishName: rx },
+            { 'detailInfo.companyBasicDTO.companyName': rx },
+            { 'detailInfo.companyBasicDTO.companyEnglishName': rx }
+          ]
+        };
+      } else {
+        setGovernanceData([]);
+        setGovernanceLoading(false);
+        return;
       }
 
       const partRes = await request('/api/v1/wildcards/ibossParticipantDetail', {
@@ -3465,7 +3472,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
           query: JSON.stringify(queryObj),
           options: JSON.stringify({ limit: 50000 })
         }
-      });
+      }).catch(() => ({ results: [] }));
       const rawPartList = partRes.results || partRes.data?.results || [];
 
       const assembled = rawPartList.map((r: any) => {
@@ -4181,24 +4188,35 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const res = await request('/api/v1/wildcards/keycustomer', {
         method: 'GET',
         params: { query: JSON.stringify({ GID: String(gid) }) }
-      });
+      }).catch(() => ({ results: [] }));
       const recs = res.results || res.data?.results || [];
       if (recs.length > 0 && Array.isArray(recs[0].keyWords) && recs[0].keyWords.length > 0) {
         keywords = recs[0].keyWords;
       } else {
         const rootNode = originalData.find(d => !d.parentId) || originalData[0];
-        if (rootNode) {
-          const names = [rootNode.companyNameCn, rootNode.companyNameEn, rootNode.abbr].filter(Boolean);
-          keywords = Array.from(new Set(names));
-        }
+        const names = [
+          recs[0]?.nameCn,
+          recs[0]?.nameEn,
+          recs[0]?.abbr,
+          rootNode?.companyNameCn,
+          rootNode?.companyNameEn,
+          rootNode?.abbr
+        ].filter(Boolean);
+        keywords = Array.from(new Set(names));
       }
       const opts = keywords.map(kw => ({ label: kw, value: kw }));
       setGovernanceKeywordsOptions(opts);
       setSelectedKeywords(keywords); // 默认多选全选
       setSavedKeywords(keywords); // 同步已落库关键字基准
-      fetchGovernanceData(keywords);
-      fetchEndCustomerGovernanceData(keywords);
-      fetchEnterpriseCustomerGovernanceData(keywords);
+      if (keywords.length > 0) {
+        fetchGovernanceData(keywords);
+        fetchEndCustomerGovernanceData(keywords);
+        fetchEnterpriseCustomerGovernanceData(keywords);
+      } else {
+        setGovernanceData([]);
+        setEndCustomerData([]);
+        setEnterpriseCustomerData([]);
+      }
     } catch (e) {
       console.error('加载治理关键字失败', e);
     }
@@ -4247,9 +4265,14 @@ const KeyGlobalFamilyTree: React.FC = () => {
   // --- 终端客户治理工具：数据获取与匹配映射 ---
   const fetchEndCustomerGovernanceData = useCallback(async (overrideKeywords?: string[]) => {
     if (!gid) return;
+    const kwList = overrideKeywords !== undefined ? overrideKeywords : selectedKeywords;
+    if (!kwList || kwList.length === 0) {
+      setEndCustomerData([]);
+      setEndCustomerLoading(false);
+      return;
+    }
     setEndCustomerLoading(true);
     try {
-      const kwList = overrideKeywords || selectedKeywords;
       const nodeMap = new Map<string, any>();
       originalData.forEach(d => {
         if (d.GID || d.id) {
@@ -4260,7 +4283,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const custMappingRes = await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
         method: 'GET',
         params: { options: JSON.stringify({ limit: 50000 }) }
-      });
+      }).catch(() => ({ results: [] }));
       const custMappingRecords = custMappingRes.results || custMappingRes.data?.results || [];
 
       const extCustToGidMap = new Map<string, string>();
@@ -4285,19 +4308,21 @@ const KeyGlobalFamilyTree: React.FC = () => {
       });
 
       let queryObj: any = { customerTypeName: 'End Customer' };
-      if (kwList && kwList.length > 0) {
-        const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
-        if (pattern) {
-          const rx = { $regex: pattern, $options: 'i' };
-          queryObj = {
-            customerTypeName: 'End Customer',
-            $or: [
-              { enterpriseName: rx },
-              { custId: rx },
-              { custCode: rx }
-            ]
-          };
-        }
+      const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
+      if (pattern) {
+        const rx = { $regex: pattern, $options: 'i' };
+        queryObj = {
+          customerTypeName: 'End Customer',
+          $or: [
+            { enterpriseName: rx },
+            { custId: rx },
+            { custCode: rx }
+          ]
+        };
+      } else {
+        setEndCustomerData([]);
+        setEndCustomerLoading(false);
+        return;
       }
 
       const custRes = await request('/api/v1/wildcards/ibosscustomers', {
@@ -4306,7 +4331,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
           query: JSON.stringify(queryObj),
           options: JSON.stringify({ limit: 50000 })
         }
-      });
+      }).catch(() => ({ results: [] }));
       const rawCustList = custRes.results || custRes.data?.results || [];
 
       // 提取当前终端客户记录列表的所有企业名称 (enterpriseName) 集合，关联 dmcTCV 表中的“终端客户名称”
@@ -4315,11 +4340,12 @@ const KeyGlobalFamilyTree: React.FC = () => {
       let rawTcvList: any[] = [];
       if (currentEnterpriseNames.length > 0) {
         try {
-          // 为了防范大量企业名称导致 GET URL 参数超长 (HTTP 414)，采用 Chunk=150 分块并发抓取
-          const chunkSize = 150;
+          // 为了防范大量企业名称导致 GET URL 参数超长 (HTTP 414/431)，采用 Chunk=30 分块并发抓取，最多抓取前 300 家企业
+          const chunkSize = 30;
           const chunks: string[][] = [];
-          for (let i = 0; i < currentEnterpriseNames.length; i += chunkSize) {
-            chunks.push(currentEnterpriseNames.slice(i, i + chunkSize));
+          const cappedNames = currentEnterpriseNames.slice(0, 300);
+          for (let i = 0; i < cappedNames.length; i += chunkSize) {
+            chunks.push(cappedNames.slice(i, i + chunkSize));
           }
 
           const promises = chunks.map((chunk: string[]) =>
@@ -4536,11 +4562,15 @@ const KeyGlobalFamilyTree: React.FC = () => {
   // --- 企业客户治理工具：拉取 ibosscustomers 表 customerTypeName = "Enterprise" 记录并组装节点映射 ---
   const fetchEnterpriseCustomerGovernanceData = useCallback(async (overrideKeywords?: string[]) => {
     if (!gid || !originalData || originalData.length === 0) return;
+    const kwList = overrideKeywords !== undefined ? overrideKeywords : selectedKeywords;
+    if (!kwList || kwList.length === 0) {
+      setEnterpriseCustomerData([]);
+      setEnterpriseCustomerLoading(false);
+      return;
+    }
 
     setEnterpriseCustomerLoading(true);
     try {
-      const kwList = overrideKeywords !== undefined ? overrideKeywords : selectedKeywords;
-
       const nodeMap = new Map<string, any>();
       originalData.forEach((d: any) => {
         if (d.GID || d.id) {
@@ -4551,7 +4581,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const custMappingRes = await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
         method: 'GET',
         params: { options: JSON.stringify({ limit: 50000 }) }
-      });
+      }).catch(() => ({ results: [] }));
       const custMappingRecords = custMappingRes.results || custMappingRes.data?.results || [];
 
       const extCustToGidMap = new Map<string, string>();
@@ -4576,19 +4606,21 @@ const KeyGlobalFamilyTree: React.FC = () => {
       });
 
       let queryObj: any = { customerTypeName: 'Enterprise' };
-      if (kwList && kwList.length > 0) {
-        const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
-        if (pattern) {
-          const rx = { $regex: pattern, $options: 'i' };
-          queryObj = {
-            customerTypeName: 'Enterprise',
-            $or: [
-              { enterpriseName: rx },
-              { custId: rx },
-              { custCode: rx }
-            ]
-          };
-        }
+      const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
+      if (pattern) {
+        const rx = { $regex: pattern, $options: 'i' };
+        queryObj = {
+          customerTypeName: 'Enterprise',
+          $or: [
+            { enterpriseName: rx },
+            { custId: rx },
+            { custCode: rx }
+          ]
+        };
+      } else {
+        setEnterpriseCustomerData([]);
+        setEnterpriseCustomerLoading(false);
+        return;
       }
 
       const custRes = await request('/api/v1/wildcards/ibosscustomers', {
@@ -4597,7 +4629,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
           query: JSON.stringify(queryObj),
           options: JSON.stringify({ limit: 50000 })
         }
-      });
+      }).catch(() => ({ results: [] }));
       const rawCustList = custRes.results || custRes.data?.results || [];
 
       // 提取当前企业客户记录列表的所有 custId 集合，精准关联 dmcTCV 表中的“签约客户标识”
@@ -4606,11 +4638,12 @@ const KeyGlobalFamilyTree: React.FC = () => {
       let rawTcvList: any[] = [];
       if (currentCustIds.length > 0) {
         try {
-          // 为了防范大量 custId 导致 GET URL 参数超长 (HTTP 414)，采用 Chunk=150 分块并发抓取
-          const chunkSize = 150;
+          // 为了防范大量 custId 导致 GET URL 参数超长 (HTTP 414/431)，采用 Chunk=30 分块并发抓取，最多抓取前 300 家企业
+          const chunkSize = 30;
           const chunks: string[][] = [];
-          for (let i = 0; i < currentCustIds.length; i += chunkSize) {
-            chunks.push(currentCustIds.slice(i, i + chunkSize));
+          const cappedCustIds = currentCustIds.slice(0, 300);
+          for (let i = 0; i < cappedCustIds.length; i += chunkSize) {
+            chunks.push(cappedCustIds.slice(i, i + chunkSize));
           }
 
           const promises = chunks.map((chunk: string[]) =>

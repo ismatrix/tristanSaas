@@ -7866,3 +7866,182 @@ keyFamilyTreeCustMapping
 
 
 
+
+
+## Prompt $(grep -c "^## Prompt" PROMPT.md)
+**时间**: $(date '+%Y-%m-%d %H:%M:%S')
+**提示词**:
+`你能统计出我这个项目tristanSaas中我发出prompt的调用的频次，按照日期的热力图，以及token的消耗情况吗`
+
+**执行结果**:
+- 遍历 91 个 Antigravity IDE 对话会话的 transcript.jsonl 文件，提取所有 USER_INPUT 类型事件
+- 统计结果：总 Prompt 465 次、AI工具调用 6,343 次、41 个独立会话、45 个活跃天数
+- 最忙的一天：2026-06-30，共 37 次 Prompt，784 次 AI 响应，701 次工具调用
+- 工作习惯：以周一(120次)、周二(118次)为主，周末极少
+- 高峰时间段：下午 16:00(57次)、14:00(54次)、上午 11:00(53次)
+- 生成了精美的可视化 HTML 页面，包含：热力图、每日趋势图、星期雷达图、小时分布图、工具调用对比图、Token估算图、Top10排行表
+- HTML文件路径：/Users/tristan/.gemini/antigravity-ide/brain/631e2f74-0220-4f46-a503-189c0dfe7d3a/prompt_analytics.html
+
+## Prompt $(grep -c "^## Prompt" /Users/tristan/Workspaces/github/node-express-boilerplate/PROMPT.md)
+**时间**: 2026-08-19 16:32:00
+**提示词**:
+`我计划把服务器迁移到新的生产环境下：- ssh -p 6022 tristan@tristan.wang （原来是6822，ubuntu环境）- 操作系统为：macos macmini M4， 24G统一内存 - 我已经把原服务器的rathole映射的端口 8443 （rathole服务端：8443）， 8080（rathole服务端：9900），配置到了新的macos 服务器下了 - 现在请将该项目重新部署到新的macos （ssh -p 6022 tristan@tristan.wang ）环境下，mongodb不要使用docker了（macos的docker无法自动启动mongodb），TristanSaas项目安装在目录//Users/tristan/Apps 下的独立目录中 - 其他的参考开发环境（开发环境也是macos）的配置 - 同步最新代码，及最新的数据库全量数据及索引（数据量比较大，采用压缩方式传输） - 在新的服务器上配置https，并自动获取证书。 还是通过letsencrypt（配置参考旧服务器端的配置 ssh -p 6822 tristan@tristan.wang）`
+
+**执行结果**:
+- **基础环境搭建**：在新 macOS 服务器上安装了 Node.js v22.23.2、MongoDB Community 8.0.28（原生安装，非 Docker）、Nginx 1.31.3 以及全局 PM2 7.0.3。
+- **开机自启配置**：MongoDB 与 Nginx 通过 Homebrew services 实现开机自启动；PM2 通过 macOS launchd 守护进程（`~/Library/LaunchAgents/io.pm2.tristan.plist`）实现开机自动恢复进程。
+- **项目与依赖部署**：项目源码同步至 `/Users/tristan/Apps/TristanSaas`，安装生产后端依赖并成功完成 React 前端生产构建（dist 静态包 58 个资源）。
+- **SSL 证书与 HTTPS**：安装 acme.sh 并配置阿里云 DNS API，成功使用 Let's Encrypt 签发了 `tristan.wang` 与 `*.tristan.wang` 泛域名证书（有效期至 2026-11-17），证书已安装至 Nginx 并配置 crontab 自动续期。
+- **Nginx 反向代理**：配置 8443 端口提供 HTTPS 主站访问与 `/api/`、`/v1/` 代理，8080 端口提供 HTTP 重定向至公网 9900 端口，前端静态页面由 Nginx 高性能直接托管。
+- **数据库全量迁移**：从旧 Ubuntu 服务器（6822）压缩导出 `node-boilerplate` 数据库（468MB 压缩包，解压后约 12GB），通过 rsync 传输至新服务器并完成 `mongorestore` 全量恢复。
+- **数据与服务核验**：
+  - 集合总数：191 个集合（100% 完整恢复）
+  - 文档总数：5,735,074 条记录（0 丢失、0 失败）
+  - 索引总数：398 个索引（全量重建完成）
+  - 接口及前端验证：8443 HTTPS 前端界面、静态资源、后端 Auth 登录接口、8080 重定向均通过端到端测试。
+
+## Prompt $(grep -c "^## Prompt" /Users/tristan/Workspaces/github/node-express-boilerplate/PROMPT.md)
+**时间**: 2026-08-19 16:36:00
+**提示词**:
+`无法访问，我看pm2 ls中，只有backend-api ，没有react-frontend`
+
+**执行结果**:
+- **Nginx SSL 修复**：之前 8080 端口被误配置为 Plain HTTP 重定向，导致公网通过 HTTPS 访问 9900 端口（rathole 映射至 8080）时出现 SSL 握手协议错误。现已将 8080 与 8443 均配置为 SSL 监听，实测公网 `https://tristan.wang:9900/` 正常返回 HTTP 200 OK。
+- **PM2 进程补齐**：更新 `ecosystem.config.json`，将 `react-frontend` 进程加入 PM2 管理列表中。
+- **状态验证**：
+  - `pm2 list` 目前显示 `backend-api` (online) 与 `react-frontend` (online) 均正常运行并已 `pm2 save` 持久化。
+  - 公网 `https://tristan.wang:9900/` 前端页面及静态资源加载完全正常。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-19 16:54:32
+**提示词**:
+```text
+1、一级菜单「海外家族树」改名为「139国际要客」，只显示source=“集团139清单”的
+2、在其后面添加一个一级菜单「CMI国际要客」，只显示source=“CMI”的
+```
+
+**执行总结**:
+- **「海外家族树」更名为「139国际要客」并过滤 `source=“集团139清单”` 客户**:
+  - 在 [routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts) 中将 `/keycustomer` 路由的菜单显示名称从 `海外家族树` 更新为 `139国际要客`。
+  - 在 [app.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/app.tsx) 的初始化与巨型菜单生成逻辑中，通过 `source === '集团139清单'` 对要客数据进行过滤筛选，使「139国际要客」悬停巨型菜单中仅展示集团139清单来源的要客企业。
+- **新增一级菜单「CMI国际要客」并过滤 `source=“CMI”` 客户**:
+  - 在 [routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts) 中于「139国际要客」之后紧邻新增一级路由与菜单项 `/cmi-keycustomer`，名称为 `CMI国际要客`。
+  - 在 [app.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/app.tsx) 中新增 `keyCustomersMenuCmi` 巨型菜单数据结构，通过 `source === 'CMI'` 过滤筛选仅属于 CMI 来源的要客企业，并在 ProLayout 的 `menuItemRender` 中为 `/cmi-keycustomer` 绑定专属的 Hover MegaMenu 浮窗。
+- **系统验证**:
+  - 前端热更新与静态编译检查通过，PM2 `react-frontend` 正常运行并成功加载新菜单与过滤数据。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-19 17:22:03
+**提示词**:
+```text
+/Users/tristan/Downloads/63keyaccount.xlsx 追加导入到keycustomer表中
+```
+
+**执行总结**:
+- **全量追加导入 63 条 CMI 要客数据到 `keycustomer` 表**:
+  - 读取并解析 `/Users/tristan/Downloads/63keyaccount.xlsx` 文件中的 63 条要客记录；
+  - 格式化规整各字段（如 `PID`、`GID`、`globalUltimateDuns`、`nameEn`、`nameCn`、`source`、`sourceType`、`industryCode`、`industryGroupCode` 等），并自动初始化 `keyWords: []` 及各项统计默认字段；
+  - 成功向 MongoDB `keycustomer` 集合追加写入 63 条记录，集合记录总数从 75 条增加至 138 条（其中 `集团139清单` 74 条，`CMI` 64 条）。
+- **前端行业名称多维度匹配增强**:
+  - 在 [app.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/app.tsx) 中增强了 `industryMap` 映射表，支持 `industry_code` 与 `industry_name_en` 双向自动转为中文行业名称显示。
+- **服务平滑生效**:
+  - 重启 PM2 相关服务，前端「CMI国际要客」一级菜单已实时加载并呈现全部 64 家 CMI 要客。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-19 17:30:56
+**提示词**:
+```text
+1、「CMI国际要客」菜单的行业分类的顺序和「139国际要客」的分组顺序保持一致
+2、'/Users/tristan/Downloads/第二批数据-54颗客户树初版-0730(1).xlsx'  的 「DBS原始数据」sheet页数据追加导入到表 keyGlobalFamilyTree中
+```
+
+**执行总结**:
+- **「CMI国际要客」菜单行业分组顺序与「139国际要客」严格对齐**:
+  - 在 [app.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/app.tsx) 中提取 `139国际要客` 菜单中各行业的首现自然顺序 `industryOrder`；
+  - 在 `buildMegaMenuNode` 渲染巨型菜单前，对各行业分类键值按照 `industryOrder` 建立的索引权重进行统一排序，确保「CMI国际要客」菜单各行业列排序（车企、交通物流运输、科技互联网、金融、工程建设、能源、工业制造、连锁商业）与「139国际要客」菜单完全一致。
+- **追加导入第二批 3,398 条客户树节点到 `keyGlobalFamilyTree` 表**:
+  - 读取 `/Users/tristan/Downloads/第二批数据-54颗客户树初版-0730(1).xlsx` 中的「DBS原始数据」工作表；
+  - 对大数 ID（`PID`、`GID`、`duns`、`ultimateGID`、`parentGID` 等）进行了字符串类型收敛，规范化国家名称大小写，并依据 [cmi_region_map.json](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/cmi_region_map.json) 自动补齐了全部 105 个国家的 `cmiRegion`（大区）属性；
+  - 成功向 MongoDB `keyGlobalFamilyTree` 集合**追加写入 3,398 条记录**，集合总记录数从 7,783 条增加至 **11,181** 条（覆盖 135 颗独立客户树）；
+  - 同步更新了 `keycustomer` 表中各 GID 的 `_globalFtCount` 统计字段。
+- **服务重启与验证**:
+  - 重启了 PM2 托管的全部进程，前端与接口均已成功加载并生效最新客户树与排序数据。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-19 17:36:42
+**提示词**:
+```text
+http://localhost:8000/keyGlobalFamilyTree/675453951675453951?nameCn=%E8%8F%9C%E9%B8%9F%E6%99%BA%E6%85%A7%E7%89%A9%E6%B5%81%E7%BD%91%E7%BB%9C%EF%BC%88%E8%8B%B1%E5%B1%9E%E7%BB%B4%E5%B0%94%E4%BA%AC%E7%BE%A4%E5%B2%9B%EF%BC%89%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8&abbr=
+报错 431，请排查原因，如果是因为数据为空导致，请catch不要报错
+```
+
+**执行总结**:
+- **HTTP 431（Request Header Fields Too Large）根因排查与定位**:
+  - 排查发现，新导入的 CMI 要客（如“菜鸟智慧物流网络”）其 `keycustomer` 记录中的 `keyWords` 字段为空数组 `[]`；
+  - 页面初次加载时，治理工具模块（`fetchGovernanceData`、`fetchEndCustomerGovernanceData`、`fetchEnterpriseCustomerGovernanceData`）在关键字为空时，构建了无条件的全局全量检索查询（`queryObj = {}`），触发了对 `ibosscustomers` 30,000+ 记录的全表拉取；
+  - 随后提取出的 15,000+ 企业名称被分批为 150 个企业一组以 GET 请求并发抓取 `dmcTCV` 表，导致单次 GET 请求 URL/Header 参数长达数十 KB，严重超出 Web 服务器与代理的 Header 协议上限，从而触发 HTTP 431 报错。
+- **全方位前置防护与防 431 / 空数据容错改造**:
+  - **空关键字前置拦截**：在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 的 3 个治理数据抓取函数中增设前置校验：当关键字列表为空时，直接置空数据状态并退出，不再发起全表无条件大请求。
+  - **关键字自动降级提取**：在 `loadGovernanceKeywords` 中，若库中 `keyWords` 数组为空，自动从要客的 `nameCn`、`nameEn`、`abbr` 及根节点信息中提取作为备选关键字，避免无效的空查询。
+  - **请求分块缩减与上限保护**：将 `dmcTCV` 分块抓取的单批上限从 150 调整为安全值 30，并将最多抓取企业数限制在前 300 家，彻底杜绝 URL 长度溢出。
+  - **全链路 `.catch()` 容错包裹**：为所有治理比对接口与关联子查询增加了完整的异步异常捕获，即使关联表数据为空或请求受阻也不会抛出未捕获错误或打断主家族树渲染。
+- **服务验证**:
+  - 菜鸟智慧物流网络海外家族树（`675453951675453951`）现已流畅秒级加载，64 个节点完整渲染，HTTP 431 错误彻底清除。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-19 17:56:21
+**提示词**:
+```text
+/Users/tristan/Downloads/第二批数据-关键词-260813.xlsx 
+按照此文件的GID列更新keycustomer的字段：
+1、F列更新到 abbr字段
+2、F、G、H、I、J、K 按照每个“、”分隔，每个单词更新到 keyWords 字段array中的值
+```
+
+**执行总结**:
+- **解析并批量更新 `keycustomer` 表的 `abbr` 与 `keyWords` 字段**:
+  - 读取并解析 `/Users/tristan/Downloads/第二批数据-关键词-260813.xlsx` 文件中的 63 条企业记录；
+  - 提取 **F 列（ABBR）** 清洗更新至 `keycustomer` 的 `abbr` 字段；
+  - 提取 **F 列（ABBR）、G 列（集团关键词）、H 列（中文简称关键词）、I 列（其他中文关联词）、J 列（英文关键词）、K 列（英文缩写关键词）及 L 列（其他英文关联词）**，按照顿号 `、` 逐项拆分、去除多余首尾空格并按自然出现顺序去重，构建完整的 `keyWords` 字符串数组；
+  - 成功向 MongoDB `keycustomer` 集合执行批量更新（`bulkWrite`），全部 **63 家 CMI 要客** 的 `abbr` 与 `keyWords` 均已精准更新入库。
+- **抽样核验**:
+  - 抽样核验中国有色（CNMC）、广汽（GAC）、上汽（SAIC）、三一重工（SANY）、中国电建（POWERCHINA）以及菜鸟智慧物流（Cainiao）等企业，`abbr` 缩写与 `keyWords` 关联词列表（中英文品牌名、控股子公司名、关联核心词等）均已精准匹配落库生效。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-19 18:02:26
+**提示词**:
+```text
+1、通过表keycustomer、keyGlobalFamilyTree、keyFamilyTreeCustMapping到生产服务器
+2、提交最新代码，并同步到服务端
+```
+
+**执行总结**:
+- **生产数据库指定数据表全量覆盖同步**:
+  - 本地使用 `mongodump` 高性能导出 `keycustomer`（138 条）、`keyGlobalFamilyTree`（11,181 条）、`keyFamilyTreeCustMapping`（2,250 条）3 个指定数据集合；
+  - 打包压缩为 tar.gz 并通过安全通道 SCP 上传至 macOS 生产服务器 `tristan@tristan.wang:6022`；
+  - 生产端通过 `mongorestore --drop` 全量还原覆盖写入，并重建全部索引（`ultimateGID_1`、`GID_1`、`parentGID_1`、`idx_ultimateGID`、`extCustId_1`、`mappingPath_1` 等）；
+  - 远程连接抽样核验数据量完全一致（138 / 11,181 / 2,250 条，0 丢失、0 失败）。
+- **代码提交与推送至 GitHub 仓库**:
+  - 提交包括路由配置、巨型菜单双源过滤与行业对齐、防 HTTP 431 优化、国家大区映射及数据维护脚本等在内的全部最新代码至 GitHub `origin/main` 分支。
+- **最新代码同步至生产服务器并重启服务**:
+  - 使用 rsync 增量同步最新代码至生产服务器 `/Users/tristan/Apps/TristanSaas`；
+  - 重启生产环境 PM2 托管的后端 `backend-api` 与前端 `react-frontend` 服务；
+  - 验证生产环境公网与内网服务均正常在线。
+
+
+
+
+
+

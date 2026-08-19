@@ -56,7 +56,8 @@ export async function getInitialState(): Promise<{
   loading?: boolean;
   fetchUserInfo?: () => Promise<API.CurrentUser | undefined>;
   dnbCollections?: string[];
-  keyCustomersMenu?: React.ReactNode;
+  keyCustomersMenu139?: React.ReactNode;
+  keyCustomersMenuCmi?: React.ReactNode;
 }> {
   const fetchUserInfo = async () => {
     try {
@@ -84,12 +85,131 @@ export async function getInitialState(): Promise<{
     }
   };
 
+  // 构建通用要客巨型菜单节点
+  const buildMegaMenuNode = (
+    customersList: any[],
+    industryMap: Record<string, string>,
+    activeGids: Set<string>,
+    penetratedGids: Set<string>,
+    industryOrder?: string[],
+  ): React.ReactNode => {
+    // Group customers by industryCode
+    const grouped: Record<string, any[]> = {};
+    customersList.forEach((c: any) => {
+      const code = c.industryCode || '未知行业';
+      if (!grouped[code]) grouped[code] = [];
+      grouped[code].push(c);
+    });
+
+    const sortedCodes = Object.keys(grouped).sort((a, b) => {
+      if (!industryOrder || industryOrder.length === 0) return 0;
+      const idxA = industryOrder.indexOf(a);
+      const idxB = industryOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexWrap: 'nowrap', 
+        gap: '32px', 
+        padding: '24px', 
+        width: 'max-content',
+        maxWidth: '100vw',
+        maxHeight: 'calc(100vh - 80px)', 
+        overflowX: 'auto',
+        overflowY: 'auto',
+        backgroundColor: '#ffffff'
+      }}>
+        {sortedCodes.map((code) => {
+          const groupName = industryMap[code] || code;
+          const count = grouped[code].length;
+          return (
+            <div key={code} style={{ flex: '0 0 auto', width: '160px', marginBottom: '16px' }}>
+              <div style={{ 
+                fontWeight: 600, 
+                color: '#111', 
+                fontSize: '14px',
+                marginBottom: '12px' 
+              }}>
+                {groupName} <span style={{ color: '#888', fontWeight: 'normal', fontSize: '12px' }}>({count})</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {grouped[code].map((c: any) => {
+                  const hasTree = c.GID && activeGids.has(String(c.GID).trim());
+                  const isPenetrated = c.GID && penetratedGids.has(String(c.GID).trim());
+                  const nameCn = encodeURIComponent(c.nameCn || '');
+                  const abbr = encodeURIComponent(c.abbr || '');
+
+                  let displayColor = '#bfbfbf';
+                  let hoverColor = '#bfbfbf';
+                  if (hasTree) {
+                    if (isPenetrated) {
+                      displayColor = '#1677ff'; // 已渗透：亮蓝色
+                      hoverColor = '#ff6a00';
+                    } else {
+                      displayColor = '#595959'; // 未渗透要客：深灰色
+                      hoverColor = '#ff6a00';
+                    }
+                  }
+
+                  return (
+                    <div key={c._id || c.GID}>
+                      {hasTree ? (
+                        <Link 
+                          to={`/keyGlobalFamilyTree/${c.GID}?nameCn=${nameCn}&abbr=${abbr}`} 
+                          className="mega-menu-link"
+                          style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                          title={c.nameCn || c.nameEn || '未知公司'}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = hoverColor)}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = displayColor)}
+                        >
+                          {c.nameCn || c.nameEn || '未知公司'}
+                        </Link>
+                      ) : (
+                        <span 
+                          className="mega-menu-link-disabled"
+                          style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'not-allowed' }}
+                          title={`${c.nameCn || c.nameEn || '未知公司'} (暂无境外家族树)`}
+                        >
+                          {c.nameCn || c.nameEn || '未知公司'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // 获取并构建行业要客菜单数据
-  const fetchKeyCustomersMenu = async (): Promise<React.ReactNode | null> => {
+  const fetchKeyCustomersMenus = async (): Promise<{
+    menu139: React.ReactNode | null;
+    menuCmi: React.ReactNode | null;
+  }> => {
     try {
       const [customersRes, industriesRes, familyTreesRes, penetratedRes] = await Promise.all([
-        requestFn('/api/v1/wildcards/keycustomer', { method: 'GET', skipErrorHandler: true }),
-        requestFn('/api/v1/wildcards/industry', { method: 'GET', skipErrorHandler: true }),
+        requestFn('/api/v1/wildcards/keycustomer', {
+          method: 'GET',
+          params: {
+            options: JSON.stringify({ limit: 20000 }),
+          },
+          skipErrorHandler: true,
+        }),
+        requestFn('/api/v1/wildcards/industry', {
+          method: 'GET',
+          params: {
+            options: JSON.stringify({ limit: 2000 }),
+          },
+          skipErrorHandler: true,
+        }),
         requestFn('/api/v1/wildcards/keyGlobalFamilyTree', {
           method: 'GET',
           params: {
@@ -121,103 +241,46 @@ export async function getInitialState(): Promise<{
         }
       });
 
-      // Create a map for industryCode -> industry_name
-      const industryMap: Record<string, string> = {};
+      // Create a map for industryCode / industry_name_en -> industry_name
+      const industryMap: Record<string, string> = {
+        'Technology and Internet': '科技互联网',
+        'Transportation and Logistics': '交通物流运输',
+        'Engineering and Construction': '工程建设',
+        'Industrial Manufacturing': '工业制造',
+        'Energy': '能源',
+        'Finance': '金融',
+        'Hospitality, Catering and Public Services': '酒店餐饮及公共服务',
+        'Automotive': '车企',
+        'Retail Chain and Public Services': '连锁商业',
+      };
       industries.forEach((ind: any) => {
         if (ind.industry_code && ind.industry_name) {
           industryMap[ind.industry_code] = ind.industry_name;
         }
+        if (ind.industry_name_en && ind.industry_name) {
+          industryMap[ind.industry_name_en] = ind.industry_name;
+        }
       });
 
-      // Group customers by industryCode
-      const grouped: Record<string, any[]> = {};
-      customers.forEach((c: any) => {
+      const customers139 = customers.filter((c: any) => c.source === '集团139清单');
+      const customersCmi = customers.filter((c: any) => c.source === 'CMI');
+
+      // 提取「139国际要客」中各行业的出现顺序，使「CMI国际要客」与其严格对齐保持一致
+      const industryOrder: string[] = [];
+      customers139.forEach((c: any) => {
         const code = c.industryCode || '未知行业';
-        if (!grouped[code]) grouped[code] = [];
-        grouped[code].push(c);
+        if (!industryOrder.includes(code)) {
+          industryOrder.push(code);
+        }
       });
 
-      const megaMenuNode = (
-        <div style={{ 
-          display: 'flex', 
-          flexWrap: 'nowrap', 
-          gap: '32px', 
-          padding: '24px', 
-          width: 'max-content',
-          maxWidth: '100vw',
-          maxHeight: 'calc(100vh - 80px)', 
-          overflowX: 'auto',
-          overflowY: 'auto',
-          backgroundColor: '#ffffff'
-        }}>
-          {Object.keys(grouped).map((code) => {
-            const groupName = industryMap[code] || code;
-            const count = grouped[code].length;
-            return (
-              <div key={code} style={{ flex: '0 0 auto', width: '160px', marginBottom: '16px' }}>
-                <div style={{ 
-                  fontWeight: 600, 
-                  color: '#111', 
-                  fontSize: '14px',
-                  marginBottom: '12px' 
-                }}>
-                  {groupName} <span style={{ color: '#888', fontWeight: 'normal', fontSize: '12px' }}>({count})</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {grouped[code].map((c: any) => {
-                    const hasTree = c.GID && activeGids.has(String(c.GID).trim());
-                    const isPenetrated = c.GID && penetratedGids.has(String(c.GID).trim());
-                    const nameCn = encodeURIComponent(c.nameCn || '');
-                    const abbr = encodeURIComponent(c.abbr || '');
+      const menu139 = buildMegaMenuNode(customers139, industryMap, activeGids, penetratedGids, industryOrder);
+      const menuCmi = buildMegaMenuNode(customersCmi, industryMap, activeGids, penetratedGids, industryOrder);
 
-                    let displayColor = '#bfbfbf';
-                    let hoverColor = '#bfbfbf';
-                    if (hasTree) {
-                      if (isPenetrated) {
-                        displayColor = '#1677ff'; // 已渗透：亮蓝色
-                        hoverColor = '#ff6a00';
-                      } else {
-                        displayColor = '#595959'; // 未渗透要客：深灰色
-                        hoverColor = '#ff6a00';
-                      }
-                    }
-
-                    return (
-                      <div key={c._id}>
-                        {hasTree ? (
-                          <Link 
-                            to={`/keyGlobalFamilyTree/${c.GID}?nameCn=${nameCn}&abbr=${abbr}`} 
-                            className="mega-menu-link"
-                            style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                            title={c.nameCn || c.nameEn || '未知公司'}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = hoverColor)}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = displayColor)}
-                          >
-                            {c.nameCn || c.nameEn || '未知公司'}
-                          </Link>
-                        ) : (
-                          <span 
-                            className="mega-menu-link-disabled"
-                            style={{ color: displayColor, fontSize: '13px', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'not-allowed' }}
-                            title={`${c.nameCn || c.nameEn || '未知公司'} (暂无境外家族树)`}
-                          >
-                            {c.nameCn || c.nameEn || '未知公司'}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-
-      return megaMenuNode;
+      return { menu139, menuCmi };
     } catch (e) {
-      console.error('Failed to fetch key customers', e);
-      return null;
+      console.error('Failed to fetch key customers menus', e);
+      return { menu139: null, menuCmi: null };
     }
   };
 
@@ -230,12 +293,13 @@ export async function getInitialState(): Promise<{
   ) {
     const currentUser = await fetchUserInfo();
     const dnbCollections = await fetchDnbCollections();
-    const keyCustomersMenu = await fetchKeyCustomersMenu();
+    const { menu139, menuCmi } = await fetchKeyCustomersMenus();
     return {
       fetchUserInfo,
       currentUser,
       dnbCollections,
-      keyCustomersMenu,
+      keyCustomersMenu139: menu139,
+      keyCustomersMenuCmi: menuCmi,
       settings: defaultSettings as Partial<LayoutSettings>,
     };
   }
@@ -313,7 +377,7 @@ export const layout: RunTimeLayoutConfig = ({
             })),
           };
         }
-        if (item.path === '/keycustomer') {
+        if (item.path === '/keycustomer' || item.path === '/cmi-keycustomer') {
           return {
             ...item,
             children: undefined, // Prevent ProLayout from rendering a standard dropdown wrapper
@@ -323,9 +387,18 @@ export const layout: RunTimeLayoutConfig = ({
       });
     },
     menuItemRender: (itemProps, defaultDom) => {
-      if (itemProps.path === '/keycustomer' && initialState?.keyCustomersMenu) {
+      if (itemProps.path === '/keycustomer' && initialState?.keyCustomersMenu139) {
         return (
-          <MegaMenuPopover content={initialState.keyCustomersMenu}>
+          <MegaMenuPopover content={initialState.keyCustomersMenu139}>
+            <div style={{ width: '100%', height: '100%' }}>
+              {defaultDom}
+            </div>
+          </MegaMenuPopover>
+        );
+      }
+      if (itemProps.path === '/cmi-keycustomer' && initialState?.keyCustomersMenuCmi) {
+        return (
+          <MegaMenuPopover content={initialState.keyCustomersMenuCmi}>
             <div style={{ width: '100%', height: '100%' }}>
               {defaultDom}
             </div>

@@ -1,123 +1,89 @@
-require('dotenv').config();
+const XLSX = require('xlsx');
 const mongoose = require('mongoose');
-const xlsx = require('xlsx');
-const path = require('path');
+const config = require('../src/config/config');
 
-// Excel 文件路径
-const EXCEL_PATH = '/Users/tristan/Downloads/企业名称缩写对照表（更新关联关键词）-260806.xlsx';
+async function updateKeyCustomerKeywords() {
+  const filePath = '/Users/tristan/Downloads/第二批数据-关键词-260813.xlsx';
+  console.log(`正在读取 Excel: ${filePath}...`);
 
-async function updateKeyCustomerKeyWords() {
-  const mongoUrl = process.env.MONGODB_URL || 'mongodb://127.0.0.1:27017/node-boilerplate';
-  console.log('正在连接 MongoDB 数据库...');
-  await mongoose.connect(mongoUrl, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
-  console.log('数据库连接成功。');
-
-  const db = mongoose.connection.db;
-  const collection = db.collection('keycustomer');
-
-  console.log(`正在读取 Excel 文件: ${EXCEL_PATH}`);
-  const workbook = xlsx.readFile(EXCEL_PATH);
+  const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
-  console.log(`使用工作表: ${sheetName}`);
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-  const rawRows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-  if (!rawRows || rawRows.length <= 1) {
-    console.log('Excel 中没有有效数据。');
-    await mongoose.disconnect();
-    return;
-  }
+  console.log(`成功读取工作表: ${sheetName}, 共 ${rows.length} 行 (包含表头)`);
 
-  const header = rawRows[0];
-  console.log('Excel 表头:', header);
+  const updates = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row[2]) continue;
 
-  const matchedList = [];
-  const unmatchedList = [];
-  const bulkOperations = [];
+    const gid = String(row[2]).trim();
+    const abbr = row[5] !== undefined && row[5] !== null ? String(row[5]).trim() : '';
 
-  for (let i = 1; i < rawRows.length; i++) {
-    const row = rawRows[i];
-    if (!row || row.length === 0) continue;
-
-    // A列/B列 GID
-    const gidCol0 = row[0] != null ? String(row[0]).trim() : '';
-    const gidCol1 = row[1] != null ? String(row[1]).trim() : '';
-    const nameEn = row[2] != null ? String(row[2]).trim() : '';
-    const nameCn = row[3] != null ? String(row[3]).trim() : '';
-    // K列 关键字合集 (索引 10)
-    const rawKeyWords = row[10] != null ? String(row[10]).trim() : '';
-
-    const gid = gidCol0 || gidCol1;
-    if (!gid) {
-      console.log(`第 ${i + 1} 行 GID 为空，跳过`);
-      continue;
+    const keywords = [];
+    // 列 F(5), G(6), H(7), I(8), J(9), K(10), L(11)
+    for (let c = 5; c <= 11; c++) {
+      const val = row[c];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        const parts = String(val).split('、');
+        for (const part of parts) {
+          const clean = part.trim();
+          if (clean && !keywords.includes(clean)) {
+            keywords.push(clean);
+          }
+        }
+      }
     }
 
-    // 根据顿号“、”分隔拆分关键字，去除首尾空格并过滤空元素
-    const keyWordsArray = rawKeyWords
-      ? rawKeyWords
-          .split('、')
-          .map((item) => item.trim())
-          .filter(Boolean)
-      : [];
-
-    // 在 keycustomer 集中按 GID 进行匹配
-    const doc = await collection.findOne({ GID: gid });
-    if (doc) {
-      matchedList.push({
-        excelRow: i + 1,
-        gid,
-        nameCn,
-        dbNameCn: doc.nameCn,
-        keyWordsCount: keyWordsArray.length,
-        keyWordsArray,
-      });
-
-      bulkOperations.push({
-        updateOne: {
-          filter: { _id: doc._id },
-          update: { $set: { keyWords: keyWordsArray } },
-        },
-      });
-    } else {
-      unmatchedList.push({
-        excelRow: i + 1,
-        gid,
-        nameEn,
-        nameCn,
-        rawKeyWords,
-      });
-    }
-  }
-
-  console.log('\n=================== 匹配结果统计 ===================');
-  console.log(`Excel 总数据行数: ${rawRows.length - 1}`);
-  console.log(`成功匹配到的记录数: ${matchedList.length}`);
-  console.log(`未匹配到的记录数: ${unmatchedList.length}`);
-
-  if (bulkOperations.length > 0) {
-    console.log(`\n正在批量更新 ${bulkOperations.length} 条记录到 keycustomer 表...`);
-    const bulkRes = await collection.bulkWrite(bulkOperations);
-    console.log(`批量更新完成！修改行数: ${bulkRes.modifiedCount}, 匹配行数: ${bulkRes.matchedCount}`);
-  }
-
-  if (unmatchedList.length > 0) {
-    console.log('\n=================== 未匹配到的 GID 清单 ===================');
-    unmatchedList.forEach((item, index) => {
-      console.log(
-        `${index + 1}. [行 ${item.excelRow}] GID: ${item.gid} | 中文名: ${item.nameCn || '无'} | 英文名: ${item.nameEn || '无'}`
-      );
+    updates.push({
+      gid,
+      abbr,
+      keywords,
+      nameCn: row[0] ? String(row[0]).trim() : '',
+      nameEn: row[1] ? String(row[1]).trim() : '',
     });
   }
 
-  console.log('\n正在断开数据库连接...');
+  console.log(`共解析出 ${updates.length} 条待更新企业数据。`);
+
+  await mongoose.connect(config.mongoose.url, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+
+  const db = mongoose.connection.db;
+
+  const bulkOps = updates.map(item => ({
+    updateMany: {
+      filter: { GID: item.gid },
+      update: {
+        $set: {
+          abbr: item.abbr,
+          keyWords: item.keywords,
+        }
+      }
+    }
+  }));
+
+  const res = await db.collection('keycustomer').bulkWrite(bulkOps);
+  console.log(`✅ 成功更新 keycustomer 集合！匹配数: ${res.matchedCount}, 修改数: ${res.modifiedCount}`);
+
+  // 抽样验证
+  const sample = await db.collection('keycustomer').find({
+    GID: { $in: updates.slice(0, 5).map(u => u.gid) }
+  }).toArray();
+
+  console.log('\n=== 抽样验证前 5 条更新结果 ===');
+  sample.forEach(c => {
+    console.log(`- [${c.GID}] ${c.nameCn} | 缩写(abbr): ${c.abbr} | 关键字数: ${c.keyWords?.length} | 关键字: ${JSON.stringify(c.keyWords)}`);
+  });
+
   await mongoose.disconnect();
-  console.log('数据库连接已安全断开。');
+  console.log('\nMongoDB 连接已断开。');
 }
 
-updateKeyCustomerKeyWords().catch((err) => {
-  console.error('更新过程中发生错误:', err);
+updateKeyCustomerKeywords().catch(err => {
+  console.error('更新失败:', err);
   process.exit(1);
 });
