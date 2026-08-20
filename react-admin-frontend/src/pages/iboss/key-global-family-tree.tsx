@@ -34,6 +34,7 @@ import * as d3 from 'd3';
 import { OrgChart } from 'd3-org-chart';
 import { renderToString } from 'react-dom/server';
 import Flag from 'react-world-flags';
+import { OverseasBranchWorldMap } from './components/OverseasBranchWorldMap';
 
 // 注册 AG Grid 模块
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
@@ -1592,6 +1593,17 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           ))}
         </div>
       </Card>
+
+      {/* 海外分支机构与网点全球地图可视化分布 */}
+      <OverseasBranchWorldMap
+        branchNodes={branchNodes}
+        siteNodes={siteNodes}
+        onSelectCountry={(countryName, type) => {
+          setSelectedCountry(countryName);
+          setDrawerType(type || 'branch');
+          setDrawerVisible(true);
+        }}
+      />
 
       {/* 国家海外分支机构明细展示抽屉 */}
       <Drawer
@@ -6631,6 +6643,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       {/* 主体 Tabs */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <Tabs
+          destroyInactiveTabPane={true}
           activeKey={activeTab}
           onChange={(key) => {
             setActiveTab(key);

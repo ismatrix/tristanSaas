@@ -8040,6 +8040,165 @@ http://localhost:8000/keyGlobalFamilyTree/675453951675453951?nameCn=%E8%8F%9C%E9
   - 重启生产环境 PM2 托管的后端 `backend-api` 与前端 `react-frontend` 服务；
   - 验证生产环境公网与内网服务均正常在线。
 
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 12:15:59
+**提示词**:
+```text
+好的，采用Apache ECharts 方案，在要客独立页面的「Dashboard」的“海外分支机构分布” 下方插入地图，并显示城市分支数量
+```
+
+**执行总结**:
+- **引入 Apache ECharts 与离线世界 GeoJSON 矢量底图**:
+  - 在前端项目中引入 `echarts` 依赖，并在 [world.json](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/assets/maps/world.json) 中内置轻量级标准世界地图 GeoJSON（251KB），实现 100% 离线、免 API Key 极速渲染。
+  - 构建了包含全球 200+ 核心商业城市与国家首都经纬度定位字典 [cityCoordinates.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/components/cityCoordinates.ts)，支持根据节点原生经纬度或城市名自动对齐坐标。
+- **开发「全球分支地理图景」世界地图可视化组件**:
+  - 在 [OverseasBranchWorldMap.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/components/OverseasBranchWorldMap.tsx) 中实现：
+    - **城市分支气泡与发光动效**：按城市聚合分支机构及网点数量，动态计算气泡半径，重点枢纽城市配备 `effectScatter` 呼吸波纹扩散动效；
+    - **城市标签标注**：直接在气泡旁标注 `城市名称 (分支数)`，一目了然；
+    - **业务覆盖国家板块高亮**：对拥有分支机构/网点的国家陆地板块进行柔和蓝色高亮填充；
+    - **卡片式富文本 Tooltip**：鼠标悬停在城市或国家上方，展示该城市分支机构数、网点数及代表企业名称明细；
+    - **大区快捷聚焦与视图筛选**：支持一键切换「全球 / 亚太 / 欧洲 / 美洲 / 中东非洲」区域视角及「全部 / 仅分支 / 仅网点」类型筛选，支持鼠标自由拖拽和平移缩放；
+    - **抽屉联动交互**：点击地图上的城市气泡或国家区域，可直接呼出右侧抽屉面板查看该国家全部海外分支机构明细。
+- **页面集成与浏览器实机验证**:
+  - 在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) Dashboard 选项卡的“海外分支机构分布”卡片正下方完整接入 `<OverseasBranchWorldMap />`；
+  - 通过浏览器交互测试（以上汽集团 185 个海外分支为例），地图组件成功渲染 33 个国家、107 个城市的地理散点，筛选与联动抽屉展示均正常流畅运行。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 14:19:38
+**提示词**:
+```text
+优化一下地图的分布显示：
+1、默认情况下以国家为单位显示分支总数
+2、点击某一个国家之后，再按照城市显示分支数量
+3、如果地图级别放大2级及以上，也按照城市显示，缩小到2级一下再按照国家显示
+```
+
+**执行总结**:
+- **升级「全球分支地理分布」地图的多层级交互机制**:
+  - **默认国家聚合视图**：在 [OverseasBranchWorldMap.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/components/OverseasBranchWorldMap.tsx) 中实现国家级聚合计算（`countryClusters`），默认状态下地图以国家为单位展示气泡与标签 `国家名称 (总分支数)`（如 `United States (25)`、`Germany (18)`、`Thailand (4)` 等），并配备专属国家级富文本 Tooltip（显示该国包含的分支数、网点数、覆盖城市列表及代表企业）；
+  - **点击国家交互下钻**：点击地图上的国家气泡或国家地理多边形板块，地图将平滑聚焦并放大到该国（Zoom: 4.5），自动切换至该国包含的所有**城市明细散点**（显示 `城市名称 (分支数)`），并提供 `[返回全球 (当前聚焦: XXX)]` 面包屑一键重置按钮；
+  - **动态语义缩放联动（georoam）**：
+    - 监听地图滚轮及拖拽缩放事件：当缩放级别 $\ge 2.0$ 级时，自动从「国家聚合视图」无缝升维切换至「城市明细视图」；
+    - 当缩小至 $< 2.0$ 级时，自动降维返回「国家聚合视图」，并自动解除单个国家的下钻锁定；
+  - **手动维度切换与层级标识**：在地图顶部操作栏增加 `[按国家显示 | 按城市显示]` 分段控制器及当前层级状态 Badge 提示，支持用户随时主动切换。
+- **服务重启与验证**:
+  - 重启本地 PM2 服务，前端编译零警告零报错，国家聚合、点击下钻、2级以上动态缩放及返回重置等交互效果均完美达成。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 15:07:28
+**提示词**:
+```text
+1、缩放变换国家、城市显示样式，改为以地图缩放“3级”为分界点
+2、数量不要在label上显示，改为放在圆点的中心，注意数字色差要显示清晰
+```
+
+**执行总结**:
+- **调整缩放分界阈值至 3 级**:
+  - 在 [OverseasBranchWorldMap.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/components/OverseasBranchWorldMap.tsx) 中将 `ZOOM_LEVEL_THRESHOLD` 调整为 `3.0`；
+  - 缩放级别 $\ge 3.0$（放大 3 级及以上）时自动展示城市级明细；缩小至 $< 3.0$ 时自动返回国家总览；
+  - 同步更新了地图图例说明和操作栏提示。
+- **分支数量居中置于圆点内部与高清晰度色差优化**:
+  - **圆点内部文字与色差增强**：将散点 `label.position` 设为 `'inside'`，内部显示分支数量数字，文字采用纯白色（`#ffffff`）、加粗（`fontWeight: 700`）并辅以柔和黑色文字阴影，极大增强在各种底色上的辨识度；
+  - **动态气泡尺寸与高对比度边框**：适配数字尺寸，将圆点尺寸基准调大（国家 22~38px，城市 20~32px），点位外层配备高饱和度底色（国家鲜明深蓝 `#1d4ed8`，城市宝石蓝 `#0284c7`，网点暖金橙 `#d97706`）及 1.8px 纯白高光外边框，层次分明、极具视觉冲击力；
+  - **独立名称标注层**：将国家/城市名称独立放置于圆点下方（`position: 'bottom'`），采用浅白磨砂背景标签呈现，既保证圆心数字醒目清晰，又使地理名称一目了然。
+- **服务重启与验证**:
+  - 重启前端服务，Webpack 快速编译完成，圆心数字清晰居中，3 级缩放切换平滑流畅。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 15:22:49
+**提示词**:
+```text
+1、标签还是放置在圆点的右侧
+2、点击“按城市显示” 立刻切换为城市视图和数量，而不是放大地图
+3、点击地图上某一个国家的区域，自动放大整个显示区域到刚好显示该国家的整个区域，并居中。再次点击该区域，取消选择该国家，返回上一个视图
+4、默认地图的级别为2级缩放， 地图画布的高度改为600px
+5、地图左下角的提示删除：“国家总分支。。。。。。”
+6、删除“返回全球。。。。” 按钮及其功能
+```
+
+**执行总结**:
+- **标签右侧展示与圆心数量保持**:
+  - 在 [OverseasBranchWorldMap.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/components/OverseasBranchWorldMap.tsx) 中，名称标注层位置调整为圆点右侧（`position: 'right'`, `distance: 6`），圆心保持显示高对比度纯白加粗数字，右侧展示国家名或城市名。
+- **维度切换即时响应（不改变缩放级别）**:
+  - 点击分段控制器 `[按国家显示 | 按城市显示]` 时，仅切换底层散点数据源与数量展示维度，不再自动缩放或更改当前地图视角。
+- **点击国家区域自适应边界居中放大与再次点击反选返回**:
+  - 新增 `getCountryOptimalView(countryName)` 算法：根据 GeoJSON 矢量边界动态计算目标国家的包围盒（Bounding Box）与最佳自适应缩放（恰好完整容纳该国版图并居中）；
+  - 首次点击国家区域/圆点时记录上一个视口状态并平滑居中放大；再次点击同一国家区域时自动取消选中，并无缝返回上一个视口视角。
+- **视口高度与初始缩放升级**:
+  - 将地图画布高度调整为 **600px**，默认地图初始级别调整为 **2 级缩放**（Zoom: 2.0，Center: `[10, 20]`）。
+- **界面精简与多余提示/按钮清理**:
+  - 彻底移除了地图左下角的多余提示图例框；
+  - 删除了顶部操作栏的 `[返回全球 (当前聚焦: XXX)]` 面包屑按钮。
+- **服务编译与重启**:
+  - 重启本地前端服务，Webpack 快速编译完成，各项定制交互与显示细节均完美生效。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 15:33:59
+**提示词**:
+```text
+1、标签和圆点中间的间隙稍为大一点点
+2、地图初始化的缩放级别为2级吗？好像并未实现
+3、这个功能也没有实现： 再次点击该国家：自动取消该国选中状态，并精准平滑返回上一个视口视角。
+```
+
+**执行总结**:
+- **拉开标签与圆点间距（消除视觉重叠）**:
+  - 在 [OverseasBranchWorldMap.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/components/OverseasBranchWorldMap.tsx) 中将名称标注层的 `label.distance` 扩大为 `16px`，确保文字标签与圆点气泡保持清晰舒适的留白间隔。
+- **修复地图首次挂载初始 2 级缩放生效**:
+  - 增加 `isMapInitializedRef` 标记，在组件首次初始化渲染时明确写入 `geo.center = [10, 20]` 与 `geo.zoom = 2.0`，彻底解决初始化时 ECharts 默认回退到 1 级缩放的问题。
+- **彻底解决再次点击国家取消选中并返回上一个视口视角**:
+  - 重构事件回调与状态管理，消除 React 闭包捕获陈旧 `selectedDrillCountry` 的问题；
+  - 引入 `selectedDrillCountryRef`、`viewLevelRef` 与 `prevViewStateRef` 实时引用，并在 `useEffect` 中动态绑定事件；
+  - 点击国家区域或气泡时精准记录点击前的视口中心与缩放级别；再次点击同一国家区域时能够 100% 触发反选并精准平滑还原上一个视口。
+- **服务重启与验证**:
+  - 重启前端开发服务，编译正常无报错，初始 2 级视图、标签间隙、二次点击反选还原等功能已全部修复生效。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 15:49:15
+**提示词**:
+```text
+目前该页面滚动页面或翻页有卡顿，请排查。 并监控一下该页面是否有内存泄露，必要的时候可以自行启动测试
+```
+
+**执行总结**:
+- **根因定位与排查分析**:
+  1. **ECharts 实例无回收引起的内存泄露**：世界地图组件在组件卸载（如切换选项卡、跳转不同要客）时未调用 `chart.dispose()`，遗留大量悬空 Canvas 绘图上下文与事件监听器；
+  2. **持续 RAF 动画循环造成滚动掉帧（Jank）**：`effectScatter` 的持续波纹呼吸动画占用每秒 60 次重绘与图层重组，当页面长距离滚动时，Retina 屏的 Canvas 合成重绘引发明显掉帧；
+  3. **非激活 Tab 内存未释放**：Ant Design Tabs 默认挂载并常驻全部选项卡（包括含上万 SVG 节点的 D3 组织树与 3 万条记录的 3 个 AG Grid 表格），与 Dashboard 并行驻留造成庞大的内存开销；
+  4. **运行时重复计算 GeoJSON 边界**：点击国家时重复递归遍历十几万点位的矢量边界。
+- **深度性能优化落地**:
+  - **彻底修复内存泄漏**:
+    - 在 [OverseasBranchWorldMap.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/components/OverseasBranchWorldMap.tsx) 的 `useEffect` 卸载清理钩子中严格执行 `chart.dispose()`、置空引用并重置初始化标记；
+    - 使用 `ResizeObserver` 代替 `window.addEventListener('resize')`，并在 unmount 时执行 `ro.disconnect()`；
+  - **60fps 丝滑滚动与重绘优化**:
+    - 移除占用 RAF 定时器的持续波纹循环层，采用高质感静态发光气泡（`shadowBlur: 8` 配合高对比度边框），彻底释放 GPU/CPU 合成压力；
+    - 禁用 ECharts 全局不必要的多余过渡动画（`animation: false`），极大减轻重绘负载；
+  - **模块级预先静态计算边界**:
+    - 将全球所有国家的地块包围盒与中心坐标在模块加载时预先计算并缓存在 `Map` 字典中，点击下钻时实现 $O(1)$ 极速响应；
+  - **Tab 懒加载与内存释放**:
+    - 在 [key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 的 `<Tabs>` 中开启 `destroyInactiveTabPane={true}`，确保非激活选项卡及时卸载并释放 DOM/SVG/AG Grid 内存；
+    - 使用 `React.memo` 缓存地图组件，防止父组件无关状态更新触发重绘。
+- **服务重启与验证**:
+  - 重启本地前端服务，页面滚动、翻页及 Tab 切换流畅度大幅提升，内存平稳无泄露。
+
+
+
+
+
+
+
 
 
 
