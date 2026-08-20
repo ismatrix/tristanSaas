@@ -50,6 +50,52 @@ const unescapeHtml = (str: string) => {
     .replace(/&amp;/g, '&');
 };
 
+/**
+ * 分批分块并发查询 Wildcard 接口，防止数组过大引发 GET URL 长度超标 (HTTP 414 / 431)
+ */
+async function chunkedWildcardQuery(
+  collection: string,
+  field: string,
+  values: (string | number)[],
+  chunkSize: number = 60,
+  extraQuery: Record<string, any> = {},
+): Promise<any[]> {
+  if (!values || values.length === 0) return [];
+  const uniqueValues = Array.from(
+    new Set(
+      values
+        .map(String)
+        .map((v) => v.trim())
+        .filter((v) => Boolean(v && v !== '-1' && v !== '0' && v !== 'null' && v !== 'undefined')),
+    ),
+  );
+  if (uniqueValues.length === 0) return [];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < uniqueValues.length; i += chunkSize) {
+    chunks.push(uniqueValues.slice(i, i + chunkSize));
+  }
+
+  const promises = chunks.map((chunk) =>
+    request(`/api/v1/wildcards/${collection}`, {
+      method: 'GET',
+      params: {
+        query: JSON.stringify({ ...extraQuery, [field]: { $in: chunk } }),
+        options: JSON.stringify({ limit: 10000 }),
+      },
+    })
+      .then((res) => (res.results || res.data?.results || []) as any[])
+      .catch((err) => {
+        console.warn(`[chunkedWildcardQuery] Failed querying ${collection} on field ${field}:`, err);
+        return [] as any[];
+      }),
+  );
+
+  const resultsArray = await Promise.all(promises);
+  return resultsArray.flat();
+}
+
+
 // 预设富文本编辑颜色列表 (黑、白、红、黄、绿、蓝)
 const PRESET_COLORS = [
   { label: '黑色', value: '#111827' },
@@ -2920,14 +2966,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const gTreeInfoMap = new Map();
       if (gids.length > 0) {
         try {
-          const gTreeRes = await request('/api/v1/wildcards/keyGlobalFamilyTree', {
-            method: 'GET',
-            params: {
-              query: JSON.stringify({ GID: { $in: gids } }),
-              options: JSON.stringify({ limit: 10000 })
-            }
-          });
-          const gTreeRecords = gTreeRes.results || gTreeRes.data?.results || [];
+          const gTreeRecords = await chunkedWildcardQuery('keyGlobalFamilyTree', 'GID', gids, 60);
           gTreeRecords.forEach((r: any) => gTreeInfoMap.set(String(r.GID), r));
         } catch (e) {
           console.error('Failed to fetch keyGlobalFamilyTree details', e);
@@ -2937,14 +2976,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const custToCompanyIdMap = new Map();
       if (extIds.length > 0) {
         try {
-          const partMapRes = await request('/api/v1/wildcards/excelParticipantCustMapping', {
-            method: 'GET',
-            params: {
-              query: JSON.stringify({ extCustId: { $in: extIds } }),
-              options: JSON.stringify({ limit: 10000 })
-            }
-          });
-          const partMapRecords = partMapRes.results || partMapRes.data?.results || [];
+          const partMapRecords = await chunkedWildcardQuery('excelParticipantCustMapping', 'extCustId', extIds, 60);
           partMapRecords.forEach((r: any) => custToCompanyIdMap.set(String(r.extCustId), r));
         } catch (e) {
           console.error('Failed to fetch excelParticipantCustMapping', e);
@@ -2954,14 +2986,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const customerMap = new Map();
       if (extIds.length > 0) {
         try {
-          const custRes = await request('/api/v1/wildcards/ibosscustomers', {
-            method: 'GET',
-            params: {
-              query: JSON.stringify({ custId: { $in: extIds } }),
-              options: JSON.stringify({ limit: 10000 })
-            }
-          });
-          const custRecords = custRes.results || custRes.data?.results || [];
+          const custRecords = await chunkedWildcardQuery('ibosscustomers', 'custId', extIds, 60);
           custRecords.forEach((r: any) => customerMap.set(String(r.custId), r));
         } catch (e) {
           console.error('Failed to fetch ibosscustomers', e);
@@ -2972,14 +2997,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       const participantMap = new Map();
       if (companyIds.length > 0) {
         try {
-          const partRes = await request('/api/v1/wildcards/ibossParticipantDetail', {
-            method: 'GET',
-            params: {
-              query: JSON.stringify({ companyId: { $in: companyIds.map(String) } }),
-              options: JSON.stringify({ limit: 10000 })
-            }
-          });
-          const partRecords = partRes.results || partRes.data?.results || [];
+          const partRecords = await chunkedWildcardQuery('ibossParticipantDetail', 'companyId', companyIds.map(String), 60);
           partRecords.forEach((r: any) => participantMap.set(String(r.companyId), r));
         } catch (e) {
           console.error('Failed to fetch ibossParticipantDetail', e);
@@ -3459,33 +3477,50 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       });
 
-      // 构建模糊正则检索 $or 选项 (合并多关键字正则，防止 URL 超长引发 403/431)
-      let queryObj: any = {};
-      const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
-      if (pattern) {
-        const rx = { $regex: pattern, $options: 'i' };
-        queryObj = {
-          $or: [
-            { companyName: rx },
-            { companyEnglishName: rx },
-            { 'detailInfo.companyBasicDTO.companyName': rx },
-            { 'detailInfo.companyBasicDTO.companyEnglishName': rx }
-          ]
-        };
-      } else {
+      // 构建模糊正则检索 $or 选项 (采用分块并发，每个请求最多 8 个关键字，防止 URL 超长引发 414/431)
+      const validKws = kwList.map((kw) => kw.trim()).filter(Boolean);
+      if (validKws.length === 0) {
         setGovernanceData([]);
         setGovernanceLoading(false);
         return;
       }
 
-      const partRes = await request('/api/v1/wildcards/ibossParticipantDetail', {
-        method: 'GET',
-        params: {
-          query: JSON.stringify(queryObj),
-          options: JSON.stringify({ limit: 50000 })
+      const kwChunks: string[][] = [];
+      for (let i = 0; i < validKws.length; i += 8) {
+        kwChunks.push(validKws.slice(i, i + 8));
+      }
+
+      const partPromises = kwChunks.map((chunk) => {
+        const pattern = chunk.map((kw) => escapeRegExp(kw)).join('|');
+        const rx = { $regex: pattern, $options: 'i' };
+        const queryObj = {
+          $or: [
+            { companyName: rx },
+            { companyEnglishName: rx },
+            { 'detailInfo.companyBasicDTO.companyName': rx },
+            { 'detailInfo.companyBasicDTO.companyEnglishName': rx },
+          ],
+        };
+        return request('/api/v1/wildcards/ibossParticipantDetail', {
+          method: 'GET',
+          params: {
+            query: JSON.stringify(queryObj),
+            options: JSON.stringify({ limit: 50000 }),
+          },
+        })
+          .then((res) => (res.results || res.data?.results || []) as any[])
+          .catch(() => [] as any[]);
+      });
+
+      const partChunkResults = await Promise.all(partPromises);
+      const rawPartMap = new Map<string, any>();
+      partChunkResults.flat().forEach((r: any) => {
+        const idKey = String(r._id || r.companyId || '');
+        if (idKey && !rawPartMap.has(idKey)) {
+          rawPartMap.set(idKey, r);
         }
-      }).catch(() => ({ results: [] }));
-      const rawPartList = partRes.results || partRes.data?.results || [];
+      });
+      const rawPartList = Array.from(rawPartMap.values());
 
       const assembled = rawPartList.map((r: any) => {
         const basic = r.detailInfo?.companyBasicDTO || {};
@@ -3653,14 +3688,7 @@ const KeyGlobalFamilyTree: React.FC = () => {
       }
 
       // 2. 查询 ibosscustomers 表，匹配 custId
-      const custRes = await request('/api/v1/wildcards/ibosscustomers', {
-        method: 'GET',
-        params: {
-          query: JSON.stringify({ custId: { $in: extCustIds } }),
-          options: JSON.stringify({ limit: 1000 })
-        }
-      });
-      const custRecords = custRes.results || custRes.data?.results || [];
+      const custRecords = await chunkedWildcardQuery('ibosscustomers', 'custId', extCustIds, 60);
       setParticipantCustomerList(custRecords);
     } catch (e) {
       console.error('获取参与方关联客户详情失败', e);
@@ -4319,32 +4347,49 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       });
 
-      let queryObj: any = { customerTypeName: 'End Customer' };
-      const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
-      if (pattern) {
-        const rx = { $regex: pattern, $options: 'i' };
-        queryObj = {
-          customerTypeName: 'End Customer',
-          $or: [
-            { enterpriseName: rx },
-            { custId: rx },
-            { custCode: rx }
-          ]
-        };
-      } else {
+      const validKws = kwList.map((kw) => kw.trim()).filter(Boolean);
+      if (validKws.length === 0) {
         setEndCustomerData([]);
         setEndCustomerLoading(false);
         return;
       }
 
-      const custRes = await request('/api/v1/wildcards/ibosscustomers', {
-        method: 'GET',
-        params: {
-          query: JSON.stringify(queryObj),
-          options: JSON.stringify({ limit: 50000 })
+      const kwChunks: string[][] = [];
+      for (let i = 0; i < validKws.length; i += 8) {
+        kwChunks.push(validKws.slice(i, i + 8));
+      }
+
+      const custPromises = kwChunks.map((chunk) => {
+        const pattern = chunk.map((kw) => escapeRegExp(kw)).join('|');
+        const rx = { $regex: pattern, $options: 'i' };
+        const queryObj = {
+          customerTypeName: 'End Customer',
+          $or: [
+            { enterpriseName: rx },
+            { custId: rx },
+            { custCode: rx },
+          ],
+        };
+        return request('/api/v1/wildcards/ibosscustomers', {
+          method: 'GET',
+          params: {
+            query: JSON.stringify(queryObj),
+            options: JSON.stringify({ limit: 50000 }),
+          },
+        })
+          .then((res) => (res.results || res.data?.results || []) as any[])
+          .catch(() => [] as any[]);
+      });
+
+      const custChunkResults = await Promise.all(custPromises);
+      const rawCustMap = new Map<string, any>();
+      custChunkResults.flat().forEach((r: any) => {
+        const idKey = String(r._id || r.custId || '');
+        if (idKey && !rawCustMap.has(idKey)) {
+          rawCustMap.set(idKey, r);
         }
-      }).catch(() => ({ results: [] }));
-      const rawCustList = custRes.results || custRes.data?.results || [];
+      });
+      const rawCustList = Array.from(rawCustMap.values());
 
       // 提取当前终端客户记录列表的所有企业名称 (enterpriseName) 集合，关联 dmcTCV 表中的“终端客户名称”
       const currentEnterpriseNames = Array.from(new Set(rawCustList.map((r: any) => String(r.enterpriseName || '').trim()).filter(Boolean))) as string[];
@@ -4617,32 +4662,49 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       });
 
-      let queryObj: any = { customerTypeName: 'Enterprise' };
-      const pattern = kwList.map(kw => escapeRegExp(kw.trim())).filter(Boolean).join('|');
-      if (pattern) {
-        const rx = { $regex: pattern, $options: 'i' };
-        queryObj = {
-          customerTypeName: 'Enterprise',
-          $or: [
-            { enterpriseName: rx },
-            { custId: rx },
-            { custCode: rx }
-          ]
-        };
-      } else {
+      const validKws = kwList.map((kw) => kw.trim()).filter(Boolean);
+      if (validKws.length === 0) {
         setEnterpriseCustomerData([]);
         setEnterpriseCustomerLoading(false);
         return;
       }
 
-      const custRes = await request('/api/v1/wildcards/ibosscustomers', {
-        method: 'GET',
-        params: {
-          query: JSON.stringify(queryObj),
-          options: JSON.stringify({ limit: 50000 })
+      const kwChunks: string[][] = [];
+      for (let i = 0; i < validKws.length; i += 8) {
+        kwChunks.push(validKws.slice(i, i + 8));
+      }
+
+      const custPromises = kwChunks.map((chunk) => {
+        const pattern = chunk.map((kw) => escapeRegExp(kw)).join('|');
+        const rx = { $regex: pattern, $options: 'i' };
+        const queryObj = {
+          customerTypeName: 'Enterprise',
+          $or: [
+            { enterpriseName: rx },
+            { custId: rx },
+            { custCode: rx },
+          ],
+        };
+        return request('/api/v1/wildcards/ibosscustomers', {
+          method: 'GET',
+          params: {
+            query: JSON.stringify(queryObj),
+            options: JSON.stringify({ limit: 50000 }),
+          },
+        })
+          .then((res) => (res.results || res.data?.results || []) as any[])
+          .catch(() => [] as any[]);
+      });
+
+      const custChunkResults = await Promise.all(custPromises);
+      const rawCustMap = new Map<string, any>();
+      custChunkResults.flat().forEach((r: any) => {
+        const idKey = String(r._id || r.custId || '');
+        if (idKey && !rawCustMap.has(idKey)) {
+          rawCustMap.set(idKey, r);
         }
-      }).catch(() => ({ results: [] }));
-      const rawCustList = custRes.results || custRes.data?.results || [];
+      });
+      const rawCustList = Array.from(rawCustMap.values());
 
       // 提取当前企业客户记录列表的所有 custId 集合，精准关联 dmcTCV 表中的“签约客户标识”
       const currentCustIds = Array.from(new Set(rawCustList.map((r: any) => String(r.custId || '').trim()).filter(Boolean))) as string[];
