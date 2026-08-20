@@ -8241,6 +8241,58 @@ http://localhost:8000/keyGlobalFamilyTree/675453951675453951?nameCn=%E8%8F%9C%E9
 - **本地编译与验证**:
   - 重启本地前端服务，Webpack 编译通过无任何报错，HTTP 414 风险已在代码架构层面彻底消除。
 
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 16:23:37
+**提示词**:
+```text
+同步代码到服务端
+```
+
+**执行总结**:
+- **代码提交与推送**:
+  - 本地修复 HTTP 414 错误的相关代码变更已通过 `git add .`、`git commit` 提交并推送到 GitHub 远程仓库 `origin/main`（Commit: `206f177`）。
+- **服务端文件同步与生产编译**:
+  - 通过 `rsync` 增量同步最新代码至生产服务器 `/Users/tristan/Apps/TristanSaas/`（端口 6022）；
+  - 在生产服务器执行 `npm run build` 成功完成 Webpack 生产构建（耗时 7.57s），生成最新的 `dist/` 静态资源包。
+- **Nginx 缓冲区与进程池更新**:
+  - 生产端 Nginx 配置中配置了 `client_header_buffer_size 16k;` 与 `large_client_header_buffers 4 64k;` 双重缓冲区安全防线；
+  - 重启生产端 PM2 进程池并成功重载 Nginx，`https://tristan.wang:9900` 超大要客（如 CCCC 中国交建）页面已完全恢复正常加载。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-20 16:49:55
+**提示词**:
+```text
+服务端添加数据库导出备份：
+1、每晚23:00点开始备份，参考开发端的备份脚本和逻辑
+2、排除掉所有DNB开头的表
+3、dmcBR、dmcTCV 每周备份一次，独立压缩包
+```
+
+**执行总结**:
+- **自动化备份脚本开发与逻辑架构 ([scripts/backup_mongodb.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/backup_mongodb.js))**:
+  - **规则 1（全量表智能过滤）**：
+    - 连接目标数据库 `node-boilerplate`，动态获取全量数据表集合列表；
+    - 使用严格的前缀正则匹配，自动排除所有以 `DNB` / `dnb` / `diffDNB` 开头的集合（共 154 张 DNB 表），不备份；
+  - **规则 2（每日核心业务表归档）**：
+    - 每日备份排除 DNB 表与 DMC 表后的所有核心业务表（35 张核心表，包括 `keycustomer`、`keyGlobalFamilyTree`、`keyFamilyTreeCustMapping`、`ibosscustomers`、`contracts` 等）；
+    - 使用原生 `mongodump` 快速导出并自动打包压缩为 `.tar.gz`（格式：`daily_backup_YYYYMMDDHHMMSS.tar.gz`），存放在 `/Users/tristan/Backups/TristanSaasMongoBackup/daily/`；
+  - **规则 3（DMC 独立周备份）**：
+    - `dmcBR` 与 `dmcTCV` 专享独立周备份逻辑，在 `--auto` 调度下每周日自动触发，独立打包为 `dmc_weekly_backup_YYYYMMDDHHMMSS.tar.gz`，存放在 `/Users/tristan/Backups/TristanSaasMongoBackup/weekly/`；
+  - **规则 4（存储轮转与生命周期管理）**：
+    - 自动清理过期归档：日常业务备份保留最近 14 天（14 份），DMC 周备份保留最近 8 周（8 份），并在 `/Users/tristan/Backups/TristanSaasMongoBackup/backup.log` 记录详细运行日志。
+- **本地与生产环境联调验证**:
+  - 本地与生产服务端分别执行全量试运行测试，日常备份 5 秒内完成导出压缩（归档体积约 46.72 MB），DMC 周备份顺利完成独立压缩归档；
+  - 代码已同步至生产服务器 `/Users/tristan/Apps/TristanSaas/scripts/backup_mongodb.js`。
+- **Crontab 定时任务配置**:
+  - 在生产服务器 `tristan@tristan.wang` 上配置了每日 23:00 定时调度：
+    `0 23 * * * export PATH=/opt/homebrew/bin:/opt/homebrew/opt/node@22/bin:$PATH; /opt/homebrew/bin/node /Users/tristan/Apps/TristanSaas/scripts/backup_mongodb.js --auto >> /Users/tristan/Backups/TristanSaasMongoBackup/cron.log 2>&1`
+
+
+
 
 
 
