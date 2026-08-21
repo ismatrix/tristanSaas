@@ -8397,3 +8397,15 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
   1. **Flex 弹性等高**：在 `key-global-family-tree.tsx` 中为 Section 4 的主 `<Row>` 添加 `display: 'flex'`, `alignItems: 'stretch'` 样式；并将 3 个 `<Col>` 的外层容器统一下调/移除固定的 height/minHeight，统一设置为 `height: '100%', boxSizing: 'border-box'`，消除底部所有不匹配的悬空间隙，实现高度完全齐平对齐；
   2. **生产构建部署**：Git 提交后通过 rsync 传输至生产服务器 `tristan@tristan.wang:6022`，并在生产端成功运行 `npm run build` 重新打包（耗时 15.28s），平滑重载 PM2 进程池与 Nginx (`nginx -s reload`) 实时生效。
 
+---
+
+## Prompt 最新
+**时间**: 2026-08-21 13:26:57
+**提示词**:
+```text
+同步最新代码到服务端
+```
+
+**执行总结**:
+- （正在同步代码并部署生产服务端中）
+
