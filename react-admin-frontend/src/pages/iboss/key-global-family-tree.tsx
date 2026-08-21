@@ -1887,10 +1887,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         bordered={false}
         style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 16 }}
       >
-        <Row gutter={16}>
+        <Row gutter={16} style={{ display: 'flex', alignItems: 'stretch' }}>
           {/* 第一列：销售单元 (国家公司) 堆积柱状图 + 右侧汇总卡片 (span={11}) */}
           <Col span={11}>
-            <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px' }}>
+            <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               {sortedTcvStats.length > 0 ? (
                 <Row gutter={12} align="middle">
                   {/* 左侧：堆积柱状图与图例 */}
@@ -2122,7 +2122,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 
           {/* 第二列：CMI 产品大类分解 (span={6}) */}
           <Col span={6}>
-            <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '350px' }}>
+            <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
               <div style={{ fontSize: 13, fontWeight: 'bold', color: '#666', marginBottom: 16 }}>
                 📦 CMI 产品大类占比
               </div>
@@ -2174,7 +2174,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 
           {/* 第三列：子分类小类分解排行 (span={7}) */}
           <Col span={7}>
-            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '6px', padding: '12px', height: '300px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '6px', padding: '12px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: '12px', color: '#1890ff', fontWeight: 'bold', marginBottom: 12, borderBottom: '1px solid #e8e8e8', paddingBottom: 6 }}>
                 📝 【{selectedLargeProductCat}】小类排行
               </div>

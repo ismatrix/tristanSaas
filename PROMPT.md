@@ -8382,3 +8382,16 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
 - **第三列「小类排行」卡片高度固定 300px 修改并部署上线**:
   1. **样式微调**：在 `key-global-family-tree.tsx` 中将第三列外框容器 `height` 统一锁定为 `300px`，配置 `boxSizing: 'border-box'`，保持内层 `overflowY: 'auto'` 滚动支持；
   2. **生产构建部署**：提交 Git 变更并通过 rsync 传输至生产服务器 `tristan@tristan.wang:6022`，在生产端成功执行 `npm run build` 打包编译（耗时 15.50s），并平滑重启 PM2 进程池与 Nginx (`nginx -s reload`) 实时生效。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-21 12:06:42
+**提示词**:
+```text
+「分支与 CMI 历史签单统计情况」中三列的高度保持一致，并且下方不要留间隙
+```
+
+**执行总结**:
+- （正在执行三列等高对齐修改中）
+
