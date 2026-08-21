@@ -8354,4 +8354,18 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
 - **代码已成功同步并部署上线至生产服务器 `tristan.wang:6022`**:
   1. **Git 代码提交与推送**：将本地受版本控制的 `PROMPT.md` 与核心页面 `key-global-family-tree.tsx` 的最新修改提交 commit `e05efa1` 并成功推送至 GitHub `main` 分支；
   2. **生产服务器极速同步**：通过 rsync 将本地全量前端增量代码即时无损传输至 macOS 生产服务器 `/Users/tristan/Apps/TristanSaas`；
-  3. **产物打包与服务平滑重载**：在生产服务器端顺利完成了前端 Webpack/Umi 构建打包（耗时 15.87s，生成静态产物 `dist`），并成功平滑重载了 PM2 后端/前端服务进程 `backend-api` 与 `react-frontend`。所有最新代码优化已在生产环境 `https://tristan.wang:9900` 实时生效运行！
+---
+
+## Prompt 最新
+**时间**: 2026-08-21 11:30:20
+**提示词**:
+```text
+开发端数据表： keyFamilyTreeCustMapping， 覆盖同步到服务器端
+```
+
+**执行总结**:
+- **`keyFamilyTreeCustMapping` 数据表全量覆盖同步至生产服务器**:
+  1. **本地导出**：使用 `mongodump` 将开发端 MongoDB `node-boilerplate` 数据库中的 `keyFamilyTreeCustMapping` 集合完整导出（共计 **2,252** 条文档及完整索引配置）；
+  2. **生产端覆盖还原**：通过 rsync 传输至生产服务器 `tristan@tristan.wang:6022`，并执行 `mongorestore --drop` 清空原表后还原覆盖写入 2,252 条最新映射记录；
+  3. **索引重建与数据校验**：自动重建了 `GID_1`、`idx_ultimateGID`、`extCustId_1` 和 `mappingPath_1` 四大核心索引。经生产端 `mongosh` 实测校验，记录数精准等于 2,252，数据即时在生产服务中生效。
+
