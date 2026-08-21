@@ -25,6 +25,8 @@ import {
   TranslationOutlined,
   DeleteOutlined,
   FormOutlined,
+  FileTextOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
@@ -38,6 +40,37 @@ import { OverseasBranchWorldMap } from './components/OverseasBranchWorldMap';
 
 // 注册 AG Grid 模块
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
+
+// 顶层全局通用 Excel (CSV utf-8 bom) 导出函数
+const exportToCsvExcel = (filename: string, headers: string[], keys: ((row: any, idx?: number) => any)[], data: any[]) => {
+  if (!data || data.length === 0) {
+    message.warning('暂无可导出数据');
+    return;
+  }
+  let csvContent = '\uFEFF';
+  csvContent += headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(',') + '\r\n';
+
+  data.forEach((row, idx) => {
+    const rowValues = keys.map(k => {
+      let val = k(row, idx);
+      if (val === undefined || val === null) val = '—';
+      const strVal = String(val).replace(/"/g, '""');
+      return `"${strVal}"`;
+    });
+    csvContent += rowValues.join(',') + '\r\n';
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  message.success(`已成功导出 ${data.length} 条记录至 Excel (CSV)`);
+};
 
 // HTML 实体转义还原助手函数
 const unescapeHtml = (str: string) => {
@@ -1187,6 +1220,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   const [selectedSubCat, setSelectedSubCat] = useState<string>('');
   const [subCatTcvRecords, setSubCatTcvRecords] = useState<any[]>([]);
 
+  // 签单明细与客户分组汇总弹窗状态
+  const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
+  const [customerGroupModalVisible, setCustomerGroupModalVisible] = useState<boolean>(false);
+
   // 大区变化时，重置所选国家(销售单元)为 null
   useEffect(() => {
     setSelectedTcvUnit(null);
@@ -1220,34 +1257,127 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
     return sortedTcvStats.slice(0, 5).map(item => item.unit);
   }, [sortedTcvStats]);
 
-  // 计算这 5 个国家在 2024、2025、2026 三年的年度签单数据 (金额与笔数)
-  const yearlyChartData = useMemo(() => {
-    const years = ['2024', '2025', '2026'];
+  // 计算 Top 5 销售单元在 selectedTcvYears 年份下的年度堆积签单数据 (金额与笔数)
+  const yearlyChartStackedData = useMemo(() => {
+    const years = selectedTcvYears.length > 0 ? [...selectedTcvYears].sort() : ['2024', '2025', '2026'];
     return years.map(yr => {
+      let yearTotalAmount = 0;
+      let yearTotalCount = 0;
       const countryData: Record<string, { amount: number; count: number }> = {};
       topCountries.forEach(cName => {
         const recs = tcvRecords.filter((r: any) => {
           const uName = r['销售单元中文名称'] || r['销售单元编码'] || '其他单元';
           const signDate = String(r['合同签署日期'] || r['设置起租日期'] || '');
-          return uName === cName && signDate.startsWith(yr);
+          const passRegion = selectedTcvRegion === 'All' || (r['大区中文名称'] || r['大区'] || '其他大区') === selectedTcvRegion;
+          return passRegion && uName === cName && signDate.startsWith(yr);
         });
         const amount = recs.reduce((sum: number, r: any) => sum + parseFloat(r['签单金额(港币)'] || 0), 0);
         countryData[cName] = { amount, count: recs.length };
+        yearTotalAmount += amount;
+        yearTotalCount += recs.length;
       });
-      return { year: yr, data: countryData };
+      return { year: yr, data: countryData, yearTotalAmount, yearTotalCount };
     });
-  }, [tcvRecords, topCountries]);
+  }, [tcvRecords, topCountries, selectedTcvYears, selectedTcvRegion]);
 
-  // 获取各国家各年份单柱最高金额，以确定 Y 轴的最大值刻度
-  const yearlyMaxVal = useMemo(() => {
+  // 获取各年份堆积柱最高的总金额，以确定 Y 轴刻度的最大值
+  const stackedMaxVal = useMemo(() => {
     let max = 1;
-    yearlyChartData.forEach(yrData => {
-      Object.values(yrData.data).forEach((val: any) => {
-        if (val.amount > max) max = val.amount;
-      });
+    yearlyChartStackedData.forEach(yrData => {
+      if (yrData.yearTotalAmount > max) max = yrData.yearTotalAmount;
     });
     return max;
-  }, [yearlyChartData]);
+  }, [yearlyChartStackedData]);
+
+  // 当前选中年份、大区及销售单元下的已过滤签单记录全集
+  const yearlyFilteredTcvRecords = useMemo(() => {
+    return tcvRecords.filter((r: any) => {
+      const signDate = String(r['合同签署日期'] || r['设置起租日期'] || '');
+      const passYear = selectedTcvYears.length === 0 || selectedTcvYears.some(yr => signDate.startsWith(yr));
+      if (!passYear) return false;
+
+      if (selectedTcvRegion !== 'All') {
+        const region = r['大区中文名称'] || r['大区'] || '其他大区';
+        if (region !== selectedTcvRegion) return false;
+      }
+
+      if (selectedTcvUnit) {
+        const unit = r['销售单元中文名称'] || r['销售单元编码'] || '其他单元';
+        if (unit !== selectedTcvUnit) return false;
+      }
+
+      return true;
+    });
+  }, [tcvRecords, selectedTcvYears, selectedTcvRegion, selectedTcvUnit]);
+
+  // 当前筛选条件下的签单笔数与金额合计
+  const currentSelectedTotalCount = yearlyFilteredTcvRecords.length;
+  const currentSelectedTotalAmount = useMemo(() => {
+    return yearlyFilteredTcvRecords.reduce((sum: number, r: any) => sum + parseFloat(r['签单金额(港币)'] || 0), 0);
+  }, [yearlyFilteredTcvRecords]);
+
+  // 按签约客户名称分组的金额统计数据 (降序)
+  const customerGroupedTcvStats = useMemo(() => {
+    const map = new Map<string, { signingCustomer: string; count: number; totalAmount: number }>();
+    yearlyFilteredTcvRecords.forEach((r: any) => {
+      const cust = r['签约客户名称'] || '未填签约客户';
+      const amount = parseFloat(r['签单金额(港币)'] || 0);
+      if (!map.has(cust)) {
+        map.set(cust, { signingCustomer: cust, count: 0, totalAmount: 0 });
+      }
+      const item = map.get(cust)!;
+      item.count += 1;
+      item.totalAmount += amount;
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [yearlyFilteredTcvRecords]);
+
+  // 提炼当前客户名称作为文件名前缀
+  const companyPrefix = useMemo(() => {
+    if (tcvRecords && tcvRecords.length > 0) {
+      const first = tcvRecords[0];
+      const name = first['签约客户名称'] || first['终端客户名称'];
+      if (name) return name;
+    }
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const n = sp.get('nameCn');
+      if (n) return n;
+    } catch (e) {}
+    return '全量客户';
+  }, [tcvRecords]);
+
+  // 1. 导出签单全量明细
+  const handleExportDetailExcel = useCallback(() => {
+    const headers = ['签约客户名称', '终端客户名称', '销售单元', '电路编号', '合同签署日期', '产品分类', '签单金额 (港币)'];
+    const keys = [
+      (r: any) => r['签约客户名称'] || '—',
+      (r: any) => r['终端客户名称'] || '—',
+      (r: any) => r['销售单元'] || r['销售单元中文名称'] || r['销售单元编码'] || '—',
+      (r: any) => r['电路编号'] || r['电路参考编号'] || '—',
+      (r: any) => r['合同签署日期'] || r['设置起租日期'] || '—',
+      (r: any) => r['产品分类'] || r['市场经分产品分类'] || r['TCV产品名称'] || '—',
+      (r: any) => {
+        const val = parseFloat(r['签单金额(港币)'] !== undefined ? r['签单金额(港币)'] : (r['签单金额（港币）'] || r['签单金额 (港币)'] || r['签单金额'] || 0));
+        return val.toFixed(2);
+      }
+    ];
+    const yrsStr = selectedTcvYears.length > 0 ? selectedTcvYears.join('_') : '全量';
+    exportToCsvExcel(`${companyPrefix}_历史签单全量明细_${yrsStr}`, headers, keys, yearlyFilteredTcvRecords);
+  }, [yearlyFilteredTcvRecords, selectedTcvYears, companyPrefix]);
+
+  // 2. 导出签约客户分组汇总
+  const handleExportCustomerGroupExcel = useCallback(() => {
+    const headers = ['序号', '签约客户名称', '签单笔数', '签单金额合计 (港币)'];
+    const keys = [
+      (_: any, idx?: number) => (idx !== undefined ? idx + 1 : 1),
+      (r: any) => r.signingCustomer || '未填签约客户',
+      (r: any) => r.count,
+      (r: any) => parseFloat(r.totalAmount || 0).toFixed(2)
+    ];
+    const yrsStr = selectedTcvYears.length > 0 ? selectedTcvYears.join('_') : '全量';
+    exportToCsvExcel(`${companyPrefix}_签约客户签单金额汇总_${yrsStr}`, headers, keys, customerGroupedTcvStats);
+  }, [customerGroupedTcvStats, selectedTcvYears, companyPrefix]);
 
   // 计算指定销售单元(国家)过去 3 年 (2024-2026) 签单趋势
   const getCountryYearlyStats = useCallback((countryName: string) => {
@@ -1268,18 +1398,8 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // 根据当前联动的大区和销售单元(国家)过滤出活跃 TCV 签单明细列表
   const activeTcvRecords = useMemo(() => {
-    let list = tcvRecords;
-    if (selectedTcvRegion !== 'All') {
-      list = list.filter((r: any) => (r['大区中文名称'] || r['大区'] || '其他大区') === selectedTcvRegion);
-    }
-    if (selectedTcvUnit) {
-      list = list.filter((r: any) => {
-        const unitName = r['销售单元中文名称'] || r['销售单元编码'] || '其他单元';
-        return unitName === selectedTcvUnit;
-      });
-    }
-    return list;
-  }, [tcvRecords, selectedTcvRegion, selectedTcvUnit]);
+    return yearlyFilteredTcvRecords;
+  }, [yearlyFilteredTcvRecords]);
 
   // 基于活跃 TCV 明细列表计算产品构成分布
   const PRODUCT_CATEGORY_MAP: Record<string, { parent: string; sub: string }> = {
@@ -1768,152 +1888,230 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 16 }}
       >
         <Row gutter={16}>
-          {/* 第一列：销售单元 (国家公司) 签单排行 (4/10比例 -> span={10}) */}
-          <Col span={10}>
+          {/* 第一列：销售单元 (国家公司) 堆积柱状图 + 右侧汇总卡片 (span={11}) */}
+          <Col span={11}>
             <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 'bold', color: '#666' }}>
-                  📊 销售单元{selectedTcvYears.length > 0 ? [...selectedTcvYears].sort().join(',') : '无'}年签单金额及数量趋势
-                </span>
-              </div>
-
               {sortedTcvStats.length > 0 ? (
-                <div>
-                  {/* 国家/单元色彩映射图例 (点击可快速联动筛选该国家) */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', marginBottom: 12 }}>
-                    {topCountries.map((cName, idx) => {
-                      const COUNTRY_COLORS = ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96'];
-                      const isSelected = selectedTcvUnit === cName;
-                      return (
-                        <div
-                          key={cName}
-                          onClick={() => setSelectedTcvUnit(isSelected ? null : cName)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            fontSize: '11px',
-                            color: isSelected ? '#1890ff' : '#666',
-                            fontWeight: isSelected ? 'bold' : 'normal',
-                            cursor: 'pointer',
-                            padding: '2px 8px',
-                            border: isSelected ? '1px solid #91d5ff' : '1px solid transparent',
-                            background: isSelected ? '#e6f7ff' : 'transparent',
-                            borderRadius: '4px',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <span style={{
-                            display: 'inline-block',
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: COUNTRY_COLORS[idx % COUNTRY_COLORS.length],
-                            marginRight: 4
-                          }}></span>
-                          {cName}
-                        </div>
-                      );
-                    })}
-                  </div>
+                <Row gutter={12} align="middle">
+                  {/* 左侧：堆积柱状图与图例 */}
+                  <Col span={14}>
+                    {/* 国家/单元色彩映射图例 (点击可快速联动筛选该国家) */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px', marginBottom: 10 }}>
+                      {topCountries.map((cName, idx) => {
+                        const COUNTRY_COLORS = ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96'];
+                        const isSelected = selectedTcvUnit === cName;
+                        return (
+                          <div
+                            key={cName}
+                            onClick={() => setSelectedTcvUnit(isSelected ? null : cName)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              fontSize: '11px',
+                              color: isSelected ? '#1890ff' : '#666',
+                              fontWeight: isSelected ? 'bold' : 'normal',
+                              cursor: 'pointer',
+                              padding: '2px 6px',
+                              border: isSelected ? '1px solid #91d5ff' : '1px solid transparent',
+                              background: isSelected ? '#e6f7ff' : 'transparent',
+                              borderRadius: '4px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <span style={{
+                              display: 'inline-block',
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              backgroundColor: COUNTRY_COLORS[idx % COUNTRY_COLORS.length],
+                              marginRight: 4
+                            }}></span>
+                            {cName}
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                  {/* SVG 手工多柱图面板 */}
-                  <div style={{ width: '100%', height: '300px', position: 'relative' }}>
-                    <svg viewBox="0 0 400 280" width="100%" height="100%" style={{ display: 'block' }}>
-                      <defs>
-                        {topCountries.map((cName, idx) => {
-                          const COUNTRY_COLORS = ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96'];
-                          const col = COUNTRY_COLORS[idx % COUNTRY_COLORS.length];
+                    {/* SVG 手工堆积柱状图面板 */}
+                    <div style={{ width: '100%', height: '280px', position: 'relative' }}>
+                      <svg viewBox="0 0 400 280" width="100%" height="100%" style={{ display: 'block' }}>
+                        <defs>
+                          {topCountries.map((cName, idx) => {
+                            const COUNTRY_COLORS = ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96'];
+                            const col = COUNTRY_COLORS[idx % COUNTRY_COLORS.length];
+                            return (
+                              <linearGradient key={cName} id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={col} />
+                                <stop offset="100%" stopColor={col + 'aa'} />
+                              </linearGradient>
+                            );
+                          })}
+                        </defs>
+
+                        {/* 背景虚线网格与 Y 轴刻度 (以百万 HKD 为单位) */}
+                        {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+                          const y = 20 + (200 * (1 - ratio));
+                          const val = (stackedMaxVal / 1000000) * ratio;
                           return (
-                            <linearGradient key={cName} id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={col} />
-                              <stop offset="100%" stopColor={col + '99'} />
-                            </linearGradient>
+                            <g key={idx}>
+                              <line x1="38" y1={y} x2="390" y2={y} stroke="#f0f0f0" strokeDasharray="3,3" />
+                              <text x="33" y={y + 3.5} textAnchor="end" fontSize="8" fill="#aaa">{val.toFixed(2)}M</text>
+                            </g>
                           );
                         })}
-                      </defs>
 
-                      {/* 背景虚线网格与 Y 轴刻度 (以百万 HKD 为单位) */}
-                      {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
-                        const y = 20 + (200 * (1 - ratio));
-                        const val = (yearlyMaxVal / 1000000) * ratio;
-                        return (
-                          <g key={idx}>
-                            <line x1="40" y1={y} x2="390" y2={y} stroke="#f0f0f0" strokeDasharray="3,3" />
-                            <text x="35" y={y + 3.5} textAnchor="end" fontSize="8" fill="#aaa">{val.toFixed(2)}M</text>
-                          </g>
-                        );
-                      })}
+                        {/* 按选中年份堆积柱状图渲染 (多单元堆叠为一根柱) */}
+                        {yearlyChartStackedData.map((yrData, yIdx) => {
+                          const xStart = 45;
+                          const xEnd = 385;
+                          const countYears = yearlyChartStackedData.length;
+                          const interval = countYears > 0 ? (xEnd - xStart) / countYears : 340;
+                          const groupCenterX = xStart + interval * yIdx + interval / 2;
+                          const barWidth = 26; // 堆积柱宽度
+                          const barX = groupCenterX - barWidth / 2;
 
-                      {/* 按多选年份分组渲染多立柱 */}
-                      {yearlyChartData.map((yrData, yIdx) => {
-                        const xStart = 50;
-                        const xEnd = 380;
-                        const interval = yearlyChartData.length > 0 ? (xEnd - xStart) / yearlyChartData.length : 330;
-                        const groupCenterX = xStart + interval * yIdx + interval / 2;
-                        const barWidth = 8;
-                        const barGap = 1.5;
-                        const groupWidth = topCountries.length * (barWidth + barGap) - barGap;
+                          let currentY = 220;
 
-                        return (
-                          <g key={yrData.year}>
-                            {/* 年份大类别标题 */}
-                            <text x={groupCenterX} y="245" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#666">
-                              {yrData.year}年
-                            </text>
+                          return (
+                            <g key={yrData.year}>
+                              {/* 年份标题 */}
+                              <text x={groupCenterX} y="245" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#555">
+                                {yrData.year}年
+                              </text>
 
-                            {topCountries.map((cName, cIdx) => {
-                              const val = yrData.data[cName] || { amount: 0, count: 0 };
-                              const barX = groupCenterX - groupWidth / 2 + cIdx * (barWidth + barGap);
-                              const barH = val.amount > 0 ? (val.amount / yearlyMaxVal) * 200 : 0;
-                              const barY = 220 - barH;
+                              {/* 垂直分层堆叠各个销售单元 */}
+                              {topCountries.map((cName, cIdx) => {
+                                const val = yrData.data[cName] || { amount: 0, count: 0 };
+                                if (val.amount <= 0 && val.count <= 0) return null;
 
-                              const isSelected = selectedTcvUnit === cName;
-                              const isAnySelected = selectedTcvUnit !== null;
+                                const segmentH = (val.amount / stackedMaxVal) * 200;
+                                const segmentY = currentY - segmentH;
+                                currentY = segmentY; // 为上层提供起点
 
-                              return (
-                                <g key={cName}>
-                                  <Tooltip title={`${yrData.year}年 [${cName}]: ${val.count} 笔 / ${(val.amount / 1000000).toFixed(2)} M HKD`}>
-                                    <rect
-                                      x={barX}
-                                      y={barY}
-                                      width={barWidth}
-                                      height={barH}
-                                      fill={`url(#grad-${cIdx})`}
-                                      rx="1"
-                                      style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                                      opacity={isAnySelected ? (isSelected ? 1 : 0.25) : 1}
-                                      onClick={() => setSelectedTcvUnit(isSelected ? null : cName)}
-                                    />
-                                  </Tooltip>
-                                  {/* 柱体上方绘制该国当年的签单笔数 */}
-                                  {val.count > 0 && (
-                                    <text
-                                      x={barX + barWidth / 2}
-                                      y={Math.max(barY - 2.5, 9)}
-                                      textAnchor="middle"
-                                      fontSize="7.5"
-                                      fill="#333"
-                                      fontWeight="bold"
-                                      opacity={isAnySelected ? (isSelected ? 1 : 0.25) : 1}
-                                    >
-                                      {val.count}
-                                    </text>
-                                  )}
-                                </g>
-                              );
-                            })}
-                          </g>
-                        );
-                      })}
+                                const isSelected = selectedTcvUnit === cName;
+                                const isAnySelected = selectedTcvUnit !== null;
 
-                      {/* X 轴横基线 */}
-                      <line x1="40" y1="220" x2="390" y2="220" stroke="#ccc" strokeWidth="1" />
-                    </svg>
-                  </div>
-                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: 4 }}>
-                    💡 提示：点击上方的国家图例或直接点击图表中的立柱，可秒级联动过滤右侧大类与小类数据
-                  </div>
-                </div>
+                                return (
+                                  <g key={cName}>
+                                    <Tooltip title={`${yrData.year}年 [${cName}]: ${val.count} 笔 / ${(val.amount / 1000000).toFixed(2)} M HKD`}>
+                                      <rect
+                                        x={barX}
+                                        y={segmentY}
+                                        width={barWidth}
+                                        height={segmentH}
+                                        fill={`url(#grad-${cIdx})`}
+                                        stroke="#ffffff"
+                                        strokeWidth="1"
+                                        rx={1}
+                                        style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                                        opacity={isAnySelected ? (isSelected ? 1 : 0.3) : 1}
+                                        onClick={() => setSelectedTcvUnit(isSelected ? null : cName)}
+                                      />
+                                    </Tooltip>
+                                  </g>
+                                );
+                              })}
+
+                              {/* 柱顶部绘制该年份全单元总签单笔数 */}
+                              {yrData.yearTotalCount > 0 && (
+                                <text
+                                  x={groupCenterX}
+                                  y={Math.max(currentY - 4, 12)}
+                                  textAnchor="middle"
+                                  fontSize="8.5"
+                                  fill="#1890ff"
+                                  fontWeight="bold"
+                                >
+                                  {yrData.yearTotalCount}笔
+                                </text>
+                              )}
+                            </g>
+                          );
+                        })}
+
+                        {/* X 轴横基线 */}
+                        <line x1="38" y1="220" x2="390" y2="220" stroke="#ccc" strokeWidth="1" />
+                      </svg>
+                    </div>
+                  </Col>
+
+                  {/* 右侧：上下 2 个数据统计卡片 */}
+                  <Col span={10}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center', height: '100%', minHeight: '280px' }}>
+                      {/* 卡片1：签单数合计 */}
+                      <div
+                        onClick={() => setDetailModalVisible(true)}
+                        style={{
+                          background: 'linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%)',
+                          border: '1px solid #91d5ff',
+                          borderRadius: '8px',
+                          padding: '14px 16px',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(24,144,255,0.08)',
+                          transition: 'all 0.2s cubic-bezier(0.38, 0, 0.24, 1)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = '0 4px 14px rgba(24,144,255,0.22)';
+                          e.currentTarget.style.borderColor = '#1890ff';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(24,144,255,0.08)';
+                          e.currentTarget.style.borderColor = '#91d5ff';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: '12px', color: '#595959', fontWeight: 600 }}>签单数合计</span>
+                          <FileTextOutlined style={{ fontSize: '18px', color: '#1890ff' }} />
+                        </div>
+                        <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1890ff', lineHeight: 1.2 }}>
+                          {currentSelectedTotalCount.toLocaleString()} <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#666' }}>笔</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#8c8c8c', marginTop: 8, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <span>点击查看全量明细</span>
+                          <RightOutlined style={{ fontSize: 9 }} />
+                        </div>
+                      </div>
+
+                      {/* 卡片2：签单金额合计 */}
+                      <div
+                        onClick={() => setCustomerGroupModalVisible(true)}
+                        style={{
+                          background: 'linear-gradient(135deg, #fff1f0 0%, #ffffff 100%)',
+                          border: '1px solid #ffa39e',
+                          borderRadius: '8px',
+                          padding: '14px 16px',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(245,34,45,0.08)',
+                          transition: 'all 0.2s cubic-bezier(0.38, 0, 0.24, 1)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = '0 4px 14px rgba(245,34,45,0.22)';
+                          e.currentTarget.style.borderColor = '#ff4d4f';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(245,34,45,0.08)';
+                          e.currentTarget.style.borderColor = '#ffa39e';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: '12px', color: '#595959', fontWeight: 600 }}>签单金额合计</span>
+                          <DollarOutlined style={{ fontSize: '18px', color: '#f5222d' }} />
+                        </div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#cf1322', lineHeight: 1.2, wordBreak: 'break-all' }}>
+                          {(currentSelectedTotalAmount / 1000000).toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#666' }}>M HKD</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#8c8c8c', marginTop: 8, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <span>按签约客户查看汇总</span>
+                          <RightOutlined style={{ fontSize: 9 }} />
+                        </div>
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
               ) : (
                 <div style={{ textAlign: 'center', padding: '100px 0', color: '#999', fontStyle: 'italic' }}>
                   当前筛选条件下暂无历史签单趋势数据
@@ -1922,8 +2120,8 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
           </Col>
 
-          {/* 第二列：CMI 产品大类分解 (3/10比例 -> span={7}) */}
-          <Col span={7}>
+          {/* 第二列：CMI 产品大类分解 (span={6}) */}
+          <Col span={6}>
             <div style={{ borderRight: '1px solid #f0f0f0', paddingRight: '16px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '350px' }}>
               <div style={{ fontSize: 13, fontWeight: 'bold', color: '#666', marginBottom: 16 }}>
                 📦 CMI 产品大类占比
@@ -1974,7 +2172,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
           </Col>
 
-          {/* 第三列：子分类小类分解排行 (3/10比例 -> span={7}) */}
+          {/* 第三列：子分类小类分解排行 (span={7}) */}
           <Col span={7}>
             <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '6px', padding: '12px', height: '100%', minHeight: '350px', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: '12px', color: '#1890ff', fontWeight: 'bold', marginBottom: 12, borderBottom: '1px solid #e8e8e8', paddingBottom: 6 }}>
@@ -2028,6 +2226,184 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           </Col>
         </Row>
       </Card>
+
+      {/* 需求3 Modal：点击「签单数合计」，弹出 modal 使用 AG Grid 显示所有签单明细 */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <FileTextOutlined style={{ color: '#1890ff' }} />
+            <span>历史签单明细列表 (年份: {selectedTcvYears.length > 0 ? selectedTcvYears.join(', ') : '全量'})</span>
+          </div>
+        }
+        open={detailModalVisible}
+        onCancel={() => setDetailModalVisible(false)}
+        footer={[
+          <Button key="export" icon={<DownloadOutlined />} onClick={handleExportDetailExcel}>
+            导出 Excel
+          </Button>,
+          <Button key="close" type="primary" onClick={() => setDetailModalVisible(false)}>
+            关闭
+          </Button>
+        ]}
+        width={1100}
+        centered
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 12, color: '#666', fontSize: 12 }}>
+          当前筛选条件下共计 <strong style={{ color: '#1890ff' }}>{yearlyFilteredTcvRecords.length}</strong> 笔签单明细
+        </div>
+        <div className="ag-theme-alpine" style={{ width: '100%', height: 450 }}>
+          <AgGridReact
+            rowData={yearlyFilteredTcvRecords}
+            columnDefs={[
+              {
+                headerName: '签约客户名称',
+                field: '签约客户名称',
+                minWidth: 160,
+                flex: 1,
+                valueGetter: (params: any) => params.data?.['签约客户名称'] || '—',
+                filter: true,
+                sortable: true
+              },
+              {
+                headerName: '终端客户名称',
+                field: '终端客户名称',
+                minWidth: 160,
+                flex: 1,
+                valueGetter: (params: any) => params.data?.['终端客户名称'] || '—',
+                filter: true,
+                sortable: true
+              },
+              {
+                headerName: '销售单元',
+                field: '销售单元',
+                width: 140,
+                valueGetter: (params: any) => {
+                  const r = params.data || {};
+                  return r['销售单元'] || r['销售单元中文名称'] || r['销售单元编码'] || '—';
+                },
+                filter: true,
+                sortable: true
+              },
+              {
+                headerName: '电路编号',
+                field: '电路编号',
+                width: 140,
+                valueGetter: (params: any) => {
+                  const r = params.data || {};
+                  return r['电路编号'] || r['电路参考编号'] || '—';
+                },
+                filter: true,
+                sortable: true
+              },
+              {
+                headerName: '合同签署日期',
+                field: '合同签署日期',
+                width: 130,
+                valueGetter: (params: any) => {
+                  const r = params.data || {};
+                  return r['合同签署日期'] || r['设置起租日期'] || '—';
+                },
+                filter: true,
+                sortable: true
+              },
+              {
+                headerName: '产品分类',
+                field: '产品分类',
+                width: 130,
+                valueGetter: (params: any) => {
+                  const r = params.data || {};
+                  return r['产品分类'] || r['市场经分产品分类'] || r['TCV产品名称'] || '—';
+                },
+                filter: true,
+                sortable: true
+              },
+              {
+                headerName: '签单金额 (港币)',
+                field: '签单金额(港币)',
+                width: 160,
+                type: 'numericColumn',
+                cellStyle: { textAlign: 'right', fontWeight: 'bold' },
+                valueGetter: (params: any) => {
+                  const r = params.data || {};
+                  return parseFloat(r['签单金额(港币)'] !== undefined ? r['签单金额(港币)'] : (r['签单金额（港币）'] || r['签单金额 (港币)'] || r['签单金额'] || 0));
+                },
+                valueFormatter: (params: any) => {
+                  const val = parseFloat(params.value || 0);
+                  return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                },
+                filter: true,
+                sortable: true
+              }
+            ]}
+            defaultColDef={{
+              resizable: true,
+              sortable: true,
+              filter: true
+            }}
+            pagination={true}
+            paginationPageSize={100}
+          />
+        </div>
+      </Modal>
+
+      {/* 需求4 Modal：点击「签单金额合计」，弹出 modal 使用 AG Grid 显示，按照「签约客户名称」分组 */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DollarOutlined style={{ color: '#f5222d' }} />
+            <span>签约客户签单金额汇总 (按签约客户名称分组)</span>
+          </div>
+        }
+        open={customerGroupModalVisible}
+        onCancel={() => setCustomerGroupModalVisible(false)}
+        footer={[
+          <Button key="export" icon={<DownloadOutlined />} onClick={handleExportCustomerGroupExcel}>
+            导出 Excel
+          </Button>,
+          <Button key="close" type="primary" onClick={() => setCustomerGroupModalVisible(false)}>
+            关闭
+          </Button>
+        ]}
+        width={900}
+        centered
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 12, color: '#666', fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
+          <span>签约客户数: <strong style={{ color: '#1890ff' }}>{customerGroupedTcvStats.length}</strong> 家</span>
+          <span>签单总金额: <strong style={{ color: '#cf1322' }}>{currentSelectedTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</strong></span>
+        </div>
+        <div className="ag-theme-alpine" style={{ width: '100%', height: 450 }}>
+          <AgGridReact
+            rowData={customerGroupedTcvStats}
+            columnDefs={[
+              { headerName: '#', valueGetter: 'node.rowIndex + 1', width: 70, filter: false, sortable: false },
+              { headerName: '签约客户名称', field: 'signingCustomer', minWidth: 240, flex: 1, filter: true, sortable: true },
+              { headerName: '签单笔数', field: 'count', width: 120, type: 'numericColumn', cellStyle: { textAlign: 'right' }, filter: true, sortable: true },
+              {
+                headerName: '签单金额合计 (港币)',
+                field: 'totalAmount',
+                width: 200,
+                type: 'numericColumn',
+                cellStyle: { textAlign: 'right', fontWeight: 'bold', color: '#1890ff' },
+                valueFormatter: (params: any) => {
+                  const val = parseFloat(params.value || 0);
+                  return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                },
+                filter: true,
+                sortable: true
+              }
+            ]}
+            defaultColDef={{
+              resizable: true,
+              sortable: true,
+              filter: true
+            }}
+            pagination={true}
+            paginationPageSize={100}
+          />
+        </div>
+      </Modal>
 
       {/* 第五部分：项目计收占比柱状图 */}
       <Card
@@ -6516,19 +6892,29 @@ const KeyGlobalFamilyTree: React.FC = () => {
     cellStyle: { display: 'flex', alignItems: 'center' }
   }), []);
 
-  // 导出 JSON
-  const handleExportJson = useCallback(() => {
+  // 导出分支数据 EXCEL
+  const handleExportBranchExcel = useCallback(() => {
     if (originalData.length === 0) return;
-    const fileName = `keyGlobalFamilyTree-${abbr || 'CN'}-${gid}`;
+    const companyPrefix = nameCn || (originalData && originalData[0] ? originalData[0].companyNameCn || originalData[0].companyNameEn : '') || '海外家族树';
+    const fileName = `${companyPrefix}_分支数据`;
     const cleanExport = originalData.map(({ id: rid, parentId: rpid, iconHtml, name: rname, ...rest }) => rest);
-    const blob = new Blob([JSON.stringify(cleanExport, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${fileName}.json`;
-    a.click();
-    message.success(`已导出 ${cleanExport.length} 条数据`);
-  }, [originalData, gid, abbr]);
+    if (cleanExport.length === 0) return;
+
+    const sampleKeys = Object.keys(cleanExport[0]);
+    const headers = sampleKeys.map(k => {
+      if (k === 'companyNameCn') return '公司中文名';
+      if (k === 'companyNameEn') return '公司英文名';
+      if (k === 'registeredCountry') return '注册国家/地区';
+      if (k === 'registeredCity') return '注册城市';
+      if (k === 'operatingStatus') return '经营状态';
+      if (k === 'registeredAddress') return '注册地址';
+      if (k === 'cmiRegion') return 'CMI大区';
+      return k;
+    });
+
+    const keys = sampleKeys.map(k => (r: any) => r[k]);
+    exportToCsvExcel(fileName, headers, keys, cleanExport);
+  }, [originalData, nameCn, exportToCsvExcel]);
 
   // 保存高清图片 (PNG) - 导出当前视口与当前展开状态
   const handleSaveTreeImage = useCallback(() => {
@@ -6874,8 +7260,8 @@ const KeyGlobalFamilyTree: React.FC = () => {
                         onChange={(e) => setTableSearchText(e.target.value)}
                         style={{ width: 280 }}
                       />
-                      <Button icon={<DownloadOutlined />} onClick={handleExportJson} disabled={originalData.length === 0}>
-                        导出 JSON
+                      <Button icon={<DownloadOutlined />} onClick={handleExportBranchExcel} disabled={originalData.length === 0}>
+                        导出 EXCEL
                       </Button>
                     </Space>
                   </div>
