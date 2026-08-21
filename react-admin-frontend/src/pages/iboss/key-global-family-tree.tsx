@@ -2174,11 +2174,11 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 
           {/* 第三列：子分类小类分解排行 (span={7}) */}
           <Col span={7}>
-            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '6px', padding: '12px', height: '100%', minHeight: '350px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '6px', padding: '12px', height: '300px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: '12px', color: '#1890ff', fontWeight: 'bold', marginBottom: 12, borderBottom: '1px solid #e8e8e8', paddingBottom: 6 }}>
                 📝 【{selectedLargeProductCat}】小类排行
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '300px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', flex: 1, paddingRight: 4 }}>
                 {productStatsMerged[selectedLargeProductCat] && Object.keys(productStatsMerged[selectedLargeProductCat]).length > 0 ? (
                   Object.entries(productStatsMerged[selectedLargeProductCat])
                     .sort((a: any, b: any) => b[1] - a[1])

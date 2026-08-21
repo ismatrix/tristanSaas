@@ -8369,3 +8369,14 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
   2. **生产端覆盖还原**：通过 rsync 传输至生产服务器 `tristan@tristan.wang:6022`，并执行 `mongorestore --drop` 清空原表后还原覆盖写入 2,252 条最新映射记录；
   3. **索引重建与数据校验**：自动重建了 `GID_1`、`idx_ultimateGID`、`extCustId_1` 和 `mappingPath_1` 四大核心索引。经生产端 `mongosh` 实测校验，记录数精准等于 2,252，数据即时在生产服务中生效。
 
+---
+
+## Prompt 最新
+**时间**: 2026-08-21 12:03:46
+**提示词**:
+```text
+[分支与 CMI 历史签单统计情况]中第三列「小类排行」的高度固定为 300px
+```
+
+**执行总结**:
+- （正在执行高度修改中）
