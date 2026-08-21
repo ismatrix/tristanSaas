@@ -8379,4 +8379,6 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
 ```
 
 **执行总结**:
-- （正在执行高度修改中）
+- **第三列「小类排行」卡片高度固定 300px 修改并部署上线**:
+  1. **样式微调**：在 `key-global-family-tree.tsx` 中将第三列外框容器 `height` 统一锁定为 `300px`，配置 `boxSizing: 'border-box'`，保持内层 `overflowY: 'auto'` 滚动支持；
+  2. **生产构建部署**：提交 Git 变更并通过 rsync 传输至生产服务器 `tristan@tristan.wang:6022`，在生产端成功执行 `npm run build` 打包编译（耗时 15.50s），并平滑重启 PM2 进程池与 Nginx (`nginx -s reload`) 实时生效。
