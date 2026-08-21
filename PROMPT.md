@@ -8393,5 +8393,7 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
 ```
 
 **执行总结**:
-- （正在执行三列等高对齐修改中）
+- **「分支与 CMI 历史签单统计情况」三列 Flex 弹性等高对齐并消除底部间隙修改完成**:
+  1. **Flex 弹性等高**：在 `key-global-family-tree.tsx` 中为 Section 4 的主 `<Row>` 添加 `display: 'flex'`, `alignItems: 'stretch'` 样式；并将 3 个 `<Col>` 的外层容器统一下调/移除固定的 height/minHeight，统一设置为 `height: '100%', boxSizing: 'border-box'`，消除底部所有不匹配的悬空间隙，实现高度完全齐平对齐；
+  2. **生产构建部署**：Git 提交后通过 rsync 传输至生产服务器 `tristan@tristan.wang:6022`，并在生产端成功运行 `npm run build` 重新打包（耗时 15.28s），平滑重载 PM2 进程池与 Nginx (`nginx -s reload`) 实时生效。
 
