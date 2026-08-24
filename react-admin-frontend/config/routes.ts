@@ -140,6 +140,11 @@ export default [
         path: '/info-data/participants',
         component: './iboss/participants',
       },
+      {
+        name: '访问统计',
+        path: '/info-data/page-views',
+        component: './iboss/page-views',
+      },
     ],
   },
   {

@@ -64,6 +64,10 @@ const defaultRoutes = [
     path: '/data-governance-logs',
     route: require('./dataGovernanceLog.route'),
   },
+  {
+    path: '/page-views',
+    route: require('./pageView.route'),
+  },
 ];
 
 const devRoutes = [

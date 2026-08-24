@@ -334,6 +334,32 @@ export const layout: RunTimeLayoutConfig = ({
       // 如果没有登录，重定向到 login
       if (!initialState?.currentUser && location.pathname !== loginPath) {
         history.push(loginPath);
+        return;
+      }
+
+      // 静默页面访问实时埋点上报 (排除登录等非业务页面)
+      if (location.pathname && !location.pathname.startsWith('/user/')) {
+        try {
+          const sp = new URLSearchParams(location.search || '');
+          const nameCn = sp.get('nameCn') || '';
+          const abbr = sp.get('abbr') || '';
+          const title = document.title || '';
+
+          requestFn('/api/v1/page-views/record', {
+            method: 'POST',
+            data: {
+              path: location.pathname,
+              fullUrl: location.pathname + (location.search || ''),
+              nameCn,
+              abbr,
+              title,
+              userEmail: initialState?.currentUser?.email || '',
+              userName: initialState?.currentUser?.name || '',
+              referrer: document.referrer || '',
+            },
+            skipErrorHandler: true,
+          }).catch(() => {});
+        } catch (_) {}
       }
     },
     bgLayoutImgList: [
