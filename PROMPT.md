@@ -8473,3 +8473,26 @@ keyFamilyTreeCustMapping
 
 **执行总结**:
 - （正在制定实施计划与开发中）
+---
+
+## Prompt 最新
+**时间**: 2026-08-24 14:52:52
+**提示词**:
+```text
+一级菜单「信息数据」最后添加“访问统计” 及页面，使用AG Grid方式显示记录访问流水表（明细日志）
+然后开始执行开发
+```
+
+**执行总结**:
+- **页面 URL 访问统计与 AG Grid 审计日志全套功能开发并部署上线**:
+  1. **后端模型与服务开发**：
+     - 新建 [src/models/pageViewLog.model.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/models/pageViewLog.model.js)（明细流水表）与 [src/models/pageViewStats.model.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/models/pageViewStats.model.js)（热度汇总表）；
+     - 实现服务层与控制器，注册 /api/v1/page-views 路由（/record, /overview, /stats, /logs）；
+  2. **前端全局无侵入静默埋点**：
+     - 在 [react-admin-frontend/src/app.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/app.tsx) 的 onPageChange 路由变更中注入静默上报逻辑，提取页面路径、要客名、用户信息及时间自动上报，0 阻塞；
+  3. **菜单集成与 AG Grid 页面构建**：
+     - 在 [react-admin-frontend/config/routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts)「信息数据」最后添加「访问统计」路由 (/info-data/page-views)；
+     - 在 [react-admin-frontend/src/pages/iboss/page-views.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/page-views.tsx) 构建了现代化管理页面（顶部 4 大指标卡片、TAB 1 访问明细流水 AG Grid 表、TAB 2 页面访问热度排行榜 AG Grid 表，支持全文检索、分页、列筛选/排序、一键跳转页面及带 UTF-8 BOM 的 Excel 导出）；
+  4. **生产构建部署**：
+     - 本地打包验证通过，Git 提交推送；
+     - 使用 rsync 增量同步至生产服务器 tristan@tristan.wang:6022，在生产端成功运行 npm run build（耗时 15.53s），并平滑重启 PM2 进程池与 Nginx (nginx -s reload) 实时生效。
