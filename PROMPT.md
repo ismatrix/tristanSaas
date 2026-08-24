@@ -8410,5 +8410,18 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
 - **全量最新代码成功同步并部署上线至 macOS 生产服务器 `tristan.wang:6022`**:
   1. **Git 提交与推送**：将本地受版本控制的 `PROMPT.md` 与全部前端代码更新提交 commit `4d324e5` 并成功推送至 GitHub `main` 分支；
   2. **生产端极速同步与构建**：使用 rsync 将增量代码即时传输至生产服务器 `/Users/tristan/Apps/TristanSaas`，在生产端成功运行 `npm run build` 打包构建（耗时 15.44s，生成静态产物 `dist`）；
-  3. **服务与 Nginx 平滑重载**：顺利重启 PM2 进程池（`backend-api` 与 `react-frontend`）并重载 Nginx（`nginx -s reload`），最新代码与静态产物已在生产环境 `https://tristan.wang:9900` 实时生效运行！
+---
 
+## Prompt 最新
+**时间**: 2026-08-24 09:45:04
+**提示词**:
+```text
+/Users/tristan/Downloads/海信集团-海外数据.xlsx
+追加导入表：keyGlobalFamilyTree
+```
+
+**执行总结**:
+- **海信集团海外数据（294 条节点）成功追加导入开发端与生产服务器 `keyGlobalFamilyTree` 表**:
+  1. **Excel 解析与规范化**：读取 `/Users/tristan/Downloads/海信集团-海外数据.xlsx` (`海外分支总表`) 解析出 **294** 条分支节点记录（`ultimateGID: 546998480546998480`，海信集团控股股份有限公司）；自动规范国家名称并填充 `cmiRegion` 映射；
+  2. **开发与生产双端追加写入**：通过 `appendFamilyTree.js` 幂等清理旧记录后，成功向开发端及生产服务器 `tristan@tristan.wang:6022` 追加写入 294 条海信海外家族树节点；
+  3. **数据实测校验**：经开发端与生产端数据库查询校验，海信节点数精准等于 **294** 条，`keyGlobalFamilyTree` 全表文档数均达到 **11,473** 条，数据 100% 保持一致并即时生效。
