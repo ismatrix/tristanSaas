@@ -8425,3 +8425,22 @@ keyGlobalFamilyTree的Dashboard页面做优化更改：
   1. **Excel 解析与规范化**：读取 `/Users/tristan/Downloads/海信集团-海外数据.xlsx` (`海外分支总表`) 解析出 **294** 条分支节点记录（`ultimateGID: 546998480546998480`，海信集团控股股份有限公司）；自动规范国家名称并填充 `cmiRegion` 映射；
   2. **开发与生产双端追加写入**：通过 `appendFamilyTree.js` 幂等清理旧记录后，成功向开发端及生产服务器 `tristan@tristan.wang:6022` 追加写入 294 条海信海外家族树节点；
   3. **数据实测校验**：经开发端与生产端数据库查询校验，海信节点数精准等于 **294** 条，`keyGlobalFamilyTree` 全表文档数均达到 **11,473** 条，数据 100% 保持一致并即时生效。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-24 11:29:15
+**提示词**:
+```text
+keycustomer
+keyGlobalFamilyTree
+keyFamilyTreeCustMapping
+这3个表数据覆盖同步到服务器端
+```
+
+**执行总结**:
+- **3 张核心数据表覆盖同步生产服务器 `tristan.wang:6022` 完成**:
+  1. **全量导出与传输**：使用 `mongodump` 导出开发端 `keycustomer` (138 条)、`keyGlobalFamilyTree` (11,474 条)、`keyFamilyTreeCustMapping` (2,268 条) 并通过安全通道传输至生产端；
+  2. **生产端覆盖还原**：在生产服务器执行 `mongorestore --drop` 清空旧表并重新写入共 13,880 条记录，0 失败；
+  3. **索引重建与数据校验**：自动在生产数据库重建了全部业务索引。经在生产端执行 `mongosh` 校验，`keycustomer` (138 条)、`keyGlobalFamilyTree` (11,474 条)、`keyFamilyTreeCustMapping` (2,268 条) 数据量精准吻合，已实时生效。
+
