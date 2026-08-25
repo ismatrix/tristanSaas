@@ -8594,3 +8594,42 @@ Response status:400
      - 在 [src/controllers/user.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/user.controller.js) 中自动转换 current/pageSize 为后端标准分页参数，并支持 email/name 模糊搜索及清理空字段；
      - 在 [react-admin-frontend/src/pages/iboss/users-management.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/users-management.tsx) 中规范化分页请求参数；
   3. **验证与提交**：本地测试 Joi 校验 100% 通过，前端打包编译成功（耗时 8.08s），代码已推送至 GitHub (commit b2592b0)。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 11:57:28
+**提示词**:
+```text
+1、只读用户： 在所有页面的增删改、关联类的按钮都置灰色。  （包括用户信息页面的，强制登出、密码重置、删除、新建用户按钮及其后端的方法）
+2、 将 tristan@tristan.wang，修改为“超级管理员” 角色； 将tristanwang@cmi.chinamobile.com，修改为“标准用户（编辑权限）”
+3、对所有“只读用户”角色，隐藏「用户信息」菜单和页面
+```
+
+**执行总结**:
+- （正在制定实施计划与准备开发中）
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 11:57:28
+**提示词**:
+```text
+1、只读用户： 在所有页面的增删改、关联类的按钮都置灰色。  （包括用户信息页面的，强制登出、密码重置、删除、新建用户按钮及其后端的方法）
+2、 将 tristan@tristan.wang，修改为“超级管理员” 角色； 将tristanwang@cmi.chinamobile.com，修改为“标准用户（编辑权限）”
+3、对所有“只读用户”角色，隐藏「用户信息」菜单和页面
+```
+
+**执行总结**:
+- **只读用户操作按钮全面置灰禁用、角色晋升与「用户信息」菜单权限隐藏完成**:
+  1. **只读全站操作按钮置灰与安全拦截**：
+     - 在 [react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 中将终端/企业/参与方治理工具中的所有「关联」按钮、已治理映射表的「删除」按钮、数据标注 Modal 的「标注提交」与「删除标注」按钮均绑定 disabled={isReadOnly} 并增加 Tooltip 悬浮提示；
+     - 在 [react-admin-frontend/src/pages/iboss/users-management.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/users-management.tsx) 中将「新建用户」及操作列「强制登出」、「密码重置」、「删除」按钮绑定 disabled={isReadOnly}；
+     - 在 [src/routes/v1/user.route.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/routes/v1/user.route.js) 中为用户管理写接口增加 auth('editData') 强制鉴权拦截；
+  2. **核心账号角色调整**：
+     - 将 tristan@tristan.wang 设置为 admin（超级管理员）；
+     - 将 tristanwang@cmi.chinamobile.com 设置为 user（标准用户，拥有完整数据编辑权限）；
+     - 数据库记录与 scripts/sync_readonly_users.js 已同步更新；
+  3. **只读用户菜单与路由隐藏**：
+     - 在 [react-admin-frontend/src/access.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/access.ts) 中注入 canManageUsers: !isReadOnly && !isKa 权限；
+     - 在 [react-admin-frontend/config/routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts) 中为「用户信息」路由绑定 access: 'canManageUsers'，只读用户左侧菜单完全不展示该页面入口，且直接访问 URL 也会被拦截；
+  4. **编译构建与提交**：
+     - 前端打包成功（耗时 8.14s），代码已推送至 GitHub (commit e170925)。
