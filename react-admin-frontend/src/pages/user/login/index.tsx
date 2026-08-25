@@ -183,7 +183,7 @@ const Login: React.FC = () => {
             maxWidth: '75vw',
           }}
           logo={<img alt="logo" src="/logo.png" style={{ height: 40, objectFit: 'contain' }} />}
-          title="数据治理工具"
+          title="数据治理平台"
           initialValues={{}}
           onFinish={async (values) => {
             await handleSubmit(values as API.LoginParams);
