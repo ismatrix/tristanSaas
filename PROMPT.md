@@ -8538,3 +8538,41 @@ xiuyuan <xiuyuan.l@telelands.com>;
   1. **只读权限架构**：在后端配置 readonly 角色，在 wildcards 和 dataGovernanceLog 写接口增加 auth('editData') 拦截，确保只读账号无法通过任何接口修改、删除或做关联操作；在前端 access.ts 中注入 isReadOnly 属性，对页面上的关联、解绑、保存标注、删除标注等写操作增加拦截与禁用保护；
   2. **批量账号与高强度随机密码生成**：已为 11 位用户生成强随机密码，并在数据库中批量创建为 readonly 角色；
   3. **代码提交与部署脚本**：代码已提交并推送至 GitHub (commit d4f8b44)，并编写了确定性同步脚本 scripts/sync_readonly_users.js 用于服务端一键同步。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 11:24:46
+**提示词**:
+```text
+「信息数据」 菜单中最后增加「用户信息」页面，列出当前所有用户信息列表， 最后一列添加按钮：
+「强制登出」： 点击后该用户任何页面操作，会自动登出，并跳转到登录界面
+「密码重置」：生成新的密码
+「删除」：直接彻底删除该用户账号
+```
+
+**执行总结**:
+- （正在制定实施计划与准备开发中）
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 11:24:46
+**提示词**:
+```text
+「信息数据」 菜单中最后增加「用户信息」页面，列出当前所有用户信息列表， 最后一列添加按钮：
+「强制登出」： 点击后该用户任何页面操作，会自动登出，并跳转到登录界面
+「密码重置」：生成新的密码
+「删除」：直接彻底删除该用户账号
+```
+
+**执行总结**:
+- **「用户信息」管理页面与管控功能（强制登出 / 密码重置 / 删除）开发完成并验证**:
+  1. **服务端安全机制**：
+     - 在 [src/models/user.model.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/models/user.model.js) 中增加 forceLogoutAt 字段，并在 [src/config/passport.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/config/passport.js) 中增加 JWT 签发时间校验，一旦强制登出，该用户持有的所有 Token 立即失效，接口直接拦截并返回 401；
+     - 在 [src/controllers/user.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/user.controller.js) 与 [src/routes/v1/user.route.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/routes/v1/user.route.js) 中实现了 forceLogoutUser、resetUserPassword（随机生成 10 位强密码并返回明文）、deleteUser 与 createUser 接口；
+  2. **前端拦截与自动跳转**：
+     - 在 [react-admin-frontend/src/requestErrorConfig.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/requestErrorConfig.ts) 中对 401 进行了统一拦截，自动清空 token 和 currentUser 缓存并重定向至 /user/login；
+  3. **菜单集成与管理页面构建**：
+     - 在 [react-admin-frontend/config/routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts)「信息数据」最后添加「用户信息」（/info-data/users）路由；
+     - 在 [react-admin-frontend/src/pages/iboss/users-management.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/users-management.tsx) 构建了现代化用户管理页面（顶部指标卡片、ProTable 用户列表、操作列「强制登出」、「密码重置」弹窗展示并一键复制、「删除」及「新建用户」功能）；
+  4. **本地构建验证与代码提交**：
+     - 本地打包编译通过（耗时 8.88s），代码已提交并推送至 GitHub (commit c651f41)。
