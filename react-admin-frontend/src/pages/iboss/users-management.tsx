@@ -30,7 +30,7 @@ import {
   ReloadOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
-import { request } from '@umijs/max';
+import { request, useAccess } from '@umijs/max';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
@@ -47,6 +47,7 @@ interface UserItem {
 }
 
 const UsersManagementPage: React.FC = () => {
+  const { isReadOnly } = useAccess();
   const actionRef = useRef<ActionType>();
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [createForm] = Form.useForm();
@@ -260,12 +261,15 @@ const UsersManagementPage: React.FC = () => {
           description="点击后该用户在任何页面的下一次操作均会自动登出并跳转到登录界面。"
           okText="确定强制登出"
           cancelText="取消"
+          disabled={isReadOnly}
           okButtonProps={{ danger: true }}
           onConfirm={() => handleForceLogout(record)}
         >
-          <Button size="small" type="link" icon={<LogoutOutlined />} style={{ color: '#fa8c16', padding: 0 }}>
-            强制登出
-          </Button>
+          <Tooltip title={isReadOnly ? '只读用户无权操作' : undefined}>
+            <Button size="small" type="link" disabled={isReadOnly} icon={<LogoutOutlined />} style={{ color: isReadOnly ? undefined : '#fa8c16', padding: 0 }}>
+              强制登出
+            </Button>
+          </Tooltip>
         </Popconfirm>,
         <Popconfirm
           key="reset"
@@ -273,11 +277,14 @@ const UsersManagementPage: React.FC = () => {
           description={`将为【${record.name}】随机生成新的高强度登录密码，并使其旧 Session 立即失效。`}
           okText="确定重置"
           cancelText="取消"
+          disabled={isReadOnly}
           onConfirm={() => handleResetPassword(record)}
         >
-          <Button size="small" type="link" icon={<KeyOutlined />} style={{ color: '#1890ff', padding: 0 }}>
-            密码重置
-          </Button>
+          <Tooltip title={isReadOnly ? '只读用户无权操作' : undefined}>
+            <Button size="small" type="link" disabled={isReadOnly} icon={<KeyOutlined />} style={{ color: isReadOnly ? undefined : '#1890ff', padding: 0 }}>
+              密码重置
+            </Button>
+          </Tooltip>
         </Popconfirm>,
         <Popconfirm
           key="delete"
@@ -285,12 +292,15 @@ const UsersManagementPage: React.FC = () => {
           description="此操作不可撤销，该账号将从系统中永久删除。"
           okText="彻底删除"
           cancelText="取消"
+          disabled={isReadOnly}
           okButtonProps={{ danger: true }}
           onConfirm={() => handleDeleteUser(record)}
         >
-          <Button size="small" type="link" danger icon={<DeleteOutlined />} style={{ padding: 0 }}>
-            删除
-          </Button>
+          <Tooltip title={isReadOnly ? '只读用户无权操作' : undefined}>
+            <Button size="small" type="link" danger disabled={isReadOnly} icon={<DeleteOutlined />} style={{ padding: 0 }}>
+              删除
+            </Button>
+          </Tooltip>
         </Popconfirm>,
       ],
     },
@@ -306,9 +316,11 @@ const UsersManagementPage: React.FC = () => {
           </div>
         ),
         extra: [
-          <Button key="create" type="primary" icon={<UserAddOutlined />} onClick={() => setCreateModalVisible(true)}>
-            新建用户
-          </Button>,
+          <Tooltip key="create" title={isReadOnly ? '只读用户无权创建用户' : undefined}>
+            <Button type="primary" disabled={isReadOnly} icon={<UserAddOutlined />} onClick={() => setCreateModalVisible(true)}>
+              新建用户
+            </Button>
+          </Tooltip>,
           <Button key="refresh" icon={<ReloadOutlined />} onClick={() => actionRef.current?.reload()}>
             刷新列表
           </Button>,

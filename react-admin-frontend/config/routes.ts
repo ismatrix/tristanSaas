@@ -148,6 +148,7 @@ export default [
       {
         name: '用户信息',
         path: '/info-data/users',
+        access: 'canManageUsers',
         component: './iboss/users-management',
       },
     ],

@@ -12,6 +12,7 @@ export default function access(
     canWelcome: !isKa,
     canIboss: !isKa,
     canEdit: !isReadOnly && !isKa,
+    canManageUsers: !isReadOnly && !isKa,
     isReadOnly: !!isReadOnly,
   };
 }

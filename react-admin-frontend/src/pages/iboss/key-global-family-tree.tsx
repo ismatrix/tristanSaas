@@ -3763,18 +3763,21 @@ const KeyGlobalFamilyTree: React.FC = () => {
         return (
           <Popconfirm
             title="确定要删除该已治理映射记录吗？"
+            disabled={isReadOnly}
             onConfirm={() => handleDeleteMappingRecord(p.data)}
             okText="确定"
             cancelText="取消"
           >
-            <Button type="link" danger size="small" icon={<DeleteOutlined />}>
-              删除
-            </Button>
+            <Tooltip title={isReadOnly ? '只读用户无权删除映射记录' : undefined}>
+              <Button type="link" danger disabled={isReadOnly} size="small" icon={<DeleteOutlined />}>
+                删除
+              </Button>
+            </Tooltip>
           </Popconfirm>
         );
       }
     }
-  ], [handleDeleteMappingRecord]);
+  ], [handleDeleteMappingRecord, isReadOnly]);
 
   // --- 治理比对工具：数据获取与匹配映射 ---
   const fetchGovernanceData = useCallback(async (overrideKeywords?: string[]) => {
@@ -5790,16 +5793,16 @@ const KeyGlobalFamilyTree: React.FC = () => {
         const relatedCustCount = Number(rowData.relatedCustCount || 0);
 
         // 需求4：「参与方」治理 TAB 页面，如果参与方没有对应的 cust（即参与方ID列中对应的客户数目为 0），则不允许关联，关联按钮强制为 disable 状态
-        const isBtnDisabled = !isManual || relatedCustCount === 0;
+        const isBtnDisabled = isReadOnly || !isManual || relatedCustCount === 0;
 
         const log = compId ? governanceLogsMapRef.current[`companyId_${compId}`] : null;
         const hasNotes = Boolean(log && log.notes && log.notes.trim());
 
         return (
           <>
-            <Tooltip title={relatedCustCount === 0 ? "参与方关联客户数为 0，不允许提交关联" : undefined}>
+            <Tooltip title={isReadOnly ? "只读用户无权关联" : (relatedCustCount === 0 ? "参与方关联客户数为 0，不允许提交关联" : undefined)}>
               <Button
-                type={isManual && relatedCustCount > 0 ? 'primary' : 'default'}
+                type={!isReadOnly && isManual && relatedCustCount > 0 ? 'primary' : 'default'}
                 size="small"
                 disabled={isBtnDisabled}
                 loading={isSaving}
@@ -6193,16 +6196,18 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
         return (
           <>
-            <Button
-              type={isManual ? 'primary' : 'default'}
-              size="small"
-              disabled={!isManual}
-              loading={isSaving}
-              icon={<LinkOutlined />}
-              onClick={() => handleSaveEndCustomerManualMapping(rowData)}
-            >
-              关联
-            </Button>
+            <Tooltip title={isReadOnly ? '只读用户无权关联' : undefined}>
+              <Button
+                type={!isReadOnly && isManual ? 'primary' : 'default'}
+                size="small"
+                disabled={isReadOnly || !isManual}
+                loading={isSaving}
+                icon={<LinkOutlined />}
+                onClick={() => handleSaveEndCustomerManualMapping(rowData)}
+              >
+                关联
+              </Button>
+            </Tooltip>
             <Button
               type={hasNotes ? 'primary' : 'default'}
               ghost={hasNotes}
@@ -6585,16 +6590,18 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
         return (
           <>
-            <Button
-              type={isManual ? 'primary' : 'default'}
-              size="small"
-              disabled={!isManual}
-              loading={isSaving}
-              icon={<LinkOutlined />}
-              onClick={() => handleSaveEnterpriseCustomerManualMapping(rowData)}
-            >
-              关联
-            </Button>
+            <Tooltip title={isReadOnly ? '只读用户无权关联' : undefined}>
+              <Button
+                type={!isReadOnly && isManual ? 'primary' : 'default'}
+                size="small"
+                disabled={isReadOnly || !isManual}
+                loading={isSaving}
+                icon={<LinkOutlined />}
+                onClick={() => handleSaveEnterpriseCustomerManualMapping(rowData)}
+              >
+                关联
+              </Button>
+            </Tooltip>
             <Button
               type={hasNotes ? 'primary' : 'default'}
               ghost={hasNotes}
@@ -8422,14 +8429,17 @@ const KeyGlobalFamilyTree: React.FC = () => {
                 <Popconfirm
                   title="确定要删除该标注信息吗？"
                   description="删除后标注数据将清空并恢复默认未标注状态。"
+                  disabled={isReadOnly}
                   okText="确定删除"
                   cancelText="取消"
                   okButtonProps={{ danger: true }}
                   onConfirm={handleDeleteAnnotateLog}
                 >
-                  <Button danger icon={<DeleteOutlined />} loading={submittingAnnotate}>
-                    删除标注
-                  </Button>
+                  <Tooltip title={isReadOnly ? '只读用户无权删除标注' : undefined}>
+                    <Button danger disabled={isReadOnly} icon={<DeleteOutlined />} loading={submittingAnnotate}>
+                      删除标注
+                    </Button>
+                  </Tooltip>
                 </Popconfirm>
               )}
             </div>
@@ -8437,9 +8447,11 @@ const KeyGlobalFamilyTree: React.FC = () => {
               <Button onClick={() => setAnnotateModalVisible(false)}>
                 取消
               </Button>
-              <Button type="primary" loading={submittingAnnotate} onClick={handleSubmitAnnotateLog}>
-                标注提交
-              </Button>
+              <Tooltip title={isReadOnly ? '只读用户无权提交标注' : undefined}>
+                <Button type="primary" disabled={isReadOnly} loading={submittingAnnotate} onClick={handleSubmitAnnotateLog}>
+                  标注提交
+                </Button>
+              </Tooltip>
             </Space>
           </div>
         ]}

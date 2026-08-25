@@ -8,22 +8,22 @@ const router = express.Router();
 
 router
   .route('/')
-  .post(auth(), validate(userValidation.createUser), userController.createUser)
+  .post(auth('editData'), validate(userValidation.createUser), userController.createUser)
   .get(auth(), validate(userValidation.getUsers), userController.getUsers);
 
 router
   .route('/:userId/force-logout')
-  .post(auth(), userController.forceLogoutUser);
+  .post(auth('editData'), userController.forceLogoutUser);
 
 router
   .route('/:userId/reset-password')
-  .post(auth(), userController.resetUserPassword);
+  .post(auth('editData'), userController.resetUserPassword);
 
 router
   .route('/:userId')
   .get(auth(), validate(userValidation.getUser), userController.getUser)
-  .patch(auth(), validate(userValidation.updateUser), userController.updateUser)
-  .delete(auth(), validate(userValidation.deleteUser), userController.deleteUser);
+  .patch(auth('editData'), validate(userValidation.updateUser), userController.updateUser)
+  .delete(auth('editData'), validate(userValidation.deleteUser), userController.deleteUser);
 
 module.exports = router;
 
