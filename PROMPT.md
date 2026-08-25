@@ -8731,3 +8731,21 @@ keycustomer
      - 服务端安装 echarts 依赖；
      - 服务端运行 npm run build 编译打包成功（耗时 38.19s）；
      - PM2 重载 backend-api 进程（PID: 222304），服务实时在线生效。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 14:56:58
+**提示词**:
+```text
+那个页面的标题叫： Ant Design Pro
+```
+
+**执行总结**:
+- **系统站点标题定制与部署完成**:
+  1. **配置修改**：
+     - 在 [react-admin-frontend/config/config.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/config.ts) 中将系统站点标题从 "Ant Design Pro" 修改为 **"数据治理平台"**；
+     - 在 [react-admin-frontend/src/pages/user/login/index.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/user/login/index.tsx) 与 [react-admin-frontend/src/manifest.json](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/manifest.json) 中统一将应用名称与登录页标题对齐为 **"数据治理平台"**；
+  2. **本地与生产构建**：
+     - 本地打包测试成功；
+     - Git 提交并推送至 GitHub (commit 9208da4)；
+     - rsync 增量同步至旧服务端 (6822 端口)，执行 npm run build（耗时 37.74s）并平滑重启 PM2 进程 pool（PID: 222849）实时生效。
