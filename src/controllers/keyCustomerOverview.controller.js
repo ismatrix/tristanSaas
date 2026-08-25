@@ -975,6 +975,9 @@ const getBrDetail = catchAsync(async (req, res) => {
 });
 
 // 获取指定海外家族树 GID 对应的 Dashboard 数据接口 (符合中文注释规范)
+// 单集团海外家族树 Dashboard 内存缓存（按 gid 缓存 5 分钟）
+const dashboardStatsCache = new Map();
+
 const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
   const db = mongoose.connection.db;
   const { gid } = req.query;
@@ -983,27 +986,38 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
   }
 
   const gidStr = String(gid).trim();
+  const cacheKey = gidStr;
+  const now = Date.now();
+
+  if (dashboardStatsCache.has(cacheKey) && !req.query.forceRefresh) {
+    const cached = dashboardStatsCache.get(cacheKey);
+    if (now - cached.timestamp < 5 * 60 * 1000) {
+      return res.status(httpStatus.OK).send(cached.data);
+    }
+  }
 
   const mappings = await db.collection('keyFamilyTreeCustMapping').find(
     { ultimateGID: gidStr },
     { projection: { GID: 1, extCustId: 1, mappingPath: 1 } }
   ).toArray();
 
-  console.log('=== [Backend stats] ===');
-  console.log('gidStr:', gidStr, 'type:', typeof gidStr);
-  console.log('mappings found:', mappings.length);
-
   const extCustIds = mappings.map(m => m.extCustId).filter(Boolean);
   const endCustExtIds = mappings.filter(m => m.mappingPath === 'endCustomer').map(m => m.extCustId).filter(Boolean);
 
   // 2. A端关联转换：提取 CMI 终端客户对应的 enterpriseName
   let enterpriseNames = [];
+  let enterpriseNameToCustIdMap = new Map();
   if (endCustExtIds.length > 0) {
     const ibossCustomers = await db.collection('ibosscustomers').find(
       { custId: { $in: endCustExtIds } },
       { projection: { custId: 1, enterpriseName: 1 } }
     ).toArray();
     enterpriseNames = ibossCustomers.map(c => c.enterpriseName).filter(Boolean);
+    ibossCustomers.forEach(c => {
+      if (c.enterpriseName && c.custId) {
+        enterpriseNameToCustIdMap.set(String(c.enterpriseName).trim(), String(c.custId).trim());
+      }
+    });
   }
 
   // 3. TCV 签单明细提取与清洗排重
@@ -1017,7 +1031,32 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
 
   let finalTcv = [];
   if (tcvQuery.$or.length > 0) {
-    const tcvRecords = await db.collection('dmcTCV').find(tcvQuery).toArray();
+    const tcvRecords = await db.collection('dmcTCV').find(
+      tcvQuery,
+      {
+        projection: {
+          '签约客户标识': 1,
+          '签约客户名称': 1,
+          '终端客户名称': 1,
+          '大区中文名称': 1,
+          '大区': 1,
+          '销售单元中文名称': 1,
+          '销售单元编码': 1,
+          '销售单元': 1,
+          '电路编号': 1,
+          '电路参考编号': 1,
+          '合同签署日期': 1,
+          '设置起租日期': 1,
+          '市场经分产品分类': 1,
+          '产品分类': 1,
+          '订单状态': 1,
+          '签单金额(港币)': 1,
+          '签单金额（港币）': 1,
+          '签单金额': 1
+        }
+      }
+    ).toArray();
+
     // 过滤已注销的订单
     let filteredTcv = tcvRecords.filter(rec => String(rec['订单状态'] || '').trim().toLowerCase() !== 'achive');
 
@@ -1046,7 +1085,7 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
   finalTcv.forEach(rec => {
     const region = rec['大区中文名称'] || rec['大区'] || '其他大区';
     const unit = rec['销售单元中文名称'] || rec['销售单元编码'] || '其他单元';
-    const amount = parseFloat(rec['签单金额(港币)'] || 0);
+    const amount = parseFloat(rec['签单金额(港币)'] || rec['签单金额（港币）'] || rec['签单金额'] || 0);
 
     const groupKey = `${region}_${unit}`;
     if (!tcvGroupMap.has(groupKey)) {
@@ -1064,8 +1103,8 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
 
   const tcvGroupList = Array.from(tcvGroupMap.values());
 
-  // 4. BR 项目计收明细提取
-  const circuitIds = Array.from(new Set(finalTcv.map(r => String(r['电路编号'] || '').trim()).filter(Boolean)));
+  // 4. BR 项目计收明细提取（极简 projection 避免内存膨胀）
+  const circuitIds = Array.from(new Set(finalTcv.map(r => String(r['电路编号'] || r['电路参考编号'] || '').trim()).filter(Boolean)));
   const brQuery = { $or: [] };
   if (circuitIds.length > 0) {
     brQuery.$or.push({ '电路参考编号': { $in: circuitIds } });
@@ -1076,7 +1115,27 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
 
   let brList = [];
   if (brQuery.$or.length > 0) {
-    const brRecords = await db.collection('dmcBR').find(brQuery).toArray();
+    const brRecords = await db.collection('dmcBR').find(
+      brQuery,
+      {
+        projection: {
+          '签约客户名称': 1,
+          '终端客户名称': 1,
+          '数据月份': 1,
+          '电路参考编号': 1,
+          '大区中文名称': 1,
+          '大区': 1,
+          '销售单元中文名称': 1,
+          '销售单元编码': 1,
+          '市场经分产品分类': 1,
+          '分成比例': 1,
+          '拆分后港币金额': 1,
+          '拆分后港币金额｜绝对值': 1,
+          '拆分后港币金额|绝对值': 1
+        }
+      }
+    ).toArray();
+
     brList = brRecords.map(rec => {
       const rawAmount = rec['拆分后港币金额｜绝对值'] !== undefined
         ? rec['拆分后港币金额｜绝对值']
@@ -1100,34 +1159,6 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
     });
   }
 
-  // 使用与大屏（要客概览）100% 完全一致的渗透节点判定逻辑
-  const allTcv_global = await db.collection('dmcTCV').find(
-    {},
-    { projection: { '签约客户标识': 1, '终端客户名称': 1, '订单状态': 1 } }
-  ).toArray();
-
-  const filteredTcv_global = allTcv_global.filter(rec => {
-    const status = String(rec['订单状态'] || '').trim();
-    return status.toLowerCase() !== 'achive';
-  });
-
-  const signedBExtIds_global = new Set();
-  const signedAEnterpriseNames_global = new Set();
-  filteredTcv_global.forEach(rec => {
-    if (rec['签约客户标识']) signedBExtIds_global.add(String(rec['签约客户标识']).trim());
-    if (rec['终端客户名称']) signedAEnterpriseNames_global.add(String(rec['终端客户名称']).trim());
-  });
-
-  if (signedAEnterpriseNames_global.size > 0) {
-    const ibossCustomers = await db.collection('ibosscustomers').find(
-      { enterpriseName: { $in: Array.from(signedAEnterpriseNames_global) } },
-      { projection: { custId: 1 } }
-    ).toArray();
-    ibossCustomers.forEach(c => {
-      if (c.custId) signedBExtIds_global.add(String(c.custId).trim());
-    });
-  }
-
   const extCustIdToGidSetMap = new Map();
   mappings.forEach(m => {
     const extId = m.extCustId ? String(m.extCustId).trim() : '';
@@ -1139,19 +1170,6 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
       extCustIdToGidSetMap.get(extId).add(nodeGid);
     }
   });
-
-  let enterpriseNameToCustIdMap = new Map();
-  if (endCustExtIds.length > 0) {
-    const ibossCustomers = await db.collection('ibosscustomers').find(
-      { custId: { $in: endCustExtIds } },
-      { projection: { custId: 1, enterpriseName: 1 } }
-    ).toArray();
-    ibossCustomers.forEach(c => {
-      if (c.enterpriseName && c.custId) {
-        enterpriseNameToCustIdMap.set(String(c.enterpriseName).trim(), String(c.custId).trim());
-      }
-    });
-  }
 
   const penetratedGids = new Set();
   const gidToTcvMap = {};
@@ -1191,25 +1209,35 @@ const getFamilyTreeDashboardData = catchAsync(async (req, res) => {
     });
   });
 
-  // 同时也检查一下 mappings 里的其他全局匹配关系
+  // 同时也检查 mappings 里的其他直接匹配关系
   mappings.forEach(m => {
     const extId = m.extCustId ? String(m.extCustId).trim() : '';
-    if (extId && m.GID && signedBExtIds_global.has(extId)) {
-      penetratedGids.add(String(m.GID).trim());
+    if (extId && m.GID && extCustIdToGidSetMap.has(extId)) {
+      // 若该 extId 关联过 TCV
+      if (finalTcv.some(r => String(r['签约客户标识'] || '').trim() === extId)) {
+        penetratedGids.add(String(m.GID).trim());
+      }
     }
   });
 
   console.log('penetratedGids count:', penetratedGids.size);
   console.log('gidToTcvMap keys count:', Object.keys(gidToTcvMap).length);
 
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.status(httpStatus.OK).send({
+  const responseData = {
     tcvStats: tcvGroupList,
     tcvRecords: finalTcv,
     brStats: brList,
     penetratedGids: Array.from(penetratedGids),
     gidToTcvMap
+  };
+
+  dashboardStatsCache.set(cacheKey, {
+    data: responseData,
+    timestamp: Date.now()
   });
+
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.status(httpStatus.OK).send(responseData);
 });
 
 const getPenetratedGids = catchAsync(async (req, res) => {

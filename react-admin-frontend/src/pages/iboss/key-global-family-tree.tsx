@@ -128,6 +128,35 @@ async function chunkedWildcardQuery(
   return resultsArray.flat();
 }
 
+// -------------------------------------------------------------
+// 性能优化：全局单例请求与缓存（防止多个治理 Tab 和函数重复发起 limit: 50000 的大请求）
+// -------------------------------------------------------------
+let sharedCustMappingPromise: Promise<any[]> | null = null;
+let sharedPartMappingPromise: Promise<any[]> | null = null;
+
+const getSharedCustMapping = (forceRefresh = false): Promise<any[]> => {
+  if (!sharedCustMappingPromise || forceRefresh) {
+    sharedCustMappingPromise = request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
+      method: 'GET',
+      params: { options: JSON.stringify({ limit: 50000 }) }
+    })
+      .then((res: any) => res.results || res.data?.results || [])
+      .catch(() => []);
+  }
+  return sharedCustMappingPromise;
+};
+
+const getSharedPartMapping = (forceRefresh = false): Promise<any[]> => {
+  if (!sharedPartMappingPromise || forceRefresh) {
+    sharedPartMappingPromise = request('/api/v1/wildcards/excelParticipantCustMapping', {
+      method: 'GET',
+      params: { options: JSON.stringify({ limit: 50000 }) }
+    })
+      .then((res: any) => res.results || res.data?.results || [])
+      .catch(() => []);
+  }
+  return sharedPartMappingPromise;
+};
 
 // 预设富文本编辑颜色列表 (黑、白、红、黄、绿、蓝)
 const PRESET_COLORS = [
@@ -3542,6 +3571,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
       message.success('已成功删除该已治理映射记录！');
 
+      // 刷新全局单例映射缓存
+      getSharedCustMapping(true);
+
       // 更新映射表格数据
       setMappingRowData(prev => prev.filter(item => String(item._id) !== String(targetId)));
     } catch (err) {
@@ -3811,18 +3843,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       });
 
-      // 映射表拉取
-      const custMappingRes = await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
-        method: 'GET',
-        params: { options: JSON.stringify({ limit: 50000 }) }
-      }).catch(() => ({ results: [] }));
-      const custMappingRecords = custMappingRes.results || custMappingRes.data?.results || [];
-
-      const partMappingRes = await request('/api/v1/wildcards/excelParticipantCustMapping', {
-        method: 'GET',
-        params: { options: JSON.stringify({ limit: 50000 }) }
-      }).catch(() => ({ results: [] }));
-      const partMappingRecords = partMappingRes.results || partMappingRes.data?.results || [];
+      // 映射表拉取（复用单例缓存）
+      const custMappingRecords = await getSharedCustMapping();
+      const partMappingRecords = await getSharedPartMapping();
 
       const extCustToGidMap = new Map<string, string>();
       const extCustToMethodMap = new Map<string, string>();
@@ -4725,11 +4748,8 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       });
 
-      const custMappingRes = await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
-        method: 'GET',
-        params: { options: JSON.stringify({ limit: 50000 }) }
-      }).catch(() => ({ results: [] }));
-      const custMappingRecords = custMappingRes.results || custMappingRes.data?.results || [];
+      // 映射表拉取（复用单例缓存）
+      const custMappingRecords = await getSharedCustMapping();
 
       const extCustToGidMap = new Map<string, string>();
       const extCustToMappingPathMap = new Map<string, string>();
@@ -4968,6 +4988,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
       message.success(`关联成功！已成功保存终端客户与家族树节点关联`);
 
+      // 刷新全局单例映射缓存
+      getSharedCustMapping(true);
+
       setEndCustomerRowData(prevData => {
         return prevData.map(item => {
           if (item.custId === custId) {
@@ -5044,11 +5067,8 @@ const KeyGlobalFamilyTree: React.FC = () => {
         }
       });
 
-      const custMappingRes = await request('/api/v1/wildcards/keyFamilyTreeCustMapping', {
-        method: 'GET',
-        params: { options: JSON.stringify({ limit: 50000 }) }
-      }).catch(() => ({ results: [] }));
-      const custMappingRecords = custMappingRes.results || custMappingRes.data?.results || [];
+      // 映射表拉取（复用单例缓存）
+      const custMappingRecords = await getSharedCustMapping();
 
       const extCustToGidMap = new Map<string, string>();
       const extCustToMappingPathMap = new Map<string, string>();
@@ -5287,6 +5307,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
       message.success(`关联成功！已成功保存企业客户与家族树节点关联`);
 
+      // 刷新全局单例映射缓存
+      getSharedCustMapping(true);
+
       setEnterpriseCustomerRowData(prevData => {
         return prevData.map(item => {
           if (item.custId === custId) {
@@ -5404,6 +5427,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
       }
 
       message.success(`关联成功！已成功向 keyFamilyTreeCustMapping 保存 ${successCount} 条手动关联数据`);
+
+      // 刷新全局单例映射缓存
+      getSharedCustMapping(true);
 
       // 3. 更新前端当前参与方行数据状态
       setGovernanceRowData(prevData => {
@@ -6674,14 +6700,18 @@ const KeyGlobalFamilyTree: React.FC = () => {
     }
   }, [gid]);
 
-  // 当家族树全量节点数据 originalData 加载完成时，自动重新匹配比对节点映射信息
+  // 性能优化：按需懒加载各个治理 Tab 数据（首屏在“全球家族树”图谱时，不预加载后面 Tab 的重型比对数据）
   useEffect(() => {
     if (originalData.length > 0 && selectedKeywords.length > 0) {
-      fetchGovernanceData(selectedKeywords);
-      fetchEndCustomerGovernanceData(selectedKeywords);
-      fetchEnterpriseCustomerGovernanceData(selectedKeywords);
+      if (activeTab === 'governance') {
+        fetchGovernanceData(selectedKeywords);
+      } else if (activeTab === 'endCustomerGovernance') {
+        fetchEndCustomerGovernanceData(selectedKeywords);
+      } else if (activeTab === 'enterpriseCustomerGovernance') {
+        fetchEnterpriseCustomerGovernanceData(selectedKeywords);
+      }
     }
-  }, [originalData]);
+  }, [originalData, activeTab, selectedKeywords]);
 
   // 初始化/完整重建图表（含 fit 居中定位）
   const renderChart = useCallback(
