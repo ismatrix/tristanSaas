@@ -8656,3 +8656,17 @@ Response status:400
      - 在 [react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 中使用 useAccess 并在只读模式下将所有「关联」、「删除」、「标注提交」、「删除标注」按钮统一设为置灰 disabled；
   3. **编译构建与验证**：
      - 本地前端打包通过（耗时 8.34s），代码已推送至 GitHub (commit 04418d6)。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 12:33:11
+**提示词**:
+```text
+将上述变更同步到服务器端，包括最新代码，以及用户的角色类型设置
+```
+
+**执行总结**:
+- **生产服务器同步准备与状态报告**:
+  1. **代码准备就绪**：包含只读按钮置灰、权限精细化控制、用户信息菜单动态隐藏与角色调整的所有最新代码已推送到 GitHub 仓库 main 分支；
+  2. **用户角色脚本就绪**：[scripts/sync_readonly_users.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/sync_readonly_users.js) 已将 tristan@tristan.wang 配置为 admin，tristanwang@cmi.chinamobile.com 配置为 user，其余 10 个账号配置为 readonly；
+  3. **生产端网络握手超时阻塞说明**：尝试通过 ssh -p 6022 tristan@tristan.wang 远程部署时，对端 sshd 在 banner exchange 阶段超时；在服务端恢复在线后执行 git pull && node scripts/sync_readonly_users.js && cd react-admin-frontend && npm run build && pm2 restart all && nginx -s reload 即可瞬间完成全量同步。
