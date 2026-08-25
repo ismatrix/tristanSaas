@@ -10,8 +10,20 @@ const createUser = catchAsync(async (req, res) => {
 });
 
 const getUsers = catchAsync(async (req, res) => {
-  const filter = pick(req.query, ['name', 'role']);
+  const filter = pick(req.query, ['name', 'role', 'email']);
+  // 清理空字符串
+  Object.keys(filter).forEach((key) => {
+    if (filter[key] === '' || filter[key] === null || filter[key] === undefined) {
+      delete filter[key];
+    } else if (typeof filter[key] === 'string') {
+      filter[key] = { $regex: filter[key], $options: 'i' };
+    }
+  });
+
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  if (req.query.current && !options.page) options.page = parseInt(req.query.current, 10);
+  if (req.query.pageSize && !options.limit) options.limit = parseInt(req.query.pageSize, 10);
+
   const result = await userService.queryUsers(filter, options);
   res.send(result);
 });

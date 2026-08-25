@@ -6,18 +6,23 @@ const createUser = {
     email: Joi.string().required().email(),
     password: Joi.string().required().custom(password),
     name: Joi.string().required(),
-    role: Joi.string().required().valid('user', 'admin'),
+    role: Joi.string().required().valid('user', 'admin', 'readonly'),
+    isEmailVerified: Joi.boolean(),
   }),
 };
 
 const getUsers = {
   query: Joi.object().keys({
-    name: Joi.string(),
-    role: Joi.string(),
-    sortBy: Joi.string(),
+    name: Joi.string().allow('', null),
+    email: Joi.string().allow('', null),
+    role: Joi.string().allow('', null),
+    sortBy: Joi.string().allow('', null),
     limit: Joi.number().integer(),
     page: Joi.number().integer(),
-  }),
+    current: Joi.number().integer(),
+    pageSize: Joi.number().integer(),
+    _timestamp: Joi.any(),
+  }).unknown(true),
 };
 
 const getUser = {

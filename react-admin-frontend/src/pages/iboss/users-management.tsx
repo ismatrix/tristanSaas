@@ -361,11 +361,12 @@ const UsersManagementPage: React.FC = () => {
           labelWidth: 120,
         }}
         request={async (params = {}) => {
+          const { current, pageSize, ...rest } = params;
           const res = await request('/api/v1/users', {
             params: {
-              ...params,
-              limit: params.pageSize || 100,
-              page: params.current || 1,
+              page: current || 1,
+              limit: pageSize || 100,
+              ...rest,
             },
           });
           const list = res?.results || (Array.isArray(res) ? res : []);
