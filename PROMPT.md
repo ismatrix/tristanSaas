@@ -8670,3 +8670,17 @@ Response status:400
   1. **代码准备就绪**：包含只读按钮置灰、权限精细化控制、用户信息菜单动态隐藏与角色调整的所有最新代码已推送到 GitHub 仓库 main 分支；
   2. **用户角色脚本就绪**：[scripts/sync_readonly_users.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/sync_readonly_users.js) 已将 tristan@tristan.wang 配置为 admin，tristanwang@cmi.chinamobile.com 配置为 user，其余 10 个账号配置为 readonly；
   3. **生产端网络握手超时阻塞说明**：尝试通过 ssh -p 6022 tristan@tristan.wang 远程部署时，对端 sshd 在 banner exchange 阶段超时；在服务端恢复在线后执行 git pull && node scripts/sync_readonly_users.js && cd react-admin-frontend && npm run build && pm2 restart all && nginx -s reload 即可瞬间完成全量同步。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 12:40:08
+**提示词**:
+```text
+重试同步
+```
+
+**执行总结**:
+- **生产服务器重试连接与状态定位**:
+  1. **排查定位**：TCP 三次握手成功（port 6022 Connected），但远端 sshd 进程未响应 Banner 握手报文，持续出现 Connection timed out during banner exchange，判定远端 sshd 进程处于挂起/睡眠状态；
+  2. **代码就绪**：GitHub 远程仓库 main 分支已包含全部最新代码；
+  3. **恢复同步命令**：一旦服务器 sshd 恢复或在服务器本地终端，执行 git pull && node scripts/sync_readonly_users.js && cd react-admin-frontend && npm run build && pm2 restart all && nginx -s reload 即可瞬间生效。
