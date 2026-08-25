@@ -12,23 +12,23 @@ router
 
 router
   .route('/:collection/bulk-upsert')
-  .post(auth(), validate(wildcardsValidation.bulkUpsert), wildcardsController.bulkUpsert);
+  .post(auth('editData'), validate(wildcardsValidation.bulkUpsert), wildcardsController.bulkUpsert);
 
 router
   .route('/:collection/bulkUpsert')
-  .post(auth(), validate(wildcardsValidation.bulkUpsert), wildcardsController.bulkUpsert);
+  .post(auth('editData'), validate(wildcardsValidation.bulkUpsert), wildcardsController.bulkUpsert);
 
 router
   .route('/:collection')
-  .post(auth(), validate(wildcardsValidation.createRecord), wildcardsController.createRecord)
+  .post(auth('editData'), validate(wildcardsValidation.createRecord), wildcardsController.createRecord)
   .get(auth(), validate(wildcardsValidation.getRecords), wildcardsController.getRecords)
-  .delete(auth(), validate(wildcardsValidation.deleteRecords), wildcardsController.deleteRecords);
+  .delete(auth('editData'), validate(wildcardsValidation.deleteRecords), wildcardsController.deleteRecords);
 
 router
   .route('/:collection/:id')
   .get(auth(), validate(wildcardsValidation.getRecord), wildcardsController.getRecord)
-  .patch(auth(), validate(wildcardsValidation.updateRecord), wildcardsController.updateRecord)
-  .delete(auth(), validate(wildcardsValidation.deleteRecord), wildcardsController.deleteRecord);
+  .patch(auth('editData'), validate(wildcardsValidation.updateRecord), wildcardsController.updateRecord)
+  .delete(auth('editData'), validate(wildcardsValidation.deleteRecord), wildcardsController.deleteRecord);
 
 module.exports = router;
 

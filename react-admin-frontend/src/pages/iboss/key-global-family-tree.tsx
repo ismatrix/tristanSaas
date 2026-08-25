@@ -2764,8 +2764,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
   const [selectedEnterpriseTcvList, setSelectedEnterpriseTcvList] = useState<any[]>([]);
   const [selectedEnterpriseInfo, setSelectedEnterpriseInfo] = useState<{ custId: string; enterpriseName: string } | null>(null);
 
-  // 获取当前登录用户
+  // 获取当前登录用户与只读角色判定
   const { initialState } = useModel('@@initialState');
+  const isReadOnly = (initialState as any)?.currentUser?.role === 'readonly' || (initialState as any)?.currentUser?.isReadOnly === true;
 
   // 数据治理日志 (dataGovernanceLog) 状态
   const [governanceLogsMap, setGovernanceLogsMap] = useState<Record<string, any>>({});
@@ -2808,6 +2809,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   // 提交标注数据治理日志 (dataGovernanceLog)
   const handleSubmitAnnotateLog = async () => {
+    if (isReadOnly) {
+      message.warning('当前账号为只读权限，无法提交或修改标注数据');
+      return;
+    }
     const targetCompanyId = currentAnnotateRow?.companyId ? String(currentAnnotateRow.companyId) : '';
     const targetCustId = currentAnnotateRow?.custId ? String(currentAnnotateRow.custId) : '';
 
@@ -2863,6 +2868,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   // 删除标注数据治理日志
   const handleDeleteAnnotateLog = async () => {
+    if (isReadOnly) {
+      message.warning('当前账号为只读权限，无法删除标注数据');
+      return;
+    }
     const targetCompanyId = currentAnnotateRow?.companyId ? String(currentAnnotateRow.companyId) : '';
     const targetCustId = currentAnnotateRow?.custId ? String(currentAnnotateRow.custId) : '';
 
@@ -3502,6 +3511,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   // 需求2：删除已治理映射记录 (通过 _id 关联 keyFamilyTreeCustMapping 表)
   const handleDeleteMappingRecord = useCallback(async (record: any) => {
+    if (isReadOnly) {
+      message.warning('当前账号为只读权限，无法删除映射记录');
+      return;
+    }
     if (!record) return;
     const targetId = record._id;
     if (!targetId) {
@@ -4907,6 +4920,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   // --- 终端客户治理工具：保存手动选择的关联到 keyFamilyTreeCustMapping 表 ---
   const handleSaveEndCustomerManualMapping = useCallback(async (rowRecord: any) => {
+    if (isReadOnly) {
+      message.warning('当前账号为只读权限，无法保存终端客户关联');
+      return;
+    }
     if (!rowRecord || !rowRecord.custId || !rowRecord.mappedGid) {
       message.warning('无法提交：缺少客户标识或映射节点 GID');
       return;
@@ -5222,6 +5239,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   // --- 企业客户治理工具：保存手动选择的关联到 keyFamilyTreeCustMapping 表 ---
   const handleSaveEnterpriseCustomerManualMapping = useCallback(async (rowRecord: any) => {
+    if (isReadOnly) {
+      message.warning('当前账号为只读权限，无法保存企业客户关联');
+      return;
+    }
     if (!rowRecord || !rowRecord.custId || !rowRecord.mappedGid) {
       message.warning('无法提交：缺少客户标识或映射节点 GID');
       return;
@@ -5309,6 +5330,10 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   // --- 参与方治理：提交手动映射关联，成功后自动连带刷新终端客户治理与企业客户治理数据 ---
   const handleSaveManualMapping = useCallback(async (rowRecord: any) => {
+    if (isReadOnly) {
+      message.warning('当前账号为只读权限，无法提交关联数据');
+      return;
+    }
     if (!rowRecord || !rowRecord.companyId || !rowRecord.mappedGid) {
       message.warning('无法提交：缺少参与方标识或映射节点 GID');
       return;

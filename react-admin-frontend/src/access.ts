@@ -6,9 +6,12 @@ export default function access(
 ) {
   const { currentUser } = initialState ?? {};
   const isKa = currentUser?.name === 'ka';
+  const isReadOnly = (currentUser as any)?.role === 'readonly' || (currentUser as any)?.isReadOnly === true;
   return {
     canAdmin: currentUser && currentUser.access === 'admin',
     canWelcome: !isKa,
     canIboss: !isKa,
+    canEdit: !isReadOnly && !isKa,
+    isReadOnly: !!isReadOnly,
   };
 }
