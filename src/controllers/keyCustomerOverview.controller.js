@@ -48,7 +48,20 @@ const PRODUCT_CATEGORY_MAP = {
   '其他': { parent: '智能服务', sub: '其他' }
 };
 
+// 内存级高速缓存（降低大表计算与重复请求消耗，提升前端秒开体验）
+let overviewCache = {
+  data: null,
+  timestamp: 0,
+  ttl: 3 * 60 * 1000 // 3 分钟有效
+};
+
 const getOverviewStats = catchAsync(async (req, res) => {
+  const now = Date.now();
+  // 若未强制刷新且缓存命中，直接以 0ms 从内存极速返回
+  if (overviewCache.data && (now - overviewCache.timestamp < overviewCache.ttl) && !req.query.forceRefresh) {
+    return res.status(httpStatus.OK).send(overviewCache.data);
+  }
+
   const db = mongoose.connection.db;
 
   // --- 1. 获取要客清单的 GID 到行业的映射 ---
@@ -632,7 +645,7 @@ const getOverviewStats = catchAsync(async (req, res) => {
   const br2026Total_B = calcBrTotal(brStats);
   const br2026Total_A = calcBrTotal(brStats_A);
 
-  res.status(httpStatus.OK).send({
+  const responsePayload = {
     quantity: {
       totalCustomers,
       penetratedCustomersCount,
@@ -660,7 +673,16 @@ const getOverviewStats = catchAsync(async (req, res) => {
     tcv2026Total_A,
     br2026Total_B,
     br2026Total_A
-  });
+  };
+
+  // 写入内存缓存
+  overviewCache = {
+    data: responsePayload,
+    timestamp: Date.now(),
+    ttl: 3 * 60 * 1000
+  };
+
+  res.status(httpStatus.OK).send(responsePayload);
 });
 
 const getCountryBranches = catchAsync(async (req, res) => {
@@ -1414,7 +1436,19 @@ const getKeyFamilyTreeBranches = catchAsync(async (req, res) => {
   });
 });
 
+// 下拉字典选项内存缓存（TTL 15 分钟）
+let distinctOptionsCache = {
+  data: null,
+  timestamp: 0,
+  ttl: 15 * 60 * 1000
+};
+
 const getFamilyTreeDistinctOptions = catchAsync(async (req, res) => {
+  const now = Date.now();
+  if (distinctOptionsCache.data && (now - distinctOptionsCache.timestamp < distinctOptionsCache.ttl) && !req.query.forceRefresh) {
+    return res.send(distinctOptionsCache.data);
+  }
+
   const db = mongoose.connection.db;
   const collection = db.collection('keyGlobalFamilyTree');
 
@@ -1447,7 +1481,7 @@ const getFamilyTreeDistinctOptions = catchAsync(async (req, res) => {
     return Array.from(new Set(arr.filter(v => v && typeof v === 'string' && v.trim()).map(v => v.trim()))).sort((a, b) => a.localeCompare(b, 'en-US'));
   };
 
-  res.send({
+  const responseData = {
     code: 200,
     data: {
       registeredCountryOptions: cleanAndSort(countries).map(v => ({ value: v, label: v })),
@@ -1458,7 +1492,15 @@ const getFamilyTreeDistinctOptions = catchAsync(async (req, res) => {
       cmiIndustryOptions: cleanAndSort(cmiIndustries).map(v => ({ value: v, label: v })),
       countryToRegionMap
     }
-  });
+  };
+
+  distinctOptionsCache = {
+    data: responseData,
+    timestamp: Date.now(),
+    ttl: 15 * 60 * 1000
+  };
+
+  res.send(responseData);
 });
 
 module.exports = {

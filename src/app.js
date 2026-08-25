@@ -49,7 +49,12 @@ app.use(xss());
 app.use(mongoSanitize());
 
 // gzip compression
-app.use(compression());
+app.use(
+  compression({
+    level: 6,
+    threshold: 1024,
+  })
+);
 
 // enable cors
 app.use(cors());
