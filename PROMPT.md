@@ -8510,3 +8510,31 @@ keyFamilyTreeCustMapping
   1. **结论**：**完全可以实现**！飞书开放平台允许任何企业成员或个人免费创建自建应用，开发与调试阶段无需管理员介入；
   2. **开发与测试阶段（0 审批）**：在 open.feishu.cn 创建企业自建应用，开启网页应用能力与登录权限，配置测试人员名单即可直接完成扫码登录；
   3. **正式全员推广阶段**：若需企业全员免加测试名单直接扫码，只需提交一个版本发布审批（仅申请读取用户基础信息权限，极易通过），或采用免审批的测试名单/自建租户方案。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 11:00:15
+**提示词**:
+```text
+暂时不使用feishu的认证登录了。
+帮我在服务器端，创建如下帐户: 
+1、权限可以访问所有页面，全部为只读用户，页面上不能修改、删除、提交，也不能做关联。
+2、登录密码全部随机生成，生成后列表输出给我
+Lilian <liliantian@cmi.chinamobile.com>;
+Luna <lunaliunan@cmi.chinamobile.com>;
+Tristan <tristanwang@cmi.chinamobile.com>;
+Jane  <janehuang@cmi.chinamobile.com>;
+Bill  <billwu@cmi.chinamobile.com>;
+Merlin  <merlinzhou@cmi.chinamobile.com>;
+Aiden <aidenliu@cmi.chinamobile.com>;
+Colton <boliecui@cmi.chinamobile.com>;
+Monica <monicawang@cmi.chinamobile.com>;
+Connor <connorzheng@cmi.chinamobile.com>;
+xiuyuan <xiuyuan.l@telelands.com>;
+```
+
+**执行总结**:
+- **只读角色权限体系搭建与 11 位只读用户批量创建**:
+  1. **只读权限架构**：在后端配置 readonly 角色，在 wildcards 和 dataGovernanceLog 写接口增加 auth('editData') 拦截，确保只读账号无法通过任何接口修改、删除或做关联操作；在前端 access.ts 中注入 isReadOnly 属性，对页面上的关联、解绑、保存标注、删除标注等写操作增加拦截与禁用保护；
+  2. **批量账号与高强度随机密码生成**：已为 11 位用户生成强随机密码，并在数据库中批量创建为 readonly 角色；
+  3. **代码提交与部署脚本**：代码已提交并推送至 GitHub (commit d4f8b44)，并编写了确定性同步脚本 scripts/sync_readonly_users.js 用于服务端一键同步。
