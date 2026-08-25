@@ -8702,3 +8702,32 @@ telnet tristan.wang 6022 可以正常连接，请排查原因
      - **原因 B**：路由器/NAT 端口映射到了错误的目标内网 IP/端口，或后端目标主机处于系统休眠/挂起状态；
      - **原因 C**：服务端 sshd 并发挂起连接数达到 MaxStartups 限制或 sshd 进程僵死；
   3. **解决建议**：服务端检查 sshd 服务状态，并在 /etc/ssh/sshd_config 中确认 UseDNS no 与 MaxStartups 配置。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 14:11:34
+**提示词**:
+```text
+由于新的服务端 ssh -p 6022 tristan@tristan.wang 不可用， 将最新代码，以及上述用户的新增和变更，以及下列数据表，从开发端更新到原来的旧的服务端 ssh -p 6822 tristan@tristan.wang 
+keyGlobalFamilyTree
+keyFamilyTreeCustMapping
+keycustomer
+```
+
+**执行总结**:
+- **旧服务端 (ssh -p 6822 tristan@tristan.wang) 全量代码、3 张核心表与用户体系同步部署完成**:
+  1. **3 张核心数据表覆盖同步与索引重建**：
+     - 本地导出并通过 rsync 传输至服务端 /home/tristan/workspaces/TristanSaas；
+     - 运行 [scripts/import_3tables.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/import_3tables.js) 覆盖导入并重建索引。经服务端校验：
+       - keyGlobalFamilyTree: **11,474 条** (100% 一致)
+       - keyFamilyTreeCustMapping: **2,268 条** (100% 一致)
+       - keycustomer: **138 条** (100% 一致)
+  2. **用户体系与角色设定同步**：
+     - 运行 [scripts/sync_readonly_users.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/sync_readonly_users.js) 在服务端 MongoDB 创建/同步全量账号：
+       - tristan@tristan.wang: **admin (超级管理员)**
+       - tristanwang@cmi.chinamobile.com: **user (标准用户，拥有编辑权限)**
+       - 其余 10 位账号: **readonly (只读用户，全站按钮置灰且隐藏用户信息菜单)**
+  3. **前端构建与后端服务重载**：
+     - 服务端安装 echarts 依赖；
+     - 服务端运行 npm run build 编译打包成功（耗时 38.19s）；
+     - PM2 重载 backend-api 进程（PID: 222304），服务实时在线生效。
