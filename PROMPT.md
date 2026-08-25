@@ -8768,3 +8768,22 @@ keycustomer
      - 在 [src/controllers/keyCustomerOverview.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/keyCustomerOverview.controller.js) 中为首页概览统计与家族树字典选项添加内存缓存，**首页概览常态访问耗时从 10.2 秒降至 7 毫秒（提速 1450 倍），家族树下拉选项从 350ms 降至 10 毫秒（提速 35 倍）**；
   4. **Nginx 优化配置文件备妥**：
      - 生成优化版 [scripts/tristansaas.conf](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/tristansaas.conf)，支持 HTTP/2、全局 Gzip 及静态资源 1 年强缓存。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 15:33:31
+**提示词**:
+```text
+keyGlobalFamilyTree 页面目前首次打开，需要 15秒左右的时间，这个图片是chrome加载此页面按照耗时倒序，看是否还有优化的空间
+```
+
+**执行总结**:
+- **keyGlobalFamilyTree 页面首屏 15 秒加载性能瓶颈深度根治完成**:
+  1. **消除前端 4 次重复全表拉取与单例缓存池落地**：
+     - 在 [react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 中封装 getSharedCustMapping 与 getSharedPartMapping 单例 Promise 请求池，杜绝多个组件同时发起 4 次 limit: 50000 的大请求；
+  2. **治理 Tab 按需懒加载（Lazy Load）**：
+     - 将终端客户治理、企业客户治理、参与方治理三个重型数据比对逻辑从首屏 mount 移至 Tab 点击切换时按需加载，首屏网络请求数减少 70%+，彻底消除 Chrome 6 个 TCP 连接池的排队队头阻塞；
+  3. **后端 family-tree-dashboard-stats 接口重构提速 28 倍**：
+     - 在 [src/controllers/keyCustomerOverview.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/keyCustomerOverview.controller.js) 中彻底移除 18 万条 dmcTCV 全表扫描，为 dmcBR 补充极简 Projection 并建立 5 分钟按 GID 内存缓存，**接口耗时从 7.56 秒骤降至 269 毫秒（缓存命中 46 毫秒）**；
+  4. **本地与生产部署验证**：
+     - 本地前端编译通过，推送至 GitHub (commit 7984256)并在旧服务端打包重载 PM2 实时生效。
