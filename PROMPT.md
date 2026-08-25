@@ -8576,3 +8576,21 @@ xiuyuan <xiuyuan.l@telelands.com>;
      - 在 [react-admin-frontend/src/pages/iboss/users-management.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/users-management.tsx) 构建了现代化用户管理页面（顶部指标卡片、ProTable 用户列表、操作列「强制登出」、「密码重置」弹窗展示并一键复制、「删除」及「新建用户」功能）；
   4. **本地构建验证与代码提交**：
      - 本地打包编译通过（耗时 8.88s），代码已提交并推送至 GitHub (commit c651f41)。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 11:35:54
+**提示词**:
+```text
+http://localhost:8000/info-data/users
+Response status:400
+```
+
+**执行总结**:
+- **400 校验异常排查与快速修复**:
+  1. **原因定位**：前端 ProTable 请求 /api/v1/users 时默认传递了 current、pageSize 与 _timestamp 等前端分页元数据，而后端 [src/validations/user.validation.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/validations/user.validation.js) 中的 Joi schema 开启了严格校验且未声明 unknown 属性，导致触发 400 Bad Request；同时 createUser 校验未包含新增的 readonly 角色；
+  2. **修复落地**：
+     - 在 [src/validations/user.validation.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/validations/user.validation.js) 中为 getUsers 添加 .unknown(true) 并放行 current、pageSize、email 等参数；
+     - 在 [src/controllers/user.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/user.controller.js) 中自动转换 current/pageSize 为后端标准分页参数，并支持 email/name 模糊搜索及清理空字段；
+     - 在 [react-admin-frontend/src/pages/iboss/users-management.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/users-management.tsx) 中规范化分页请求参数；
+  3. **验证与提交**：本地测试 Joi 校验 100% 通过，前端打包编译成功（耗时 8.08s），代码已推送至 GitHub (commit b2592b0)。
