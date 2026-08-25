@@ -6,24 +6,33 @@ import { request } from '@umijs/max';
 export async function currentUser(options?: { [key: string]: any }) {
   const userStr = localStorage.getItem('currentUser');
   if (userStr) {
-    const user = JSON.parse(userStr);
-    return {
-      data: {
-        name: user.name || user.email,
-        avatar: 'https://gw.alipayobjects.com/zos/antfincdn/XAosXuNZyF/BiazfanxmamNRoxxVxka.png',
-        userid: user.id || user._id,
-        email: user.email,
-        signature: 'Hello DNB',
-        title: 'User',
-        group: 'DNB Group',
-        access: user.role,
-      }
-    };
+    try {
+      const user = JSON.parse(userStr);
+      const userRole = user.role || user.access || 'readonly';
+      return {
+        data: {
+          name: user.name || user.email,
+          avatar: 'https://gw.alipayobjects.com/zos/antfincdn/XAosXuNZyF/BiazfanxmamNRoxxVxka.png',
+          userid: user.id || user._id,
+          email: user.email,
+          signature: 'Hello DNB',
+          title: userRole === 'admin' ? '超级管理员' : (userRole === 'user' ? '标准用户' : '只读用户'),
+          group: 'DNB Group',
+          role: userRole,
+          access: userRole,
+          isReadOnly: userRole === 'readonly',
+        }
+      };
+    } catch (e) {
+      console.error('Parse currentUser error', e);
+    }
   }
   return {
     data: {
       name: 'Guest',
-      access: 'guest',
+      role: 'readonly',
+      access: 'readonly',
+      isReadOnly: true,
     }
   };
 }

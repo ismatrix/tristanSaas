@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { useParams, useLocation, request, history, useModel } from '@umijs/max';
+import { useParams, useLocation, request, history, useModel, useAccess } from '@umijs/max';
 import { Checkbox, Spin, message, Button, Input, Space, Tag, Badge, Tabs, Drawer, Descriptions, Tooltip, Modal, Table, Row, Col, Card, Progress, Select, Popconfirm } from 'antd';
 import {
   ExpandAltOutlined,
@@ -2766,7 +2766,20 @@ const KeyGlobalFamilyTree: React.FC = () => {
 
   // 获取当前登录用户与只读角色判定
   const { initialState } = useModel('@@initialState');
-  const isReadOnly = (initialState as any)?.currentUser?.role === 'readonly' || (initialState as any)?.currentUser?.isReadOnly === true;
+  const access = useAccess();
+  const isReadOnly = useMemo(() => {
+    if (access && typeof access.isReadOnly === 'boolean') {
+      return access.isReadOnly;
+    }
+    const role = (initialState as any)?.currentUser?.role || (initialState as any)?.currentUser?.access;
+    if (role) return String(role).toLowerCase() === 'readonly';
+    try {
+      const local = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      return String(local.role || local.access).toLowerCase() === 'readonly';
+    } catch {
+      return false;
+    }
+  }, [access, initialState]);
 
   // 数据治理日志 (dataGovernanceLog) 状态
   const [governanceLogsMap, setGovernanceLogsMap] = useState<Record<string, any>>({});
