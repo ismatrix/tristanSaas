@@ -33,6 +33,9 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    forceLogoutAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

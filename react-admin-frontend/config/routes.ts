@@ -145,6 +145,11 @@ export default [
         path: '/info-data/page-views',
         component: './iboss/page-views',
       },
+      {
+        name: '用户信息',
+        path: '/info-data/users',
+        component: './iboss/users-management',
+      },
     ],
   },
   {

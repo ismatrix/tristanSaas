@@ -34,10 +34,22 @@ const deleteUser = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+const forceLogoutUser = catchAsync(async (req, res) => {
+  const user = await userService.forceLogoutUserById(req.params.userId);
+  res.send({ success: true, message: '用户已被强制登出，其当前 Session 已失效', user });
+});
+
+const resetUserPassword = catchAsync(async (req, res) => {
+  const { user, newPassword } = await userService.resetPasswordById(req.params.userId);
+  res.send({ success: true, message: '密码已成功重置', newPassword, user });
+});
+
 module.exports = {
   createUser,
   getUsers,
   getUser,
   updateUser,
   deleteUser,
+  forceLogoutUser,
+  resetUserPassword,
 };

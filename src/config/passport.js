@@ -17,6 +17,15 @@ const jwtVerify = async (payload, done) => {
     if (!user) {
       return done(null, false);
     }
+    // 强制登出判定：检查 JWT 签发时间是否早于强制登出时间点
+    if (user.forceLogoutAt && payload.iat) {
+      const tokenIatMs = payload.iat * 1000;
+      const logoutMs = new Date(user.forceLogoutAt).getTime();
+      // 如果 token 签发时间早于强制登出时间，直接拒绝认证，触发 401
+      if (tokenIatMs < logoutMs) {
+        return done(null, false);
+      }
+    }
     done(null, user);
   } catch (error) {
     done(error, false);
