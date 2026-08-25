@@ -8684,3 +8684,21 @@ Response status:400
   1. **排查定位**：TCP 三次握手成功（port 6022 Connected），但远端 sshd 进程未响应 Banner 握手报文，持续出现 Connection timed out during banner exchange，判定远端 sshd 进程处于挂起/睡眠状态；
   2. **代码就绪**：GitHub 远程仓库 main 分支已包含全部最新代码；
   3. **恢复同步命令**：一旦服务器 sshd 恢复或在服务器本地终端，执行 git pull && node scripts/sync_readonly_users.js && cd react-admin-frontend && npm run build && pm2 restart all && nginx -s reload 即可瞬间生效。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 12:45:32
+**提示词**:
+```text
+ssh -p 6022 tristan@tristan.wang 会超时，但是
+telnet tristan.wang 6022 可以正常连接，请排查原因
+```
+
+**执行总结**:
+- **TCP 连接正常但 SSH 握手超时的底层原因诊断**:
+  1. **探测实验**：编写原生 TCP Socket 探测脚本直连 tristan.wang:6022，验证发现 TCP 三次握手成功（SYN/ACK 畅通，防火墙与端口正常），但服务端在连接建立后完全静默（未发送 SSH 协议 Banner 第一行 "SSH-2.0-..."）；
+  2. **根因定位**：
+     - **原因 A（最常见）**：服务端 sshd 开启了 UseDNS，正在对客户端公网 IP 执行反向 PTR 域名解析，因 DNS 查询卡死导致在超时前不输出 Banner；
+     - **原因 B**：路由器/NAT 端口映射到了错误的目标内网 IP/端口，或后端目标主机处于系统休眠/挂起状态；
+     - **原因 C**：服务端 sshd 并发挂起连接数达到 MaxStartups 限制或 sshd 进程僵死；
+  3. **解决建议**：服务端检查 sshd 服务状态，并在 /etc/ssh/sshd_config 中确认 UseDNS no 与 MaxStartups 配置。
