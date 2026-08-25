@@ -8633,3 +8633,26 @@ Response status:400
      - 在 [react-admin-frontend/config/routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts) 中为「用户信息」路由绑定 access: 'canManageUsers'，只读用户左侧菜单完全不展示该页面入口，且直接访问 URL 也会被拦截；
   4. **编译构建与提交**：
      - 前端打包成功（耗时 8.14s），代码已推送至 GitHub (commit e170925)。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 12:27:14
+**提示词**:
+```text
+1、只读用户： 在所有页面的增删改、关联类的按钮都置灰色。  （包括用户信息页面的，强制登出、密码重置、删除、新建用户按钮及其后端的方法）
+3、对所有“只读用户”角色，隐藏「用户信息」菜单和页面
+
+这两条并没有生效， 反倒“标准用户” 角色失去了「用户信息」菜单和页面，请排查。
+```
+
+**执行总结**:
+- **用户角色提取与只读/标准用户权限判定彻底修复**:
+  1. **问题根本原因定位**：
+     - 在 [react-admin-frontend/src/services/ant-design-pro/api.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/services/ant-design-pro/api.ts) 中，currentUser() 方法仅返回了 access 属性，未返回 role 与 isReadOnly，导致 initialState.currentUser.role 为 undefined，前端只读判定失效；
+     - 在 access.ts 与页面组件中仅依赖了 (currentUser as any)?.role，未做多级容错（access / localStorage），导致标准用户和只读用户角色判定错乱；
+  2. **全面修复落地**：
+     - 在 api.ts 的 currentUser() 中完整注入 role、access 与 isReadOnly 属性；
+     - 在 [react-admin-frontend/src/access.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/access.ts) 中建立健壮的角色解析体系（依次尝试 currentUser.role -> currentUser.access -> localStorage 兜底），精准计算 isReadOnly、canEdit 以及 canManageUsers（标准用户 user 与超级管理员 admin 均可查看「用户信息」，只读用户 readonly 严格隐藏）；
+     - 在 [react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-global-family-tree.tsx) 中使用 useAccess 并在只读模式下将所有「关联」、「删除」、「标注提交」、「删除标注」按钮统一设为置灰 disabled；
+  3. **编译构建与验证**：
+     - 本地前端打包通过（耗时 8.34s），代码已推送至 GitHub (commit 04418d6)。
