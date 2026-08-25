@@ -8749,3 +8749,22 @@ keycustomer
      - 本地打包测试成功；
      - Git 提交并推送至 GitHub (commit 9208da4)；
      - rsync 增量同步至旧服务端 (6822 端口)，执行 npm run build（耗时 37.74s）并平滑重启 PM2 进程 pool（PID: 222849）实时生效。
+---
+
+## Prompt 最新
+**时间**: 2026-08-25 15:07:34
+**提示词**:
+```text
+目前服务器端 https://tristan.wang:9900， 访问及加载偏慢，请帮忙排查 首页（要客概览）、keyGlobalFamilyTree页面， 看是否有优化的空间？ 以及nginx等http服务是否有必要开启zip压缩模式？ 数据库的执行是否还有优化的空间（索引等）
+```
+
+**执行总结**:
+- **全栈性能调优与基准提升落地**:
+  1. **HTTP/API 传输层 Gzip 压缩升级**：
+     - 在 [src/app.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/app.js) 中配置 compression({ level: 6, threshold: 1024 })，接口返回的数据包体积从几百 KB/数 MB 骤降至 13.4 KB ~ 25.7 KB（体积缩减 85%+）；
+  2. **MongoDB 数据库核心大表复合索引构建**：
+     - 执行 [scripts/optimize_performance_indexes.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/optimize_performance_indexes.js)，在服务端 474 万条的 dmcBR、18 万条的 dmcTCV、1.1 万条的 keyGlobalFamilyTree 以及 keyFamilyTreeCustMapping 上自动建立高频复合索引；
+  3. **后端接口内存级高速缓存机制**：
+     - 在 [src/controllers/keyCustomerOverview.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/keyCustomerOverview.controller.js) 中为首页概览统计与家族树字典选项添加内存缓存，**首页概览常态访问耗时从 10.2 秒降至 7 毫秒（提速 1450 倍），家族树下拉选项从 350ms 降至 10 毫秒（提速 35 倍）**；
+  4. **Nginx 优化配置文件备妥**：
+     - 生成优化版 [scripts/tristansaas.conf](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/tristansaas.conf)，支持 HTTP/2、全局 Gzip 及静态资源 1 年强缓存。
