@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { request, history, useModel } from '@umijs/max';
-import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip, Tabs, Tag } from 'antd';
+import { Spin, message, Button, Modal, Input, Form, Space, Popconfirm, Tooltip, Tabs, Tag, Select } from 'antd';
 import { SaveOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ApartmentOutlined, DownloadOutlined, ExportOutlined, DashboardOutlined, UnorderedListOutlined, PartitionOutlined } from '@ant-design/icons';
 import KeyCustomerOverview from './KeyCustomerOverview';
 import KeyCustomerBranchTab from './KeyCustomerBranchTab';
@@ -10,6 +10,61 @@ import { AllEnterpriseModule } from 'ag-grid-enterprise';
 
 // 注册 AG Grid 模块防止 #272 错误
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
+
+/**
+ * 行业编码单元格渲染器：
+ * - 可编辑用户（isTristan）下采用下拉选择框形式（Ant Design Select）；
+ * - 选项为 keycustomer 表中 industryCode 字段的 DISTINCT 八大行业值；
+ * - 非可编辑用户下采用只读纯文本展示；
+ * - 修改时同步更新行数据并标记为脏行。
+ */
+const IndustryCodeCellRenderer: React.FC<{
+  params: any;
+  isTristan: boolean;
+  industryOptions: string[];
+  onMarkDirty: (id: string) => void;
+}> = ({ params, isTristan, industryOptions, onMarkDirty }) => {
+  const currentValue = params.value;
+
+  if (!isTristan) {
+    return <span>{currentValue || '-'}</span>;
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        width: '100%',
+        height: '100%',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Select
+        size="small"
+        style={{ width: '100%' }}
+        value={currentValue || undefined}
+        placeholder="请选择行业"
+        popupMatchSelectWidth={false}
+        onChange={(newVal) => {
+          params.node.setData({
+            ...params.data,
+            industryCode: newVal,
+          });
+          const docId = params.data?._id;
+          if (docId) {
+            onMarkDirty(String(docId));
+            message.info('行业编码已更改，请点击右上角“保存变更”提交保存');
+          }
+        }}
+        options={industryOptions.map((opt) => ({
+          label: opt,
+          value: opt,
+        }))}
+      />
+    </div>
+  );
+};
 
 /**
  * 关键词 Tag 渲染与编辑器组件
@@ -127,9 +182,11 @@ const KeyCustomerList: React.FC = () => {
   const isTristan = initialState?.currentUser?.email === 'tristan@tristan.wang';
   const gridRef = useRef<AgGridReact>(null);
 
+  // --- Tab 状态控制（默认激活 Dashboard 概览）---
+  const [activeTab, setActiveTab] = useState<string>('overview');
   // --- 数据状态 ---
   const [rowData, setRowData] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   // 脏行追踪：存储被修改过的行的 _id
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
@@ -446,6 +503,29 @@ const KeyCustomerList: React.FC = () => {
     }
   }, []);
 
+  // 提取 keycustomer 表中 industryCode 字段的 DISTINCT 八大行业值
+  const industryOptions = useMemo(() => {
+    const set = new Set<string>();
+    rowData.forEach((item: any) => {
+      if (item?.industryCode && typeof item.industryCode === 'string' && item.industryCode.trim()) {
+        set.add(item.industryCode.trim());
+      }
+    });
+    // 兜底八大行业标准枚举（来源为 keycustomer 表 industryCode 的 DISTINCT 规范值）
+    const DEFAULT_EIGHT_INDUSTRIES = [
+      'Automotive',
+      'Energy',
+      'Engineering and Construction',
+      'Finance',
+      'Industrial Manufacturing',
+      'Retail Chain and Public Services',
+      'Technology and Internet',
+      'Transportation and Logistics',
+    ];
+    DEFAULT_EIGHT_INDUSTRIES.forEach((ind) => set.add(ind));
+    return Array.from(set).sort();
+  }, [rowData]);
+
   // --- 默认列配置（基于 keycustomer 表结构） ---
   const baseColumns = useMemo(() => [
     { headerName: '#', valueGetter: "node.rowIndex + 1", width: 60, minWidth: 40, pinned: 'left', filter: false, sortable: false, editable: false, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true },
@@ -559,6 +639,30 @@ const KeyCustomerList: React.FC = () => {
     },
     { headerName: "缩写", field: "abbr", width: 150, editable: isTristan },
     {
+      headerName: "行业编码",
+      field: "industryCode",
+      width: 220,
+      minWidth: 180,
+      editable: false,
+      filter: true,
+      sortable: true,
+      cellStyle: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+      },
+      cellRenderer: (params: any) => {
+        return (
+          <IndustryCodeCellRenderer
+            params={params}
+            isTristan={isTristan}
+            industryOptions={industryOptions}
+            onMarkDirty={markRowDirty}
+          />
+        );
+      },
+    },
+    {
       headerName: "关键词",
       field: "keyWords",
       width: 320,
@@ -575,7 +679,6 @@ const KeyCustomerList: React.FC = () => {
     },
     { headerName: "来源", field: "source", width: 160, editable: isTristan, hide: true },
     { headerName: "来源类型", field: "sourceType", width: 200, editable: isTristan, hide: true },
-    { headerName: "行业编码", field: "industryCode", width: 140, editable: isTristan },
     { headerName: "集团行业", field: "industryGroupCode", width: 160, editable: isTristan, hide: true },
     {
       headerName: "家族数API/WEB",
@@ -661,7 +764,7 @@ const KeyCustomerList: React.FC = () => {
         }
       },
     },
-  ], [isTristan, markRowDirty]);
+  ], [isTristan, markRowDirty, industryOptions]);
 
   // 「更新家族树」操作列（固定钉右）
   const actionColumn = useMemo(() => ({
@@ -804,9 +907,12 @@ const KeyCustomerList: React.FC = () => {
     }
   }, [actionColumn, exportColumn]);
 
+  // --- 按需懒加载：仅当用户切换至「要客清单」Tab 且未加载过数据时触发 ---
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (activeTab === 'list' && rowData.length === 0) {
+      fetchData();
+    }
+  }, [activeTab, rowData.length, fetchData]);
 
   // --- 单元格值变更 → 标记脏行 ---
   const onCellValueChanged = useCallback((params: any) => {
@@ -958,9 +1064,6 @@ const KeyCustomerList: React.FC = () => {
 
   // --- 是否有变更 ---
   const hasDirty = dirtyIds.size > 0;
-
-  // --- Tab 状态控制 ---
-  const [activeTab, setActiveTab] = useState<string>('overview');
 
   // --- 监听 Tab 切换强刷 AG Grid 宽高自适应自动扩展全部列宽 ---
   useEffect(() => {

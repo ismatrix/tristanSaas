@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { useParams, useLocation, request, history, useModel, useAccess } from '@umijs/max';
+import { useParams, useLocation, request, history, useModel, useAccess, Helmet } from '@umijs/max';
 import { Checkbox, Spin, message, Button, Input, Space, Tag, Badge, Tabs, Drawer, Descriptions, Tooltip, Modal, Table, Row, Col, Card, Progress, Select, Popconfirm } from 'antd';
 import {
   ExpandAltOutlined,
@@ -1553,6 +1553,320 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
     return brProjectStats.reduce((sum, item) => sum + item.brAmount, 0);
   }, [brProjectStats]);
 
+  // --- 月度签单与月度计收同比趋势状态与指标计算 ---
+  const currentFullYear = new Date().getFullYear();
+  const allMonthlyCompareYears = Array.from({ length: 10 }, (_, i) => String(currentFullYear - i));
+
+  // 月度签单同比趋势状态
+  const [monthlyTcvCompareYears, setMonthlyTcvCompareYears] = useState<string[]>([String(currentFullYear - 1), String(currentFullYear)]);
+  const [hoveredTcvMonthIndex, setHoveredTcvMonthIndex] = useState<number | null>(null);
+
+  // 月度计收同比趋势状态
+  const [monthlyBrCompareYears, setMonthlyBrCompareYears] = useState<string[]>([String(currentFullYear - 1), String(currentFullYear)]);
+  const [hoveredBrMonthIndex, setHoveredBrMonthIndex] = useState<number | null>(null);
+
+  // 聚合该要客所有历年月度 TCV 签单数据
+  const gidTcvMonthly = useMemo(() => {
+    const recs = tcvRecords || [];
+    const map: Record<string, number[]> = {};
+    recs.forEach((rec: any) => {
+      const signDate = String(rec['合同签署日期'] || rec['设置起租日期'] || '');
+      const match = signDate.match(/^(\d{4})[-/]?(\d{1,2})/);
+      if (match) {
+        const y = match[1];
+        const m = parseInt(match[2], 10);
+        if (m >= 1 && m <= 12) {
+          if (!map[y]) map[y] = Array(12).fill(0);
+          const amount = parseFloat(rec['签单金额(港币)'] || rec['签单金额（港币）'] || rec['签单金额'] || 0);
+          map[y][m - 1] += amount;
+        }
+      }
+    });
+    return map;
+  }, [tcvRecords]);
+
+  // 聚合该要客所有历年月度 BR 计收数据
+  const gidBrMonthly = useMemo(() => {
+    const recs = brStats || [];
+    const map: Record<string, number[]> = {};
+    recs.forEach((rec: any) => {
+      const monthStr = String(rec['数据月份'] || '');
+      const match = monthStr.match(/^(\d{4})[-/]?(\d{1,2})/);
+      if (match) {
+        const y = match[1];
+        const m = parseInt(match[2], 10);
+        if (m >= 1 && m <= 12) {
+          if (!map[y]) map[y] = Array(12).fill(0);
+          const amount = parseFloat(rec['金额'] !== undefined ? rec['金额'] : (rec['拆分后港币金额｜绝对值'] || rec['拆分后港币金额'] || 0));
+          map[y][m - 1] += amount;
+        }
+      }
+    });
+    return map;
+  }, [brStats]);
+
+  // 解析签单对比年份
+  const [tcvBaseYear, tcvTargetYear] = useMemo(() => {
+    if (!monthlyTcvCompareYears || monthlyTcvCompareYears.length === 0) {
+      return [String(currentFullYear - 1), String(currentFullYear)];
+    }
+    if (monthlyTcvCompareYears.length === 1) {
+      const y = Number(monthlyTcvCompareYears[0]);
+      return [String(y - 1), String(y)];
+    }
+    const sorted = [...monthlyTcvCompareYears].sort((a, b) => Number(a) - Number(b));
+    return [sorted[0], sorted[sorted.length - 1]];
+  }, [monthlyTcvCompareYears, currentFullYear]);
+
+  // 解析计收对比年份
+  const [brBaseYear, brTargetYear] = useMemo(() => {
+    if (!monthlyBrCompareYears || monthlyBrCompareYears.length === 0) {
+      return [String(currentFullYear - 1), String(currentFullYear)];
+    }
+    if (monthlyBrCompareYears.length === 1) {
+      const y = Number(monthlyBrCompareYears[0]);
+      return [String(y - 1), String(y)];
+    }
+    const sorted = [...monthlyBrCompareYears].sort((a, b) => Number(a) - Number(b));
+    return [sorted[0], sorted[sorted.length - 1]];
+  }, [monthlyBrCompareYears, currentFullYear]);
+
+  // 计算该要客月度签单统计指标
+  const tcvMonthlyStatsData = useMemo(() => {
+    const listBase = gidTcvMonthly[tcvBaseYear] || Array(12).fill(0);
+    const listTarget = gidTcvMonthly[tcvTargetYear] || Array(12).fill(0);
+
+    const now = new Date();
+    const nowYear = now.getFullYear();
+    const nowMonth = now.getMonth() + 1;
+    const isCurrentYearInvolved = tcvTargetYear === String(nowYear) || tcvBaseYear === String(nowYear);
+    const cutoffMonth = isCurrentYearInvolved ? Math.max(nowMonth - 1, 1) : 12;
+
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const isEffective = m <= cutoffMonth;
+      const vBase = listBase[i] || 0;
+      const vTarget = listTarget[i] || 0;
+      const vBaseM = vBase / 1000000;
+      const vTargetM = vTarget / 1000000;
+      const diffM = vTargetM - vBaseM;
+
+      let yoyVal: number | null = null;
+      let yoyStr = '—';
+      let yoyType: 'positive' | 'negative' | 'zero' | 'new' | 'future' = 'zero';
+
+      if (!isEffective) {
+        yoyType = 'future';
+        yoyStr = '未发生';
+      } else if (vBase > 0) {
+        yoyVal = ((vTarget - vBase) / vBase) * 100;
+        yoyStr = `${yoyVal >= 0 ? '+' : ''}${yoyVal.toFixed(1)}%`;
+        yoyType = yoyVal > 0 ? 'positive' : yoyVal < 0 ? 'negative' : 'zero';
+      } else if (vTarget > 0) {
+        yoyVal = 100;
+        yoyStr = '+100% (新)';
+        yoyType = 'new';
+      } else {
+        yoyVal = 0;
+        yoyStr = '0.0%';
+        yoyType = 'zero';
+      }
+
+      return {
+        month: `${m}月`,
+        monthNum: m,
+        monthIndex: i,
+        isEffective,
+        vBase,
+        vTarget,
+        vBaseM,
+        vTargetM,
+        diffM,
+        yoyVal,
+        yoyStr,
+        yoyType
+      };
+    });
+
+    const effectiveMonths = months.filter(m => m.isEffective);
+    const maxM = Math.max(
+      ...months.map(m => Math.max(m.isEffective ? m.vTargetM : 0, m.vBaseM)),
+      1
+    );
+
+    const totalBase = effectiveMonths.reduce((a: number, b: any) => a + b.vBase, 0);
+    const totalTarget = effectiveMonths.reduce((a: number, b: any) => a + b.vTarget, 0);
+    const totalBaseM = totalBase / 1000000;
+    const totalTargetM = totalTarget / 1000000;
+    const totalDiffM = totalTargetM - totalBaseM;
+
+    let totalYoyStr = '—';
+    let totalYoyVal = 0;
+    if (totalBase > 0) {
+      totalYoyVal = ((totalTarget - totalBase) / totalBase) * 100;
+      totalYoyStr = `${totalYoyVal >= 0 ? '+' : ''}${totalYoyVal.toFixed(1)}%`;
+    } else if (totalTarget > 0) {
+      totalYoyVal = 100;
+      totalYoyStr = '+100% (新)';
+    }
+
+    let peakTargetMonth = '—';
+    let peakTargetAmountM = 0;
+    let peakBaseMonth = '—';
+    let peakBaseAmountM = 0;
+
+    effectiveMonths.forEach(m => {
+      if (m.vTargetM > peakTargetAmountM) {
+        peakTargetAmountM = m.vTargetM;
+        peakTargetMonth = m.month;
+      }
+      if (m.vBaseM > peakBaseAmountM) {
+        peakBaseAmountM = m.vBaseM;
+        peakBaseMonth = m.month;
+      }
+    });
+
+    const effectiveCount = effectiveMonths.length || 1;
+
+    return {
+      months,
+      effectiveMonths,
+      cutoffMonth,
+      isCurrentYearInvolved,
+      periodLabel: isCurrentYearInvolved ? `1~${cutoffMonth}月同期` : '全年度(1~12月)',
+      maxM: maxM * 1.15,
+      totalBaseM: totalBaseM.toFixed(2),
+      totalTargetM: totalTargetM.toFixed(2),
+      totalDiffM: totalDiffM.toFixed(2),
+      totalYoyStr,
+      totalYoyVal,
+      avgBaseM: (totalBaseM / effectiveCount).toFixed(2),
+      avgTargetM: (totalTargetM / effectiveCount).toFixed(2),
+      peakTargetMonth,
+      peakTargetAmountM: peakTargetAmountM.toFixed(2),
+      peakBaseMonth,
+      peakBaseAmountM: peakBaseAmountM.toFixed(2)
+    };
+  }, [gidTcvMonthly, tcvBaseYear, tcvTargetYear]);
+
+  // 计算该要客月度计收统计指标
+  const brMonthlyStatsData = useMemo(() => {
+    const listBase = gidBrMonthly[brBaseYear] || Array(12).fill(0);
+    const listTarget = gidBrMonthly[brTargetYear] || Array(12).fill(0);
+
+    const now = new Date();
+    const nowYear = now.getFullYear();
+    const nowMonth = now.getMonth() + 1;
+    const isCurrentYearInvolved = brTargetYear === String(nowYear) || brBaseYear === String(nowYear);
+    const cutoffMonth = isCurrentYearInvolved ? Math.max(nowMonth - 1, 1) : 12;
+
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const isEffective = m <= cutoffMonth;
+      const vBase = listBase[i] || 0;
+      const vTarget = listTarget[i] || 0;
+      const vBaseM = vBase / 1000000;
+      const vTargetM = vTarget / 1000000;
+      const diffM = vTargetM - vBaseM;
+
+      let yoyVal: number | null = null;
+      let yoyStr = '—';
+      let yoyType: 'positive' | 'negative' | 'zero' | 'new' | 'future' = 'zero';
+
+      if (!isEffective) {
+        yoyType = 'future';
+        yoyStr = '未发生';
+      } else if (vBase > 0) {
+        yoyVal = ((vTarget - vBase) / vBase) * 100;
+        yoyStr = `${yoyVal >= 0 ? '+' : ''}${yoyVal.toFixed(1)}%`;
+        yoyType = yoyVal > 0 ? 'positive' : yoyVal < 0 ? 'negative' : 'zero';
+      } else if (vTarget > 0) {
+        yoyVal = 100;
+        yoyStr = '+100% (新)';
+        yoyType = 'new';
+      } else {
+        yoyVal = 0;
+        yoyStr = '0.0%';
+        yoyType = 'zero';
+      }
+
+      return {
+        month: `${m}月`,
+        monthNum: m,
+        monthIndex: i,
+        isEffective,
+        vBase,
+        vTarget,
+        vBaseM,
+        vTargetM,
+        diffM,
+        yoyVal,
+        yoyStr,
+        yoyType
+      };
+    });
+
+    const effectiveMonths = months.filter(m => m.isEffective);
+    const maxM = Math.max(
+      ...months.map(m => Math.max(m.isEffective ? m.vTargetM : 0, m.vBaseM)),
+      1
+    );
+
+    const totalBase = effectiveMonths.reduce((a: number, b: any) => a + b.vBase, 0);
+    const totalTarget = effectiveMonths.reduce((a: number, b: any) => a + b.vTarget, 0);
+    const totalBaseM = totalBase / 1000000;
+    const totalTargetM = totalTarget / 1000000;
+    const totalDiffM = totalTargetM - totalBaseM;
+
+    let totalYoyStr = '—';
+    let totalYoyVal = 0;
+    if (totalBase > 0) {
+      totalYoyVal = ((totalTarget - totalBase) / totalBase) * 100;
+      totalYoyStr = `${totalYoyVal >= 0 ? '+' : ''}${totalYoyVal.toFixed(1)}%`;
+    } else if (totalTarget > 0) {
+      totalYoyVal = 100;
+      totalYoyStr = '+100% (新)';
+    }
+
+    let peakTargetMonth = '—';
+    let peakTargetAmountM = 0;
+    let peakBaseMonth = '—';
+    let peakBaseAmountM = 0;
+
+    effectiveMonths.forEach(m => {
+      if (m.vTargetM > peakTargetAmountM) {
+        peakTargetAmountM = m.vTargetM;
+        peakTargetMonth = m.month;
+      }
+      if (m.vBaseM > peakBaseAmountM) {
+        peakBaseAmountM = m.vBaseM;
+        peakBaseMonth = m.month;
+      }
+    });
+
+    const effectiveCount = effectiveMonths.length || 1;
+
+    return {
+      months,
+      effectiveMonths,
+      cutoffMonth,
+      isCurrentYearInvolved,
+      periodLabel: isCurrentYearInvolved ? `1~${cutoffMonth}月同期` : '全年度(1~12月)',
+      maxM: maxM * 1.15,
+      totalBaseM: totalBaseM.toFixed(2),
+      totalTargetM: totalTargetM.toFixed(2),
+      totalDiffM: totalDiffM.toFixed(2),
+      totalYoyStr,
+      totalYoyVal,
+      avgBaseM: (totalBaseM / effectiveCount).toFixed(2),
+      avgTargetM: (totalTargetM / effectiveCount).toFixed(2),
+      peakTargetMonth,
+      peakTargetAmountM: peakTargetAmountM.toFixed(2),
+      peakBaseMonth,
+      peakBaseAmountM: peakBaseAmountM.toFixed(2)
+    };
+  }, [gidBrMonthly, brBaseYear, brTargetYear]);
+
   const brColumns = [
     { title: '签约客户名称', dataIndex: '签约客户名称', key: '签约客户名称' },
     { title: '数据月份', dataIndex: '数据月份', key: '数据月份', sorter: (a: any, b: any) => a.数据月份.localeCompare(b.数据月份) },
@@ -2256,6 +2570,1038 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         </Row>
       </Card>
 
+      {/* 第四部分-2：要客月度签单同比趋势 */}
+      <Card
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 'bold' }}>月度签单同比趋势</span>
+            <Select
+              mode="multiple"
+              size="small"
+              value={monthlyTcvCompareYears}
+              onChange={(vals) => {
+                if (vals.length === 0) return;
+                setMonthlyTcvCompareYears(vals);
+              }}
+              style={{ minWidth: 160 }}
+              options={allMonthlyCompareYears.map(y => ({ label: `${y}年`, value: y }))}
+              maxTagCount={2}
+            />
+          </div>
+        }
+        extra={
+          <span style={{ fontSize: '12px', color: '#888' }}>
+            对比年份：<strong style={{ color: '#2f54eb' }}>{tcvBaseYear}年</strong> vs <strong style={{ color: '#52c41a' }}>{tcvTargetYear}年</strong> | 单位：百万港币 (M HKD)
+          </span>
+        }
+        bordered={false}
+        style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 16 }}
+      >
+        <Row gutter={16} style={{ display: 'flex', alignItems: 'stretch' }}>
+          {/* 左侧 3/4 空间：复合柱状图 + 柱顶趋势线 + 同比趋势折线 */}
+          <Col xs={24} lg={18} style={{ display: 'flex', flexDirection: 'column', height: '360px' }}>
+            {/* 图例区 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginBottom: 6, fontSize: '11px', color: '#666', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: 'linear-gradient(#adc6ff, #2f54eb)' }} />
+                <span>{tcvBaseYear}年签单</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: '#f0f5ff', border: '1px dashed #adc6ff' }} />
+                <span>{tcvBaseYear}未对比月 (参考)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: 'linear-gradient(#95de64, #52c41a)' }} />
+                <span>{tcvTargetYear}年签单</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 14, height: 1.5, background: '#2f54eb', borderTop: '1.5px dashed #2f54eb' }} />
+                <span>{tcvBaseYear}走势</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 14, height: 2, background: '#52c41a' }} />
+                <span>{tcvTargetYear}走势</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 16, height: 2, background: '#fa8c16', position: 'relative' }}>
+                  <span style={{ position: 'absolute', top: -2, left: 5, width: 6, height: 6, borderRadius: '50%', background: '#fa8c16', border: '1px solid #fff' }} />
+                </span>
+                <span>同比趋势 (YoY)</span>
+              </div>
+            </div>
+
+            {/* 复合 SVG 图表 (拉满区域，充满宽度) */}
+            <div style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}>
+              <svg viewBox="0 0 1000 315" width="100%" height="100%" style={{ display: 'block', width: '100%', height: '100%', overflow: 'visible' }}>
+                <defs>
+                  <linearGradient id="tree-tcv-month-grad-base" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#adc6ff" />
+                    <stop offset="100%" stopColor="#2f54eb" />
+                  </linearGradient>
+                  <linearGradient id="tree-tcv-month-grad-target" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#95de64" />
+                    <stop offset="100%" stopColor="#52c41a" />
+                  </linearGradient>
+                  <pattern id="tree-tcv-month-uncompared-pattern" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <rect width="6" height="6" fill="#f0f5ff" />
+                    <line x1="0" y1="0" x2="0" y2="6" stroke="#d6e4ff" strokeWidth="2.5" />
+                  </pattern>
+                  <linearGradient id="tree-tcv-month-line-grad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#fa8c16" />
+                    <stop offset="50%" stopColor="#ff4d4f" />
+                    <stop offset="100%" stopColor="#fa8c16" />
+                  </linearGradient>
+                  <linearGradient id="tree-tcv-month-line-area-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="rgba(250, 140, 22, 0.22)" />
+                    <stop offset="100%" stopColor="rgba(250, 140, 22, 0.0)" />
+                  </linearGradient>
+                </defs>
+
+                {/* 背景横线与金额刻度 (左侧 Y 轴拉满) */}
+                {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+                  const y = 265 - ratio * 165;
+                  const val = tcvMonthlyStatsData.maxM * ratio;
+                  return (
+                    <g key={idx}>
+                      <line x1="36" y1={y} x2="988" y2={y} stroke="#f0f0f0" strokeDasharray="3,3" />
+                      <text x="30" y={y + 3.5} textAnchor="end" fontSize="9" fill="#aaa">{val.toFixed(1)}M</text>
+                    </g>
+                  );
+                })}
+
+                {/* 计算柱顶坐标与柱体 */}
+                {(() => {
+                  const barW = 16;
+                  const barGap = 4;
+                  const leftX = 36;
+                  const rightX = 988;
+                  const totalW = rightX - leftX;
+                  const step = totalW / 12;
+
+                  const baseTopPoints: { x: number; y: number }[] = [];
+                  const targetTopPoints: { x: number; y: number }[] = [];
+
+                  const monthsLayout = tcvMonthlyStatsData.months.map((m, idx) => {
+                    const cx = leftX + (idx + 0.5) * step;
+                    const xBase = cx - barW - (barGap / 2);
+                    const xTarget = cx + (barGap / 2);
+
+                    const hBase = Math.max((m.vBaseM / tcvMonthlyStatsData.maxM) * 165, 0);
+                    const hTarget = m.isEffective ? Math.max((m.vTargetM / tcvMonthlyStatsData.maxM) * 165, 0) : 0;
+                    const yBase = 265 - hBase;
+                    const yTarget = 265 - hTarget;
+
+                    // 往年走势线连通全部 12 个月份
+                    baseTopPoints.push({ x: xBase + barW / 2, y: yBase });
+                    // 目标年仅限已发生月份
+                    if (m.isEffective) {
+                      targetTopPoints.push({ x: xTarget + barW / 2, y: yTarget });
+                    }
+
+                    return {
+                      ...m,
+                      cx,
+                      xBase,
+                      xTarget,
+                      hBase,
+                      hTarget,
+                      yBase,
+                      yTarget,
+                    };
+                  });
+
+                  const basePathD = baseTopPoints.reduce((acc, pt, i) => i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`, '');
+                  const targetPathD = targetTopPoints.reduce((acc, pt, i) => i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`, '');
+
+                  const effectiveForYoy = monthsLayout.filter(m => m.isEffective);
+                  const validYoYs = effectiveForYoy.map(m => m.yoyVal as number).filter(v => v !== null);
+                  const maxYoY = validYoYs.length > 0 ? Math.max(...validYoYs, 50) : 50;
+                  const minYoY = validYoYs.length > 0 ? Math.min(...validYoYs, -50) : -50;
+                  const yoyRange = Math.max(maxYoY - minYoY, 50);
+
+                  const yoyPoints = effectiveForYoy.map(m => {
+                    const yVal = m.yoyVal ?? 0;
+                    const clamped = Math.min(Math.max(yVal, minYoY), maxYoY);
+                    const norm = (clamped - minYoY) / yoyRange;
+                    const cy = 95 - norm * 60;
+                    return { cx: m.cx, cy, m };
+                  });
+
+                  const yoyLinePathD = yoyPoints.reduce((acc, pt, i) => i === 0 ? `M ${pt.cx} ${pt.cy}` : `${acc} L ${pt.cx} ${pt.cy}`, '');
+                  const yoyAreaPathD = yoyPoints.length > 0 ? `${yoyLinePathD} L ${yoyPoints[yoyPoints.length - 1].cx} 102 L ${yoyPoints[0].cx} 102 Z` : '';
+
+                  return (
+                    <g>
+                      {/* 同比折线背景区域 (仅有效月份) */}
+                      {yoyAreaPathD && <path d={yoyAreaPathD} fill="url(#tree-tcv-month-line-area-grad)" opacity="0.6" />}
+                      {yoyLinePathD && <path d={yoyLinePathD} fill="none" stroke="url(#tree-tcv-month-line-grad)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />}
+
+                      {/* 柱顶走势细线：基准年连线 (连通全部 12 个月份) */}
+                      {basePathD && <path d={basePathD} fill="none" stroke="#2f54eb" strokeWidth="1.2" strokeDasharray="3,3" opacity="0.65" />}
+                      {/* 柱顶走势细线：目标年连线 (仅有效月份) */}
+                      {targetPathD && <path d={targetPathD} fill="none" stroke="#52c41a" strokeWidth="1.6" opacity="0.85" />}
+
+                      {/* 渲染柱体 */}
+                      {monthsLayout.map((m, idx) => {
+                        const isHovered = hoveredTcvMonthIndex === idx;
+                        return (
+                          <g key={idx}>
+                            {/* 悬停高亮背景列条 */}
+                            {isHovered && (
+                              <rect
+                                x={m.cx - 36}
+                                y="20"
+                                width="72"
+                                height="250"
+                                fill={m.isEffective ? "rgba(24, 144, 255, 0.06)" : "rgba(0, 0, 0, 0.02)"}
+                                rx="5"
+                              />
+                            )}
+
+                            {/* 往年柱体：所有月份都显示出来，未参与比对月份用斜纹与虚线框等特殊样式表示 */}
+                            {m.vBaseM > 0 && (
+                              <rect
+                                x={m.xBase}
+                                y={m.yBase}
+                                width={barW}
+                                height={m.hBase}
+                                fill={m.isEffective ? "url(#tree-tcv-month-grad-base)" : "url(#tree-tcv-month-uncompared-pattern)"}
+                                stroke={m.isEffective ? "none" : "#adc6ff"}
+                                strokeDasharray={m.isEffective ? "none" : "3,2"}
+                                strokeWidth={m.isEffective ? 0 : 0.8}
+                                rx="2"
+                                opacity={hoveredTcvMonthIndex === null || isHovered ? (m.isEffective ? 1 : 0.75) : 0.35}
+                                style={{ transition: 'all 0.2s', cursor: 'pointer' }}
+                              >
+                                <title>{`${tcvBaseYear}年 ${m.month}: ${m.vBaseM.toFixed(2)} M HKD ${m.isEffective ? '' : '(不参与本期对比)'}`}</title>
+                              </rect>
+                            )}
+
+                            {/* 目标年柱体：仅在有效月份渲染 */}
+                            {m.isEffective && m.vTargetM > 0 && (
+                              <rect
+                                x={m.xTarget}
+                                y={m.yTarget}
+                                width={barW}
+                                height={m.hTarget}
+                                fill="url(#tree-tcv-month-grad-target)"
+                                rx="2"
+                                opacity={hoveredTcvMonthIndex === null || isHovered ? 1 : 0.4}
+                                style={{ transition: 'all 0.2s', cursor: 'pointer' }}
+                              >
+                                <title>{`${tcvTargetYear}年 ${m.month}: ${m.vTargetM.toFixed(2)} M HKD`}</title>
+                              </rect>
+                            )}
+
+                            {/* 柱顶点标记小圆点：往年全 12 个月均标记 */}
+                            {m.vBaseM > 0 && (
+                              <circle
+                                cx={m.xBase + barW / 2}
+                                cy={m.yBase}
+                                r={m.isEffective ? "2" : "1.6"}
+                                fill="#2f54eb"
+                                opacity={m.isEffective ? 1 : 0.6}
+                              />
+                            )}
+                            {m.isEffective && m.vTargetM > 0 && (
+                              <circle cx={m.xTarget + barW / 2} cy={m.yTarget} r="2.5" fill="#52c41a" stroke="#fff" strokeWidth="0.8" />
+                            )}
+
+                            {/* 柱顶金额标签 */}
+                            {m.vBaseM > 0 && m.hBase > 16 && (
+                              <text
+                                x={m.xBase + barW / 2}
+                                y={m.yBase - 3}
+                                textAnchor="middle"
+                                fontSize="7"
+                                fill={m.isEffective ? "#2f54eb" : "#85a5ff"}
+                                fontWeight={m.isEffective ? "500" : "normal"}
+                              >
+                                {m.vBaseM >= 10 ? m.vBaseM.toFixed(0) : m.vBaseM.toFixed(1)}
+                              </text>
+                            )}
+                            {m.isEffective && m.vTargetM > 0 && m.hTarget > 16 && (
+                              <text
+                                x={m.xTarget + barW / 2}
+                                y={m.yTarget - 3}
+                                textAnchor="middle"
+                                fontSize="7"
+                                fill="#389e0d"
+                                fontWeight="600"
+                              >
+                                {m.vTargetM >= 10 ? m.vTargetM.toFixed(0) : m.vTargetM.toFixed(1)}
+                              </text>
+                            )}
+
+                            {/* X 轴月份标签 */}
+                            <text
+                              x={m.cx}
+                              y="284"
+                              textAnchor="middle"
+                              fontSize="10"
+                              fill={!m.isEffective ? "#8c8c8c" : isHovered ? "#1890ff" : "#555"}
+                              fontWeight={isHovered ? "bold" : m.isEffective ? "500" : "normal"}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              {m.month}
+                            </text>
+
+                            {/* 透明交互触发区域 */}
+                            <rect
+                              x={m.cx - 36}
+                              y="20"
+                              width="72"
+                              height="270"
+                              fill="transparent"
+                              style={{ cursor: 'pointer' }}
+                              onMouseEnter={() => setHoveredTcvMonthIndex(idx)}
+                              onMouseLeave={() => setHoveredTcvMonthIndex(null)}
+                            />
+                          </g>
+                        );
+                      })}
+
+                      {/* 同比折线节点圆圈与数值气泡 (仅有效月份) */}
+                      {yoyPoints.map((pt, idx) => {
+                        const isHovered = hoveredTcvMonthIndex === pt.m.monthIndex;
+                        const tagColor = pt.m.yoyType === 'positive' || pt.m.yoyType === 'new' ? '#52c41a' : pt.m.yoyType === 'negative' ? '#ff4d4f' : '#8c8c8c';
+                        const tagBg = pt.m.yoyType === 'positive' || pt.m.yoyType === 'new' ? '#f6ffed' : pt.m.yoyType === 'negative' ? '#fff1f0' : '#f5f5f5';
+                        const tagBorder = pt.m.yoyType === 'positive' || pt.m.yoyType === 'new' ? '#b7eb8f' : pt.m.yoyType === 'negative' ? '#ffa39e' : '#d9d9d9';
+
+                        return (
+                          <g key={idx}>
+                            <circle
+                              cx={pt.cx}
+                              cy={pt.cy}
+                              r={isHovered ? "6" : "4"}
+                              fill="#fff"
+                              stroke={tagColor}
+                              strokeWidth={isHovered ? "2.5" : "1.8"}
+                              style={{ transition: 'all 0.2s', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.12))' }}
+                            />
+                            <g transform={`translate(${pt.cx}, ${pt.cy - 11})`}>
+                              <rect
+                                x="-21"
+                                y="-11"
+                                width="42"
+                                height="14"
+                                rx="3"
+                                fill={tagBg}
+                                stroke={tagBorder}
+                                strokeWidth="0.8"
+                              />
+                              <text
+                                x="0"
+                                y="-1.5"
+                                textAnchor="middle"
+                                fontSize="7.5"
+                                fontWeight="bold"
+                                fill={tagColor}
+                              >
+                                {pt.m.yoyStr}
+                              </text>
+                            </g>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })()}
+
+                {/* X 轴基准横线 (拉满) */}
+                <line x1="36" y1="265" x2="988" y2="265" stroke="#d9d9d9" strokeWidth="1" />
+              </svg>
+
+              {/* 悬停浮层卡片 (Tooltip) */}
+              {hoveredTcvMonthIndex !== null && (() => {
+                const m = tcvMonthlyStatsData.months[hoveredTcvMonthIndex];
+                const cxPercent = ((36 + (hoveredTcvMonthIndex + 0.5) * ((988 - 36) / 12)) / 1000) * 100;
+                return (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      left: `${Math.min(Math.max(cxPercent, 14), 86)}%`,
+                      transform: 'translateX(-50%)',
+                      background: 'rgba(255, 255, 255, 0.96)',
+                      backdropFilter: 'blur(6px)',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      boxShadow: '0 6px 16px rgba(0, 0, 0, 0.12)',
+                      pointerEvents: 'none',
+                      zIndex: 10,
+                      minWidth: 200
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', borderBottom: '1px solid #f0f0f0', paddingBottom: 4, marginBottom: 6, fontSize: '12px', color: '#1890ff' }}>
+                      📅 {m.month} 签单详情 ({rootNode?.companyNameCn || rootNode?.name || '本集团'})
+                    </div>
+                    {m.isEffective ? (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>{tcvBaseYear}年签单:</span>
+                          <strong style={{ color: '#2f54eb' }}>{m.vBaseM.toFixed(2)} M HKD</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>{tcvTargetYear}年签单:</span>
+                          <strong style={{ color: '#52c41a' }}>{m.vTargetM.toFixed(2)} M HKD</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>金额差额:</span>
+                          <strong style={{ color: m.diffM >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                            {m.diffM >= 0 ? '+' : ''}{m.diffM.toFixed(2)} M HKD
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', borderTop: '1px dashed #f0f0f0', paddingTop: 4, marginTop: 4 }}>
+                          <span style={{ color: '#666' }}>同比增长 (YoY):</span>
+                          <strong style={{ color: m.yoyType === 'positive' || m.yoyType === 'new' ? '#52c41a' : m.yoyType === 'negative' ? '#ff4d4f' : '#8c8c8c' }}>
+                            {m.yoyStr}
+                          </strong>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>{tcvBaseYear}年历史签单:</span>
+                          <strong style={{ color: '#2f54eb' }}>{m.vBaseM.toFixed(2)} M HKD</strong>
+                        </div>
+                        <div style={{ color: '#888', fontSize: '11px', borderTop: '1px dashed #f0f0f0', paddingTop: 4, marginTop: 4 }}>
+                          ℹ️ {tcvTargetYear}年该月尚未发生，故不纳入本期同比统计
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </Col>
+
+          {/* 右侧 1/4 空间：对比指标卡片面板 */}
+          <Col xs={24} lg={6} style={{ height: '360px' }}>
+            <div style={{ borderLeft: '1px solid #f0f0f0', paddingLeft: '16px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              {/* 卡片头部说明 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid #f0f0f0' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>
+                  📊 签单汇总
+                </span>
+                <span style={{ fontSize: '11px', color: '#1890ff', background: '#e6f7ff', padding: '1px 6px', borderRadius: 4, border: '1px solid #91d5ff' }}>
+                  {tcvMonthlyStatsData.periodLabel}
+                </span>
+              </div>
+
+              {/* 卡片 1：目标对比年签单合计 (仅有效月份) */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f6ffed 0%, #e6f7ff 100%)',
+                border: '1px solid #b7eb8f',
+                borderRadius: 6,
+                padding: '10px 12px',
+                marginBottom: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#389e0d', marginBottom: 2 }}>
+                  <span style={{ fontWeight: '600' }}>🟢 {tcvTargetYear}年 签单总额</span>
+                  <span style={{ fontSize: '10px', color: '#888' }}>月均 {tcvMonthlyStatsData.avgTargetM} M</span>
+                </div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#135200' }}>
+                  {tcvMonthlyStatsData.totalTargetM} <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#666' }}>M HKD</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: 3 }}>
+                  单月最高: <strong style={{ color: '#52c41a' }}>{tcvMonthlyStatsData.peakTargetMonth}</strong> ({tcvMonthlyStatsData.peakTargetAmountM} M)
+                </div>
+              </div>
+
+              {/* 卡片 2：基准年签单合计 (仅同期有效月份) */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f0f5ff 0%, #f9f0ff 100%)',
+                border: '1px solid #adc6ff',
+                borderRadius: 6,
+                padding: '10px 12px',
+                marginBottom: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#1d39c4', marginBottom: 2 }}>
+                  <span style={{ fontWeight: '600' }}>🔵 {tcvBaseYear}年 同期总额</span>
+                  <span style={{ fontSize: '10px', color: '#888' }}>月均 {tcvMonthlyStatsData.avgBaseM} M</span>
+                </div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#092b00' }}>
+                  {tcvMonthlyStatsData.totalBaseM} <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#666' }}>M HKD</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: 3 }}>
+                  单月最高: <strong style={{ color: '#2f54eb' }}>{tcvMonthlyStatsData.peakBaseMonth}</strong> ({tcvMonthlyStatsData.peakBaseAmountM} M)
+                </div>
+              </div>
+
+              {/* 卡片 3：年度同比与增减差额 (醒目大号核心指标设计) */}
+              <div style={{
+                background: tcvMonthlyStatsData.totalYoyVal >= 0
+                  ? 'linear-gradient(135deg, #f6ffed 0%, #fcffe6 100%)'
+                  : 'linear-gradient(135deg, #fff1f0 0%, #fff2e8 100%)',
+                border: tcvMonthlyStatsData.totalYoyVal >= 0 ? '1px solid #b7eb8f' : '1px solid #ffa39e',
+                borderRadius: 6,
+                padding: '10px 12px',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: tcvMonthlyStatsData.totalYoyVal >= 0 ? '#389e0d' : '#cf1322' }}>
+                    📊 同期同比增幅 (YoY)
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#888' }}>同口径</span>
+                </div>
+
+                {/* 醒目大号同比数字 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 6,
+                  margin: '4px 0'
+                }}>
+                  <span style={{
+                    fontSize: '24px',
+                    fontWeight: '800',
+                    fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+                    color: tcvMonthlyStatsData.totalYoyVal >= 0 ? '#237804' : '#cf1322',
+                    lineHeight: 1.1,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {tcvMonthlyStatsData.totalYoyVal > 0 ? '▲ ' : tcvMonthlyStatsData.totalYoyVal < 0 ? '▼ ' : ''}{tcvMonthlyStatsData.totalYoyStr}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', borderTop: '1px dashed rgba(0,0,0,0.06)', paddingTop: 4 }}>
+                  <span style={{ color: '#666' }}>同期总额差额:</span>
+                  <strong style={{
+                    color: Number(tcvMonthlyStatsData.totalDiffM) >= 0 ? '#389e0d' : '#cf1322',
+                    fontSize: '12px'
+                  }}>
+                    {Number(tcvMonthlyStatsData.totalDiffM) >= 0 ? '+' : ''}{tcvMonthlyStatsData.totalDiffM} M HKD
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* 第四部分-3：要客月度计收同比趋势 */}
+      <Card
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 'bold' }}>月度计收同比趋势</span>
+            <Select
+              mode="multiple"
+              size="small"
+              value={monthlyBrCompareYears}
+              onChange={(vals) => {
+                if (vals.length === 0) return;
+                setMonthlyBrCompareYears(vals);
+              }}
+              style={{ minWidth: 160 }}
+              options={allMonthlyCompareYears.map(y => ({ label: `${y}年`, value: y }))}
+              maxTagCount={2}
+            />
+          </div>
+        }
+        extra={
+          <span style={{ fontSize: '12px', color: '#888' }}>
+            对比年份：<strong style={{ color: '#2f54eb' }}>{brBaseYear}年</strong> vs <strong style={{ color: '#52c41a' }}>{brTargetYear}年</strong> | 单位：百万港币 (M HKD)
+          </span>
+        }
+        bordered={false}
+        style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 16 }}
+      >
+        <Row gutter={16} style={{ display: 'flex', alignItems: 'stretch' }}>
+          {/* 左侧 3/4 空间：复合柱状图 + 柱顶趋势线 + 同比趋势折线 */}
+          <Col xs={24} lg={18} style={{ display: 'flex', flexDirection: 'column', height: '360px' }}>
+            {/* 图例区 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginBottom: 6, fontSize: '11px', color: '#666', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: 'linear-gradient(#adc6ff, #2f54eb)' }} />
+                <span>{brBaseYear}年计费</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: '#f0f5ff', border: '1px dashed #adc6ff' }} />
+                <span>{brBaseYear}未对比月 (参考)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: 'linear-gradient(#95de64, #52c41a)' }} />
+                <span>{brTargetYear}年计费</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 14, height: 1.5, background: '#2f54eb', borderTop: '1.5px dashed #2f54eb' }} />
+                <span>{brBaseYear}走势</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 14, height: 2, background: '#52c41a' }} />
+                <span>{brTargetYear}走势</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-block', width: 16, height: 2, background: '#fa8c16', position: 'relative' }}>
+                  <span style={{ position: 'absolute', top: -2, left: 5, width: 6, height: 6, borderRadius: '50%', background: '#fa8c16', border: '1px solid #fff' }} />
+                </span>
+                <span>同比趋势 (YoY)</span>
+              </div>
+            </div>
+
+            {/* 复合 SVG 图表 (拉满区域，充满宽度) */}
+            <div style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}>
+              <svg viewBox="0 0 1000 315" width="100%" height="100%" style={{ display: 'block', width: '100%', height: '100%', overflow: 'visible' }}>
+                <defs>
+                  <linearGradient id="tree-br-month-grad-base" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#adc6ff" />
+                    <stop offset="100%" stopColor="#2f54eb" />
+                  </linearGradient>
+                  <linearGradient id="tree-br-month-grad-target" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#95de64" />
+                    <stop offset="100%" stopColor="#52c41a" />
+                  </linearGradient>
+                  <pattern id="tree-br-month-uncompared-pattern" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <rect width="6" height="6" fill="#f0f5ff" />
+                    <line x1="0" y1="0" x2="0" y2="6" stroke="#d6e4ff" strokeWidth="2.5" />
+                  </pattern>
+                  <linearGradient id="tree-br-month-line-grad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#fa8c16" />
+                    <stop offset="50%" stopColor="#ff4d4f" />
+                    <stop offset="100%" stopColor="#fa8c16" />
+                  </linearGradient>
+                  <linearGradient id="tree-br-month-line-area-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="rgba(250, 140, 22, 0.22)" />
+                    <stop offset="100%" stopColor="rgba(250, 140, 22, 0.0)" />
+                  </linearGradient>
+                </defs>
+
+                {/* 背景横线与金额刻度 (左侧 Y 轴拉满) */}
+                {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+                  const y = 265 - ratio * 165;
+                  const val = brMonthlyStatsData.maxM * ratio;
+                  return (
+                    <g key={idx}>
+                      <line x1="36" y1={y} x2="988" y2={y} stroke="#f0f0f0" strokeDasharray="3,3" />
+                      <text x="30" y={y + 3.5} textAnchor="end" fontSize="9" fill="#aaa">{val.toFixed(1)}M</text>
+                    </g>
+                  );
+                })}
+
+                {/* 计算柱顶坐标与柱体 */}
+                {(() => {
+                  const barW = 16;
+                  const barGap = 4;
+                  const leftX = 36;
+                  const rightX = 988;
+                  const totalW = rightX - leftX;
+                  const step = totalW / 12;
+
+                  const baseTopPoints: { x: number; y: number }[] = [];
+                  const targetTopPoints: { x: number; y: number }[] = [];
+
+                  const monthsLayout = brMonthlyStatsData.months.map((m, idx) => {
+                    const cx = leftX + (idx + 0.5) * step;
+                    const xBase = cx - barW - (barGap / 2);
+                    const xTarget = cx + (barGap / 2);
+
+                    const hBase = Math.max((m.vBaseM / brMonthlyStatsData.maxM) * 165, 0);
+                    const hTarget = m.isEffective ? Math.max((m.vTargetM / brMonthlyStatsData.maxM) * 165, 0) : 0;
+                    const yBase = 265 - hBase;
+                    const yTarget = 265 - hTarget;
+
+                    baseTopPoints.push({ x: xBase + barW / 2, y: yBase });
+                    if (m.isEffective) {
+                      targetTopPoints.push({ x: xTarget + barW / 2, y: yTarget });
+                    }
+
+                    return {
+                      ...m,
+                      cx,
+                      xBase,
+                      xTarget,
+                      hBase,
+                      hTarget,
+                      yBase,
+                      yTarget,
+                    };
+                  });
+
+                  const basePathD = baseTopPoints.reduce((acc, pt, i) => i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`, '');
+                  const targetPathD = targetTopPoints.reduce((acc, pt, i) => i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`, '');
+
+                  const effectiveForYoy = monthsLayout.filter(m => m.isEffective);
+                  const validYoYs = effectiveForYoy.map(m => m.yoyVal as number).filter(v => v !== null);
+                  const maxYoY = validYoYs.length > 0 ? Math.max(...validYoYs, 50) : 50;
+                  const minYoY = validYoYs.length > 0 ? Math.min(...validYoYs, -50) : -50;
+                  const yoyRange = Math.max(maxYoY - minYoY, 50);
+
+                  const yoyPoints = effectiveForYoy.map(m => {
+                    const yVal = m.yoyVal ?? 0;
+                    const clamped = Math.min(Math.max(yVal, minYoY), maxYoY);
+                    const norm = (clamped - minYoY) / yoyRange;
+                    const cy = 95 - norm * 60;
+                    return { cx: m.cx, cy, m };
+                  });
+
+                  const yoyLinePathD = yoyPoints.reduce((acc, pt, i) => i === 0 ? `M ${pt.cx} ${pt.cy}` : `${acc} L ${pt.cx} ${pt.cy}`, '');
+                  const yoyAreaPathD = yoyPoints.length > 0 ? `${yoyLinePathD} L ${yoyPoints[yoyPoints.length - 1].cx} 102 L ${yoyPoints[0].cx} 102 Z` : '';
+
+                  return (
+                    <g>
+                      {/* 同比折线背景区域 (仅有效月份) */}
+                      {yoyAreaPathD && <path d={yoyAreaPathD} fill="url(#tree-br-month-line-area-grad)" opacity="0.6" />}
+                      {yoyLinePathD && <path d={yoyLinePathD} fill="none" stroke="url(#tree-br-month-line-grad)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />}
+
+                      {/* 柱顶走势细线：基准年连线 (连通全部 12 个月份) */}
+                      {basePathD && <path d={basePathD} fill="none" stroke="#2f54eb" strokeWidth="1.2" strokeDasharray="3,3" opacity="0.65" />}
+                      {/* 柱顶走势细线：目标年连线 (仅有效月份) */}
+                      {targetPathD && <path d={targetPathD} fill="none" stroke="#52c41a" strokeWidth="1.6" opacity="0.85" />}
+
+                      {/* 渲染柱体 */}
+                      {monthsLayout.map((m, idx) => {
+                        const isHovered = hoveredBrMonthIndex === idx;
+                        return (
+                          <g key={idx}>
+                            {/* 悬停高亮背景列条 */}
+                            {isHovered && (
+                              <rect
+                                x={m.cx - 36}
+                                y="20"
+                                width="72"
+                                height="250"
+                                fill={m.isEffective ? "rgba(24, 144, 255, 0.06)" : "rgba(0, 0, 0, 0.02)"}
+                                rx="5"
+                              />
+                            )}
+
+                            {/* 往年柱体：所有月份都显示出来，未参与比对月份用斜纹与虚线框等特殊样式表示 */}
+                            {m.vBaseM > 0 && (
+                              <rect
+                                x={m.xBase}
+                                y={m.yBase}
+                                width={barW}
+                                height={m.hBase}
+                                fill={m.isEffective ? "url(#tree-br-month-grad-base)" : "url(#tree-br-month-uncompared-pattern)"}
+                                stroke={m.isEffective ? "none" : "#adc6ff"}
+                                strokeDasharray={m.isEffective ? "none" : "3,2"}
+                                strokeWidth={m.isEffective ? 0 : 0.8}
+                                rx="2"
+                                opacity={hoveredBrMonthIndex === null || isHovered ? (m.isEffective ? 1 : 0.75) : 0.35}
+                                style={{ transition: 'all 0.2s', cursor: 'pointer' }}
+                              >
+                                <title>{`${brBaseYear}年 ${m.month}: ${m.vBaseM.toFixed(2)} M HKD ${m.isEffective ? '' : '(不参与本期对比)'}`}</title>
+                              </rect>
+                            )}
+
+                            {/* 目标年柱体：仅在有效月份渲染 */}
+                            {m.isEffective && m.vTargetM > 0 && (
+                              <rect
+                                x={m.xTarget}
+                                y={m.yTarget}
+                                width={barW}
+                                height={m.hTarget}
+                                fill="url(#tree-br-month-grad-target)"
+                                rx="2"
+                                opacity={hoveredBrMonthIndex === null || isHovered ? 1 : 0.4}
+                                style={{ transition: 'all 0.2s', cursor: 'pointer' }}
+                              >
+                                <title>{`${brTargetYear}年 ${m.month}: ${m.vTargetM.toFixed(2)} M HKD`}</title>
+                              </rect>
+                            )}
+
+                            {/* 柱顶点标记小圆点：往年全 12 个月均标记 */}
+                            {m.vBaseM > 0 && (
+                              <circle
+                                cx={m.xBase + barW / 2}
+                                cy={m.yBase}
+                                r={m.isEffective ? "2" : "1.6"}
+                                fill="#2f54eb"
+                                opacity={m.isEffective ? 1 : 0.6}
+                              />
+                            )}
+                            {m.isEffective && m.vTargetM > 0 && (
+                              <circle cx={m.xTarget + barW / 2} cy={m.yTarget} r="2.5" fill="#52c41a" stroke="#fff" strokeWidth="0.8" />
+                            )}
+
+                            {/* 柱顶金额标签 */}
+                            {m.vBaseM > 0 && m.hBase > 16 && (
+                              <text
+                                x={m.xBase + barW / 2}
+                                y={m.yBase - 3}
+                                textAnchor="middle"
+                                fontSize="7"
+                                fill={m.isEffective ? "#2f54eb" : "#85a5ff"}
+                                fontWeight={m.isEffective ? "500" : "normal"}
+                              >
+                                {m.vBaseM >= 10 ? m.vBaseM.toFixed(0) : m.vBaseM.toFixed(1)}
+                              </text>
+                            )}
+                            {m.isEffective && m.vTargetM > 0 && m.hTarget > 16 && (
+                              <text
+                                x={m.xTarget + barW / 2}
+                                y={m.yTarget - 3}
+                                textAnchor="middle"
+                                fontSize="7"
+                                fill="#389e0d"
+                                fontWeight="600"
+                              >
+                                {m.vTargetM >= 10 ? m.vTargetM.toFixed(0) : m.vTargetM.toFixed(1)}
+                              </text>
+                            )}
+
+                            {/* X 轴月份标签 */}
+                            <text
+                              x={m.cx}
+                              y="284"
+                              textAnchor="middle"
+                              fontSize="10"
+                              fill={!m.isEffective ? "#8c8c8c" : isHovered ? "#1890ff" : "#555"}
+                              fontWeight={isHovered ? "bold" : m.isEffective ? "500" : "normal"}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              {m.month}
+                            </text>
+
+                            {/* 透明交互触发区域 */}
+                            <rect
+                              x={m.cx - 36}
+                              y="20"
+                              width="72"
+                              height="270"
+                              fill="transparent"
+                              style={{ cursor: 'pointer' }}
+                              onMouseEnter={() => setHoveredBrMonthIndex(idx)}
+                              onMouseLeave={() => setHoveredBrMonthIndex(null)}
+                            />
+                          </g>
+                        );
+                      })}
+
+                      {/* 同比折线节点圆圈与数值气泡 (仅有效月份) */}
+                      {yoyPoints.map((pt, idx) => {
+                        const isHovered = hoveredBrMonthIndex === pt.m.monthIndex;
+                        const tagColor = pt.m.yoyType === 'positive' || pt.m.yoyType === 'new' ? '#52c41a' : pt.m.yoyType === 'negative' ? '#ff4d4f' : '#8c8c8c';
+                        const tagBg = pt.m.yoyType === 'positive' || pt.m.yoyType === 'new' ? '#f6ffed' : pt.m.yoyType === 'negative' ? '#fff1f0' : '#f5f5f5';
+                        const tagBorder = pt.m.yoyType === 'positive' || pt.m.yoyType === 'new' ? '#b7eb8f' : pt.m.yoyType === 'negative' ? '#ffa39e' : '#d9d9d9';
+
+                        return (
+                          <g key={idx}>
+                            <circle
+                              cx={pt.cx}
+                              cy={pt.cy}
+                              r={isHovered ? "6" : "4"}
+                              fill="#fff"
+                              stroke={tagColor}
+                              strokeWidth={isHovered ? "2.5" : "1.8"}
+                              style={{ transition: 'all 0.2s', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.12))' }}
+                            />
+                            <g transform={`translate(${pt.cx}, ${pt.cy - 11})`}>
+                              <rect
+                                x="-21"
+                                y="-11"
+                                width="42"
+                                height="14"
+                                rx="3"
+                                fill={tagBg}
+                                stroke={tagBorder}
+                                strokeWidth="0.8"
+                              />
+                              <text
+                                x="0"
+                                y="-1.5"
+                                textAnchor="middle"
+                                fontSize="7.5"
+                                fontWeight="bold"
+                                fill={tagColor}
+                              >
+                                {pt.m.yoyStr}
+                              </text>
+                            </g>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })()}
+
+                {/* X 轴基准横线 (拉满) */}
+                <line x1="36" y1="265" x2="988" y2="265" stroke="#d9d9d9" strokeWidth="1" />
+              </svg>
+
+              {/* 悬停浮层卡片 (Tooltip) */}
+              {hoveredBrMonthIndex !== null && (() => {
+                const m = brMonthlyStatsData.months[hoveredBrMonthIndex];
+                const cxPercent = ((36 + (hoveredBrMonthIndex + 0.5) * ((988 - 36) / 12)) / 1000) * 100;
+                return (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      left: `${Math.min(Math.max(cxPercent, 14), 86)}%`,
+                      transform: 'translateX(-50%)',
+                      background: 'rgba(255, 255, 255, 0.96)',
+                      backdropFilter: 'blur(6px)',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      boxShadow: '0 6px 16px rgba(0, 0, 0, 0.12)',
+                      pointerEvents: 'none',
+                      zIndex: 10,
+                      minWidth: 200
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', borderBottom: '1px solid #f0f0f0', paddingBottom: 4, marginBottom: 6, fontSize: '12px', color: '#1890ff' }}>
+                      📅 {m.month} 计收详情 ({rootNode?.companyNameCn || rootNode?.name || '本集团'})
+                    </div>
+                    {m.isEffective ? (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>{brBaseYear}年计费:</span>
+                          <strong style={{ color: '#2f54eb' }}>{m.vBaseM.toFixed(2)} M HKD</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>{brTargetYear}年计费:</span>
+                          <strong style={{ color: '#52c41a' }}>{m.vTargetM.toFixed(2)} M HKD</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>金额差额:</span>
+                          <strong style={{ color: m.diffM >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                            {m.diffM >= 0 ? '+' : ''}{m.diffM.toFixed(2)} M HKD
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', borderTop: '1px dashed #f0f0f0', paddingTop: 4, marginTop: 4 }}>
+                          <span style={{ color: '#666' }}>同比增长 (YoY):</span>
+                          <strong style={{ color: m.yoyType === 'positive' || m.yoyType === 'new' ? '#52c41a' : m.yoyType === 'negative' ? '#ff4d4f' : '#8c8c8c' }}>
+                            {m.yoyStr}
+                          </strong>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 3 }}>
+                          <span style={{ color: '#666' }}>{brBaseYear}年历史计费:</span>
+                          <strong style={{ color: '#2f54eb' }}>{m.vBaseM.toFixed(2)} M HKD</strong>
+                        </div>
+                        <div style={{ color: '#888', fontSize: '11px', borderTop: '1px dashed #f0f0f0', paddingTop: 4, marginTop: 4 }}>
+                          ℹ️ {brTargetYear}年该月尚未发生，故不纳入本期同比统计
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </Col>
+
+          {/* 右侧 1/4 空间：计费对比指标卡片面板 */}
+          <Col xs={24} lg={6} style={{ height: '360px' }}>
+            <div style={{ borderLeft: '1px solid #f0f0f0', paddingLeft: '16px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              {/* 卡片头部说明 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid #f0f0f0' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>
+                  📊 计收汇总
+                </span>
+                <span style={{ fontSize: '11px', color: '#1890ff', background: '#e6f7ff', padding: '1px 6px', borderRadius: 4, border: '1px solid #91d5ff' }}>
+                  {brMonthlyStatsData.periodLabel}
+                </span>
+              </div>
+
+              {/* 卡片 1：目标对比年计费收入合计 (仅有效月份) */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f6ffed 0%, #e6f7ff 100%)',
+                border: '1px solid #b7eb8f',
+                borderRadius: 6,
+                padding: '10px 12px',
+                marginBottom: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#389e0d', marginBottom: 2 }}>
+                  <span style={{ fontWeight: '600' }}>🟢 {brTargetYear}年 计费总额</span>
+                  <span style={{ fontSize: '10px', color: '#888' }}>月均 {brMonthlyStatsData.avgTargetM} M</span>
+                </div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#135200' }}>
+                  {brMonthlyStatsData.totalTargetM} <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#666' }}>M HKD</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: 3 }}>
+                  单月最高: <strong style={{ color: '#52c41a' }}>{brMonthlyStatsData.peakTargetMonth}</strong> ({brMonthlyStatsData.peakTargetAmountM} M)
+                </div>
+              </div>
+
+              {/* 卡片 2：基准年计费收入合计 (仅同期有效月份) */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f0f5ff 0%, #f9f0ff 100%)',
+                border: '1px solid #adc6ff',
+                borderRadius: 6,
+                padding: '10px 12px',
+                marginBottom: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#1d39c4', marginBottom: 2 }}>
+                  <span style={{ fontWeight: '600' }}>🔵 {brBaseYear}年 同期总额</span>
+                  <span style={{ fontSize: '10px', color: '#888' }}>月均 {brMonthlyStatsData.avgBaseM} M</span>
+                </div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#092b00' }}>
+                  {brMonthlyStatsData.totalBaseM} <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#666' }}>M HKD</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: 3 }}>
+                  单月最高: <strong style={{ color: '#2f54eb' }}>{brMonthlyStatsData.peakBaseMonth}</strong> ({brMonthlyStatsData.peakBaseAmountM} M)
+                </div>
+              </div>
+
+              {/* 卡片 3：年度同比与增减差额 (醒目大号核心指标设计) */}
+              <div style={{
+                background: brMonthlyStatsData.totalYoyVal >= 0
+                  ? 'linear-gradient(135deg, #f6ffed 0%, #fcffe6 100%)'
+                  : 'linear-gradient(135deg, #fff1f0 0%, #fff2e8 100%)',
+                border: brMonthlyStatsData.totalYoyVal >= 0 ? '1px solid #b7eb8f' : '1px solid #ffa39e',
+                borderRadius: 6,
+                padding: '10px 12px',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: brMonthlyStatsData.totalYoyVal >= 0 ? '#389e0d' : '#cf1322' }}>
+                    📊 同期同比增幅 (YoY)
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#888' }}>同口径</span>
+                </div>
+
+                {/* 醒目大号同比数字 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 6,
+                  margin: '4px 0'
+                }}>
+                  <span style={{
+                    fontSize: '24px',
+                    fontWeight: '800',
+                    fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+                    color: brMonthlyStatsData.totalYoyVal >= 0 ? '#237804' : '#cf1322',
+                    lineHeight: 1.1,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {brMonthlyStatsData.totalYoyVal > 0 ? '▲ ' : brMonthlyStatsData.totalYoyVal < 0 ? '▼ ' : ''}{brMonthlyStatsData.totalYoyStr}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', borderTop: '1px dashed rgba(0,0,0,0.06)', paddingTop: 4 }}>
+                  <span style={{ color: '#666' }}>同期总额差额:</span>
+                  <strong style={{
+                    color: Number(brMonthlyStatsData.totalDiffM) >= 0 ? '#389e0d' : '#cf1322',
+                    fontSize: '12px'
+                  }}>
+                    {Number(brMonthlyStatsData.totalDiffM) >= 0 ? '+' : ''}{brMonthlyStatsData.totalDiffM} M HKD
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </Card>
+
       {/* 需求3 Modal：点击「签单数合计」，弹出 modal 使用 AG Grid 显示所有签单明细 */}
       <Modal
         title={
@@ -2560,6 +3906,23 @@ const KeyGlobalFamilyTree: React.FC = () => {
   }, [location.search]);
 
   const [originalData, setOriginalData] = useState<any[]>([]);
+
+  // 获取页面展示与浏览器标题使用的公司中文名（优先取 URL 传递的 nameCn，其次取树根节点或首节点公司中文名）
+  const displayNameCn = useMemo(() => {
+    if (nameCn && nameCn.trim()) return nameCn.trim();
+    if (originalData && originalData.length > 0) {
+      const root = originalData.find(d => d.parentId === '' || d._nodeType === 'root');
+      return (root?.companyNameCn || root?.name || originalData[0]?.companyNameCn || originalData[0]?.name || '').trim();
+    }
+    return '';
+  }, [nameCn, originalData]);
+
+  // 动态设置浏览器 Tab 标题为：nameCn + "-洞察分析"
+  useEffect(() => {
+    const pageTitle = displayNameCn ? `${displayNameCn}-洞察分析` : '洞察分析';
+    document.title = pageTitle;
+  }, [displayNameCn]);
+
   const [isRegionView, setIsRegionView] = useState(true);
   const [showSites, setShowSites] = useState(false); // 是否显示营业网点，默认不显示
   const [penetratedGids, setPenetratedGids] = useState<string[]>([]);
@@ -7142,6 +8505,9 @@ const KeyGlobalFamilyTree: React.FC = () => {
           color: #0958d9 !important;
         }
       `}</style>
+      <Helmet>
+        <title>{displayNameCn ? `${displayNameCn}-洞察分析` : '洞察分析'}</title>
+      </Helmet>
       {/* 顶部标题区域 */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space align="center">

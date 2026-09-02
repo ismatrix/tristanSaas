@@ -8787,3 +8787,657 @@ keyGlobalFamilyTree 页面目前首次打开，需要 15秒左右的时间，这
      - 在 [src/controllers/keyCustomerOverview.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/keyCustomerOverview.controller.js) 中彻底移除 18 万条 dmcTCV 全表扫描，为 dmcBR 补充极简 Projection 并建立 5 分钟按 GID 内存缓存，**接口耗时从 7.56 秒骤降至 269 毫秒（缓存命中 46 毫秒）**；
   4. **本地与生产部署验证**：
      - 本地前端编译通过，推送至 GitHub (commit 7984256)并在旧服务端打包重载 PM2 实时生效。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 22:36:13
+**提示词**:
+```text
+「要客概览」页面中在“要客历年签单金额趋势” 部分的下方，加一整行区域显示，柱状图：
+1、每个行业 2026年每个月份的签单金额，并且和2025年的对应月份放在一簇
+2、在柱状图的上方，显示line的形式，显示每个月份的同比趋势
+```
+
+**执行总结**:
+- **后端 TCV 月度聚合统计支持 (`src/controllers/keyCustomerOverview.controller.js`)**:
+  - 在 `getOverviewStats` 中对 B端与 A端 签单数据（TCV）按 `合同签署日期` 进行月度拆解聚合，计算 2025 年与 2026 年各月份（1~12月）在 8 大行业及全行业（TOTAL）维度的签单金额；
+  - 将 `tcvMonthly` 与 `tcvMonthly_A` 纳入接口返回结构并受内存缓存保护。
+- **前端月度复合柱状+折线图看板上线 (`react-admin-frontend/src/pages/iboss/KeyCustomerOverview.tsx`)**:
+  - 在“要客历年签单金额趋势”卡片下方新增一整行 Card 面板：「要客月度签单金额与同比趋势 (2026 vs 2025)」；
+  - **柱状图簇 (Bar Cluster)**：横轴 1~12 月，每月包含 2025 年柱（深蓝渐变）与 2026 年柱（翠绿渐变）并列同簇对比；
+  - **同比趋势折线 (YoY Line)**：在柱状图上方贯穿 12 个月份绘制同比增长率折线，节点展示同比百分比气泡标签（红绿区分）；
+  - **多维联动与交互**：支持【全行业汇总】及 8 大行业下拉切换，支持【B端 / A端 / A+B合计】数据视角切换，支持鼠标 Hover 悬停高亮与详细浮窗 Tooltip 对账卡片；
+  - 顶部配有当前所选行业 2025 累计、2026 累计及累计同比增幅统计胶囊。
+- **系统编译与验证**:
+  - 前端 `npm run build` 打包构建成功，后端接口返回格式与数据聚合逻辑验证无误。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:00:01
+**提示词**:
+```text
+1、默认为今年和去年的对比，也可以像“要客历年签单金额趋势”一样可以选择对比的年份
+2、要客月度趋势右侧，留出1/4的空间，以卡片的形式显示当前对比年度的签单合计及增长百分比
+3、柱状图的值使用细线连接起来，以能明显的表达月份的趋势
+4、图表都要拉满所在的区域，左右不要留太明显的空白。 “要客历年签单金额趋势”的图表也是
+```
+
+**执行总结**:
+- **支持任意对比年份与全量历史月度聚合**:
+  - 后端升级 `getOverviewStats`，支持动态聚合全量历年（2014~2026）的 12 个月度数据；
+  - 前端在月度卡片头部新增年份多选 Select，默认选择今年与去年（如 2025 vs 2026），支持用户任意切换对比年度。
+- **3/4 图表 + 1/4 指标卡片双列响应式布局**:
+  - 左侧 3/4 空间放置复合图表；
+  - 右侧 1/4 空间设计对比指标卡片面板：实时展示目标对比年签单总额及月均、基准年签单总额及月均、年度同比增幅 Tag 及绝对金额增减差额、单月最高签约月份提示。
+- **柱顶趋势细线贯穿渲染**:
+  - 在月度柱状图上，分别为基准年柱顶（蓝色虚线+小圆点）与目标年柱顶（绿色实线+小圆点）绘制平滑折线连接各月柱顶值，清晰直观地勾勒出两年度月度金额起伏走势；
+  - 顶部继续保留同比百分比折线与气泡标签，实现双轨趋势感知。
+- **消除图表左右空白、拉满容器区域**:
+  - “要客历年签单金额趋势”图表：优化绘图起点（x=38）与终点（x=590），各行业柱群自适应拉满，消除两侧过多留白；
+  - “要客月度签单金额与同比趋势”图表：优化 X 轴范围（x=36 至 x=988），12 个月份簇横向充满左侧 3/4 区域。
+- **系统构建与测试验证**:
+  - 前端 Webpack 构建顺利通过，无编译报错；后端支持 2014~2026 全量历年聚合。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:11:31
+**提示词**:
+```text
+如果今年还未发生签单月份（统计截止到当前月的上个月份），不要参与比对，往年的签单总额也不纳入这些月份， YOY也不应该纳入
+```
+
+**执行总结**:
+- **统计截止口径调整（截至上月同期）**:
+  - 当对比年份涉及今年（如 2026 年）时，自动将统计月份截断至当前月的上个月份（如 1~7 月，8~12 月为未发生月份）；
+  - 若对比的是历史完整年份（如 2024 vs 2025），则自动覆盖完整的 1~12 月。
+- **未发生月份不参与图表走势与 YOY 计算**:
+  - 柱顶趋势连线（基准年蓝色虚线、目标年绿色实线）仅在已发生月份（1~7月）之间连接，避免在未发生月份产生下坠到 0 的走势误导；
+  - 顶部 YoY 同比折线、阴影区域以及百分比数值气泡仅在已发生月份（1~7月）呈现；
+  - 未发生月份柱位显示淡灰占位提示，X 轴月份标灰，Tooltip 提示“统计截止到上月，该月份尚未发生签单，不纳入比对”。
+- **右侧 1/4 指标卡片同步采用同期统计口径（Like-for-like）**:
+  - 目标年总额仅累计 1~7 月签单额；
+  - 基准年（往年）总额同步仅累计 1~7 月同期签单额，往年 8~12 月金额不纳入卡片总额与月均；
+  - YoY 同比增幅与差额严格基于 1~7 月同口径同期金额计算；
+  - 卡片头部带有明确的周期标签提示（如 `1~7月同期`）。
+- **验证通过**: 前端构建编译一次性通过，无报错。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:19:49
+**提示词**:
+```text
+1、柱状图往年的所有月份都显示出来，不参与比对的月份用特殊的柱样式表示，不要用“未发生” 这样的字样显示在图表上
+2、卡片上，对比年的单月最高月也显示
+```
+
+**执行总结**:
+- **往年全月份完整呈现与非比对月特殊条纹柱样式**:
+  - 往年（如 2025 年）所有 12 个月份的柱体均完整绘制，不再隐藏；
+  - 参与比对的月份（1~7月）：正常显示蓝色渐变实色柱体，柱顶绘制小圆点并连接走势细线；
+  - 未参与比对的往年月份（8~12月）：采用斜线条纹图案（SVG `pattern`）与浅蓝虚线边框（`strokeDasharray="3,2"`）等特殊半透明样式，清晰表达“历史参考但未纳入本期对比”的语义；
+  - 移除了图表上所有“未发生”文本水印与多余方块，保持图表清爽专业。
+- **基准年（往年）卡片增加单月最高月份显示**:
+  - 右侧基准年卡片与目标年卡片对齐，新增展示基准年同期单月最高月份与金额（如 `单月最高: 7月 (1085.93 M)`）。
+- **验证通过**: 前端构建编译顺利通过无报错。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:22:23
+**提示词**:
+```text
+对比年的柱状图的趋势线连线，未对比月份也要连
+```
+
+**执行总结**:
+- **对比年（基准年/往年）走势线贯穿全 12 个月**:
+  - 基准年（往年）柱顶走势连线（蓝色细虚线）已升级为连接全部 12 个月份的柱顶点，涵盖已发生对比月（1~7月）与未对比月份（8~12月），完整呈现往年全年的月度签单起伏趋势；
+  - 往年所有 12 个月份柱顶均带有标记圆点；
+  - 目标年（今年）走势线依然保持仅在已发生月份（1~7月）连接。
+- **验证通过**: 前端 Webpack 构建编译一次性通过。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:24:01
+**提示词**:
+```text
+卡片上的“同期同比增幅 (YoY)” 的数字要用醒目的样式
+```
+
+**执行总结**:
+- **升级卡片 3 同期同比增幅（YoY）为大号高亮 Hero Metric 样式**:
+  - 同比增幅数字升级为 **24px 极粗字体（font-weight: 800）**，自带方向箭头标识（正增长 `▲ +XX.X%`，负增长 `▼ -XX.X%`）；
+  - 配套根据增减状态自适应渐变背景：正增长使用清新翠绿微渐变卡片（`#f6ffed` 到 `#fcffe6`，文字 `#237804`），负增长使用警示浅红微渐变卡片（`#fff1f0` 到 `#fff2e8`，文字 `#cf1322`）；
+  - 底部清晰对齐同期的总额绝对差额指标，整体视觉层次突出、醒目直观。
+- **验证通过**: 前端构建编译一次性通过，无报错。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:27:34
+**提示词**:
+```text
+参考「要客月度签单金额与同比趋势」的样式和逻辑，在下方区域在插入一个「要客月度计费收入金额与同比趋势」
+```
+
+**执行总结**:
+- **后端支持历年月度计费收入（BR）聚合**:
+  - 在 `src/controllers/keyCustomerOverview.controller.js` 中新增 `brMonthly`（B端）与 `brMonthly_A`（A端）的历年各行业及 TOTAL 1~12 月实收金额动态聚合；
+  - 完整保留 2026 年产品分类看板与客户收入统计逻辑，并在 `responsePayload` 中输出。
+- **前端新增「要客月度计费收入金额与同比趋势」复合看板**:
+  - 在「要客月度签单金额与同比趋势」下方插入全新独立 Card；
+  - 配备独立行业选择器、对比年份多选器以及数据视角切换；
+  - **左侧 3/4 空间**：
+    - 往年所有 12 个月份柱体完整呈现，未对比月采用斜线条纹图案与虚线框特殊样式；
+    - 往年柱顶走势连线贯穿全 12 个月份；
+    - 目标年（今年）走势线与月度同比（YoY）折线连接有效月份；
+    - 柱顶小圆点、数值标签与交互式 Tooltip 浮层；
+  - **右侧 1/4 空间**：
+    - 目标年同期实收总额（月均、单月最高月与金额）；
+    - 基准年同期实收总额（月均、单月最高月与金额）；
+    - 同期同比增幅 (YoY) 醒目 24px 加粗大字 + 状态感知渐变背景 + 同期总额绝对差额。
+- **验证通过**: 前端构建编译一次性成功，无任何错误。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:35:25
+**提示词**:
+```text
+代码同步到服务器端，注意现在的服务器是：ssh -p 6822 tristan@tristan.wang
+```
+
+**执行总结**:
+- **生产服务器代码与静态产物增量同步**:
+  - 针对生产服务器 `ssh -p 6822 tristan@tristan.wang`，通过安全高速通道（`rsync`）将本地编译打包完成的最新的前端产物（`react-admin-frontend/dist/`）、源码（`react-admin-frontend/src/`）、后端控制器与业务逻辑（`src/`）及 `PROMPT.md` 全量增量同步至 `/home/tristan/workspaces/TristanSaas`；
+- **后端服务热重载生效**:
+  - 在远程服务器成功执行 `pm2 reload backend-api`，无缝平滑重载后端 Node 服务，进程状态保持 `online`；
+- **线上环境双端校验通过**:
+  - 本地与公网（`https://tristan.wang:9900/`）均成功返回 HTTP 200 OK，包含最新「月度签单同比趋势」与「月度计收同比趋势」的完整页面已在生产环境稳定生效运行。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:44:15
+**提示词**:
+```text
+「keyGlobalFamilyTree」页面，在“分支与 CMI 历史签单统计情况”下方插入该要客的
+签单同比，计收同比， 样式和逻辑参考「要客概览」页面的“月度签单同比趋势” 和“月度计收同比趋势”
+```
+
+**执行总结**:
+- **家族树专属月度签单与计收数据聚合**:
+  - 在 `DashboardTab` 子组件中，自动读取该要客家族树的 `tcvRecords`（历史签单明细）与 `brStats`（计费收入明细），按月份（1~12月）动态精准汇总历年月度金额；
+- **同口径同比与卡片指标计算**:
+  - 完整复用「要客概览」的截止月份逻辑（同口径截断至当前月前一月）、历年对比年份灵活选择（默认今年 vs 去年）；
+  - 精确计算同期签单/计收总额、月均、单月最高发生月份与金额、同期同比增幅 (YoY) 及金额差额；
+- **插入并渲染双趋势看板**:
+  - 在“分支与 CMI 历史签单统计情况”区域下方按序插入：
+    1. 「**月度签单同比趋势**」：双年份复合柱状图 + 往年12月全覆盖条纹柱 + 往年全贯穿走势线 + 目标年走势线 + YoY 同比折线/气泡 + 3张汇总卡片（24px 加粗大字）；
+    2. 「**月度计收同比趋势**」：与签单同比保持统一的高级视觉风格与 3/4 + 1/4 响应式栅格布局；
+- **前端编译校验**:
+  - 本地运行 `npm run build` 编译打包 100% 成功，0 错误 0 警告。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:48:15
+**提示词**:
+```text
+再次同步最新代码到服务端
+```
+
+**执行总结**:
+- **生产服务器代码与静态产物全量增量同步**:
+  - 将本地最新构建的前端产物（包含 `keyGlobalFamilyTree` 的月度签单/计收同比趋势）、前端源码、后端服务代码及 `PROMPT.md` 通过 `rsync` 安全同步至服务器 `ssh -p 6822 tristan@tristan.wang` 的 `/home/tristan/workspaces/TristanSaas/`；
+- **后端服务平滑热重载**:
+  - 成功执行 `pm2 reload backend-api`，后端进程平滑重载完毕，状态保持 `online`；
+- **公网服务在线验证通过**:
+  - `https://tristan.wang:9900/` 返回 HTTP 200 OK，包含海外要客家族树最新月度签单与计收同比看板的完整功能已在生产服务器稳定生效运行。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:55:18
+**提示词**:
+```text
+keyGlobalFamilyTree 页面浏览器的标题改为 nameCn + “-洞察分析”
+```
+
+**执行总结**:
+- **浏览器标题动态定制**:
+  - 在 `key-global-family-tree.tsx` 主组件中提取 `nameCn`（优先从 URL 查询参数 `?nameCn=...` 获取，并支持树根节点或首节点企业中文名自动 fallback）；
+  - 使用 `useEffect` 结合 `document.title = `${displayNameCn}-洞察分析`` 以及 `@umijs/max` 的 `<Helmet><title>...</title></Helmet>` 双重机制，实现浏览器标签页标题在进入页面及数据加载完成时动态设置为 `{nameCn}-洞察分析`；
+- **前端编译校验**:
+  - `npm run build` 本地打包顺利通过，0 错误 0 警告。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-27 23:56:20
+**提示词**:
+```text
+再次同步代码到服务端
+```
+
+**执行总结**:
+- **生产服务器增量同步校验**:
+  - 本地与服务器 `ssh -p 6822 tristan@tristan.wang` 的目录文件（`react-admin-frontend/dist/`、`react-admin-frontend/src/`、`src/`、`PROMPT.md`）已完成全量增量校验与同步传输；
+- **后端服务热重载与公网验证**:
+  - 执行 `pm2 reload backend-api` 平滑重载成功，进程状态为 `online`；
+  - 访问 `https://tristan.wang:9900/` 返回 HTTP 200 OK，包含定制浏览器标题及全部最新功能的生产环境正常稳定运行。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-31 14:38:51
+**提示词**:
+```text
+「要客概览」的“要客清单” 页面表格：
+1、「行业编码」字段，在可编辑的用户下，采用下拉选择框形式。 八大行业来源为keycustomer表的 industryCode 字段的DISTINCT值
+2、「行业编码」字段，放置到“关键字” 列前
+```
+
+**执行总结**:
+- **列顺序调整**:
+  - 在 [key-customers.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-customers.tsx) 中，将「行业编码」(`industryCode`) 列移动至「关键词」(`keyWords`) 列之前。
+- **八大行业下拉选择组件**:
+  - 动态提取 `keycustomer` 列表中 `industryCode` 字段的 DISTINCT 去重值，并兜底八大行业标准规范值（Automotive, Energy, Engineering and Construction, Finance, Industrial Manufacturing, Retail Chain and Public Services, Technology and Internet, Transportation and Logistics）；
+  - 封装 `IndustryCodeCellRenderer` 单元格渲染组件：
+    - 在可编辑用户（`isTristan`）下，呈现为 Ant Design `<Select>` 下拉选择框，点击即可快速选择八大行业之一；
+    - 切换选项时同步更新 AG Grid 内部行数据，并调用 `onMarkDirty` 标记为脏行，右上角「保存变更」按钮实时响应变红并展示待提交条数，支持统一持久化到 MongoDB；
+    - 在非可编辑用户下，采用纯文本形式只读展示。
+- **编译与服务校验**:
+  - Webpack 热更新编译完成（Compiled in 324 ms），TypeScript 校验通过，0 错误 0 警告。
+
+---
+
+## Prompt 最新
+**时间**: 2026-08-31 14:55:12
+**提示词**:
+```text
+最新代码同步到服务器
+```
+
+**执行总结**:
+- **生产静态资源构建**:
+  - 在本地执行 `npm run build`（耗时 8.55s），成功打包包含最新「要客清单」行业编码下拉框及列顺序调整的生产静态文件 `dist/`。
+- **全量增量同步至生产服务器**:
+  - 通过 `rsync` 将最新打包后的 `react-admin-frontend/dist/` 增量同步至服务器 `ssh -p 6822 tristan@tristan.wang:/home/tristan/workspaces/TristanSaas/react-admin-frontend/dist/`；
+  - 增量同步最新的源码文件（包括 [key-customers.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-customers.tsx)）以及配置文件到远程项目目录。
+- **服务平滑重载与公网验证**:
+  - 远程服务器执行 `pm2 reload backend-api`，服务进程平滑重载完成并保持 online；
+  - 验证公网 `https://tristan.wang:9900/key-customers/` 及最新前端分块脚本 `p__iboss__key-customers.117e0c33.async.js`，均返回 HTTP/2 200 OK，生产环境已即时生效运行最新版本。
+
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 09:35:40
+**提示词**:
+```text
+「要客概览」页面加载慢，请排查耗时点并给出优化方案
+```
+
+**执行总结**:
+- **耗时点排查与实测数据定位**:
+  - **后端接口 GET /api/v1/key-customer-overview/stats 成为绝对瓶颈**:
+    - 冷启动/缓存过期/强制刷新下，单次接口响应耗时高达 **6,542 ms（约 6.5 ~ 7.4 秒）**；
+    - **大表数据量与单线程阻塞**:
+      - dmcBR 集合总数据量达 **4,746,113 条（474.6万条）**；
+      - 接口通过 电路参考编号 $in 分别为 B端和 A端查出了整整 **736,623 条明细**（B端 191,987 条耗时 1,177ms，A端 544,636 条耗时 2,775ms）；
+      - 仅将 73.6 万条文档从 MongoDB 通过网络拉取并反序列化为 V8 堆内存对象就耗时近 4 秒；
+      - Node.js 在单线程事件循环中对 73.6 万条记录进行密集遍历、正则匹配与字典累加计算，单核 CPU 100% 占满耗时 **2.3 秒**，直接造成 Node.js 进程事件循环完全卡顿阻塞，阻碍并发其他所有请求。
+    - **缓存机制脆弱**:
+      - 内存缓存 TTL 仅 3 分钟（且服务重启即丢失），只要 3 分钟无人访问，下一个用户必等 6.5 秒以上；
+      - 缺乏防击穿互斥锁，多请求并发时会重复触发 6.5 秒的巨型运算。
+  - **前端并发请求与无用渲染开销**:
+    - 用户进入 /key-customers 时默认激活 Dashboard Tab，但顶级组件 key-customers.tsx 仍无差别并发拉取了 /api/v1/wildcards/keycustomer（要客清单全量数据），并计算了所有动态列定义，带来额外网络和渲染开销。
+- **系统性优化方案制定**:
+  - **方案一（极速见效、零破坏性、推荐优先落地）：持久化快照（Materialized Snapshot）+ 启动预热 + Stale-While-Revalidate 异步刷新机制**
+    - 接口直接从快照/内存读取，耗时从 **6,542 ms 直降至 3~5 ms**（提速超 1,000 倍），彻底杜绝白屏；
+    - 后台定时/事件触发异步更新，并增加 SingleFlight 互斥锁防止缓存击穿。
+  - **方案二（计算层重构）：MongoDB 原生聚合管道（Aggregation）下推**
+    - 利用数据库引擎原生多线程与聚合管道 $group，避免将 73.6 万条明细搬入 Node.js 内存，内存开销减少 95% 以上。
+  - **方案三（前端按需懒加载）**:
+    - 实现 Tab 级别的数据按需加载，只有切换到对应 Tab 时才拉取该 Tab 数据；
+    - 优化加载态为骨架屏或渐进式渲染。
+
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 10:20:57
+**提示词**:
+```text
+按照 【方案一（快照持久化 + SWR 异步保鲜）】 与 【方案三（前端 Tab 懒加载）】 执行
+```
+
+**执行总结**:
+- 制定实施计划 [implementation_plan.md](file:///Users/tristan/.gemini/antigravity-ide/brain/55234485-5cee-4ec0-9b05-d7f5923aa826/implementation_plan.md)；
+- 方案包含后端快照持久化表 (`keyCustomerOverviewSnapshot`)、SWR 异步保鲜、SingleFlight 互斥锁、自动预热与前端 Tab 级按需懒加载。
+
+
+**执行结果与实测效果**:
+- **后端持久化快照 + SWR 异步保鲜 + SingleFlight 互斥锁**:
+  - 在 [keyCustomerOverview.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/keyCustomerOverview.controller.js) 中将全量计算提炼为 `computeOverviewStats(db)`，并在 MongoDB 新增 `keyCustomerOverviewSnapshot` 快照集合持久化存储；
+  - 接口优先从内存/快照读取，保鲜期（30分钟）过后通过 SWR 机制在后台静默刷新，搭配 SingleFlight 互斥锁彻底防止并发击穿与 Node.js 单线程卡顿；
+  - 实现了服务启动自动预热 (Cache Warming)。
+- **前端 Tab 级按需懒加载**:
+  - 在 [key-customers.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/key-customers.tsx) 中消除首屏无差别的 `fetchData()` 调用，仅当用户主动切换至「要客清单」Tab 且本地无数据时按需拉取，消除首屏并发争抢。
+- **性能实测数据对比**:
+  - 优化前接口响应耗时: **6,542 ms**;
+  - 优化后接口响应耗时: **3.6 ms (提速 1,817 倍，实现真正的毫秒级秒开)**;
+  - 数据完整性验证: 客户数 (138)、渗透客户数 (68)、分支数 (11339)、2026 B端签单总额与计费总额全部 **100% 精确一致**。
+
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 10:31:01
+**提示词**:
+```text
+把上述优化内容，最新代码及新增的表（如果有必要）同步到服务器
+```
+
+**执行总结**:
+- **生产环境前端静态产物构建**:
+  - 在本地执行 `npm run build`（耗时 8.34s），成功编译包含最新按需懒加载的静态构建产物（包含分块文件 `dist/p__iboss__key-customers.3e3bab7a.async.js`）。
+- **快照表同步与远程 MongoDB 导入**:
+  - 本地导出持久化快照表 `keyCustomerOverviewSnapshot`（包含最新 116 KB 聚合看板指标），通过 rsync 传输至生产服务器 `/home/tristan/workspaces/TristanSaas/keyCustomerOverviewSnapshot.json`；
+  - 在生产服务器执行导入脚本，将快照写入远程 MongoDB 的 `keyCustomerOverviewSnapshot` 集合（文档数 1，_id: 'latest_overview_stats'）。
+- **全量增量同步至生产服务器**:
+  - 通过 rsync 通道增量同步前端最新产物 `react-admin-frontend/dist/`、前端源码组件 `key-customers.tsx`、后端控制器 `src/controllers/keyCustomerOverview.controller.js` 及 `PROMPT.md` 至远程生产环境 `/home/tristan/workspaces/TristanSaas/`。
+- **服务平滑重载与公网双端验证**:
+  - 远程服务器执行 `~/.npm-global/bin/pm2 reload backend-api`，日志确认成功启动预热：`[OverviewSnapshot] 启动预热成功，已从快照恢复要客总览缓存`；
+  - 生产环境真实接口耗时实测：从原先的 6.5 秒以上直降至 **8 ms**，返回 138 个客户和 11,339 个分支指标完整无损；
+  - 验证公网 `https://tristan.wang:9900/key-customers/` 及最新 chunk 脚本，均返回 HTTP/2 200 OK，生产环境已即时全面生效。
+
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 10:37:44
+**提示词**:
+```text
+开发端帮我排查一个问题：
+「要客概览」 页面的「8大行业 2026计费收入对比」中选择“能源” 后，“2026年要客计费收入排行榜”中点击“中国南方电网有限责任公司”，弹出的计费明细表为空
+```
+
+**执行总结**:
+- **原因深度定位与数据链路排查**:
+  - **业务数据现状**:
+    - 「中国南方电网有限责任公司」在 2026 年的财务实收计费中，B 端电路记录为 0；
+    - 其 104.15 万港币计费收入全部来源于 **A 端**（通过 `mappingPath="endCustomer"` 关联 11 家电网成员企业名称，匹配 `dmcTCV` 中的 116 条 A 端电路，对应 `dmcBR` 中的 **8,971 条计费明细**）；
+    - 看板中排行榜（默认 `total` 视角或 `A` 视角）正确汇总了 A 端 104.15 万计费收入。
+  - **接口与前端调用缺陷**:
+    - 前端在点击排行榜行触发 `handleBrRowClick` 时，调用了 `/api/v1/key-customer-overview/br-detail?customerName=...&year=2026`，未传递当前数据视角参数 `mode`;
+    - 后端接口 `getBrDetail` 此前**仅实现了基于 B 端签约客户标识关联电路的查询逻辑**，未实现 A 端（endCustomer 路径）的电路及计费明细查询，导致查出的电路数为 0，最终返回了空数组 `[]`。
+- **修复方案落地**:
+  - **后端重构 `getBrDetail`**:
+    - 在 [keyCustomerOverview.controller.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/src/controllers/keyCustomerOverview.controller.js) 中增加对 `mode` 参数（'b' | 'a' | 'total'）的支持（默认 `total`）；
+    - 实现 `getAList`：通过 `endCustomer` 映射提取关联企名，匹配 `dmcTCV` 获取全部 A 端有效电路编号，并在 `dmcBR` 中拉取计费明细；
+    - 实现 `total` 模式下 A 端与 B 端明细合并去重，并保留兜底名称模糊匹配。
+  - **前端联动 `handleBrRowClick`**:
+    - 在 [KeyCustomerOverview.tsx](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/src/pages/iboss/KeyCustomerOverview.tsx) 中增加传递 `&mode=${dataMode}`，并在弹窗标题上显示当前视角（B端/A端/合计）。
+- **实测验证**:
+  - 本地 HTTP 调用 `GET /v1/key-customer-overview/br-detail?customerName=中国南方电网有限责任公司&year=2026&mode=total`；
+  - 成功返回 **8,971 条明细记录**，总金额约 **104.09 万港币**，响应耗时仅 **172 ms**，弹窗为空问题已彻底解决。
+
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 10:43:49
+**提示词**:
+```text
+好的，最新代码同步到服务端
+```
+
+**执行总结**:
+- **生产静态资源构建**:
+  - 本地执行 `npm run build`（耗时 8.87s），成功编译包含 BR 明细支持 A/B 端视角联动（`handleBrRowClick` 带 `&mode=${dataMode}`）的最新前端生产包，生成静态产物 `dist/p__iboss__key-customers.7cebabd4.async.js`。
+- **全量增量同步至生产服务器**:
+  - 通过 rsync 通道，将前端构建产物 `react-admin-frontend/dist/`、前端源码组件 `KeyCustomerOverview.tsx`、后端控制器 `keyCustomerOverview.controller.js` 及 `PROMPT.md` 增量同步至远程服务器 `ssh -p 6822 tristan@tristan.wang:/home/tristan/workspaces/TristanSaas/`。
+- **服务平滑重载与线上业务实测**:
+  - 远程服务器执行 `~/.npm-global/bin/pm2 reload backend-api`，服务平滑重载完成并保持 online；
+  - 针对「中国南方电网有限责任公司」在线上环境直接进行 `br-detail` 接口实测：成功返回 **8,971 条明细记录**，金额汇总 **1,041,500.78 港币**，耗时仅 **351 ms**；
+  - 验证公网 `https://tristan.wang:9900/p__iboss__key-customers.7cebabd4.async.js` 返回 HTTP/2 200 OK，线上点击排行榜各客户（含A端与B端计费）均可秒级弹出完整计费明细，生产环境已即时全面生效。
+
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 14:58:05
+**提示词**:
+```text
+我现在在数据库层面，重新更新了dmcBR表，keyCustomerOverviewSnapshot 这个集合，如何触发更新？
+```
+
+**执行总结**:
+- **快照更新触发机制解析与脚本提供**:
+  - **提供一键 CLI 脚本 [scripts/refreshOverviewSnapshot.js](file:///Users/tristan/Workspaces/github/node-express-boilerplate/scripts/refreshOverviewSnapshot.js)**:
+    - 运行 `node scripts/refreshOverviewSnapshot.js` 即可自动读取最新 dmcBR 等全量数据完成重算并 upsert 写入 `keyCustomerOverviewSnapshot`；
+  - **HTTP API 强刷参数**:
+    - 调用 `GET /api/v1/key-customer-overview/stats?forceRefresh=1` 会触发 SingleFlight 后台重新计算并刷新持久化快照；
+  - **SWR 自动过期静默保鲜**:
+    - 30分钟保鲜期过后，用户访问时后台自动静默拉取最新数据重算；
+  - **实测验证**:
+    - 在本地执行脚本完成最新 dmcBR 重新聚合，2026 B端计费更新为 14.08 亿，A端计费更新为 1.54 亿，快照表已成功更新完毕。
+
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 15:06:25
+**提示词**:
+```text
+从开发端同步数据表dmcBR到服务器端，要求：
+1、删除服务器端 dmcBR表中，“数据月份”字段 2026开头的所有记录
+2、把开发端dmcBR表中，“数据月份”字段 2026开头的所有记录同步到服务端
+```
+
+**执行总结**:
+- **数据导出与压缩打包**:
+  - 本地开发端 `dmcBR` 集合中 2026 年数据（202601~202607）共计 **843,053 条**；
+  - 采用流式 Gzip 压缩导出为 `dmcBR_2026.jsonl.gz`（64.16 MB），并通过 rsync 高速通道安全传输至服务端 `/home/tristan/workspaces/TristanSaas/`。
+- **用户确认与服务端删除/批量导入**:
+  - 严格按照操作规则交互确认后执行：
+    - [步骤 1] 校验服务端待删除的 2026 年历史记录（共 827,401 条）；
+    - [步骤 2] 执行服务端数据库删除：`deleteMany({"数据月份": /^2026/})`，成功清理 **827,401 条** 旧数据；
+    - [步骤 3] 服务端流式解压并分批（每批 3,000 条）执行 `insertMany`，成功写入 **843,053 条** 最新记录；
+    - [步骤 4] 校验各月份数据分布：202601(117,744), 202602(110,126), 202603(118,913), 202604(114,554), 202605(131,793), 202606(131,037), 202607(118,886)，总计 843,053 条完整无误。
+- **快照表自动重算与平滑生效**:
+  - 自动运行 `scripts/refreshOverviewSnapshot.js` 重新聚合最新 2026 计费指标并刷新 `keyCustomerOverviewSnapshot`：
+    - 2026 B端计费总额: **1,408,295,799.45 港币（14.08 亿）**;
+    - 2026 A端计费总额: **154,170,586.42 港币（1.54 亿）**;
+  - PM2 平滑重载 `backend-api`，实测服务端 API 响应时间仍稳定保持在 **7~8 ms** 秒开状态。
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-01 17:04:16
+**提示词**:
+```text
+使用超级管理员角色登录之后，出现一个多余的一级菜单「管理页」，请删除
+```
+
+**执行总结**:
+- **定位多余一级菜单路由**:
+  - 排查发现前端路由配置文件 [routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts) 中保留了模板自带的 `/admin` 路由（配置了 `name: 'admin'` 对应国际化「管理页」，并带 `access: 'canAdmin'`）；
+  - 当以 `admin` 超级管理员身份登录时，权限判断为 true，导致左侧导航栏额外渲染出该多余的「管理页」一级菜单。
+- **删除冗余路由配置**:
+  - 在 [routes.ts](file:///Users/tristan/Workspaces/github/node-express-boilerplate/react-admin-frontend/config/routes.ts) 中彻底移除 `/admin` 及其二级子路由（`/admin/sub-page`）的配置块。
+- **构建校验与测试**:
+  - 本地执行 `npm run build` 进行全量编译打包，构建顺利通过（exit code 0），验证路由与页面生成均无异常，且无副作用。
+
+---
+
+## Prompt 最新
+**时间**: 2026-09-02 09:00:52
+**提示词**:
+```text
+同步最新代码到服务端
+```
+
+**执行总结**:
+- **前端生产资源重构**:
+  - 本地执行 `npm run build` 成功重新编译包含路由变更（删除「管理页」一级菜单）的最新前端产物；
+- **核心源码与产物全量增量同步至服务端**:
+  - 通过 rsync 通道，将 `src/`、`react-admin-frontend/dist/`、`react-admin-frontend/src/`、`react-admin-frontend/config/`、`scripts/`、`package.json` 及 `PROMPT.md` 同步至远程服务器 `ssh -p 6822 tristan@tristan.wang:/home/tristan/workspaces/TristanSaas/`；
+- **服务端平滑重载与验证**:
+  - 远程执行 PM2 reload，完成 `backend-api` 服务的平滑重启并保持 online；
+  - 验证 Nginx 托管与接口状态正常。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:08:21
+**提示词**:
+```text
+http api的接口文档地址？
+```
+
+**执行总结**:
+- **查询与确认 API 文档地址**:
+  - 本地开发环境地址: `http://localhost:3000/v1/docs/`
+  - 核心定义文件: `src/routes/v1/docs.route.js` 与 `src/docs/swaggerDef.js`
+  - 访问条件说明: 文档基于 Swagger UI 动态生成，仅在开发环境（`NODE_ENV === 'development'`）下通过 `/v1/docs` 挂载；生产环境下默认关闭以保证接口安全。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:11:25
+**提示词**:
+```text
+更新该文档，将所有的http api 方法都分类更新到该文档
+```
+
+**执行总结**:
+- **全面整理并分类后端 HTTP API**:
+  - 梳理了当前系统中全部 15 个模块的 HTTP 路由（挂载于 `/v1` 前缀），涵盖认证授权、用户管理、要客总览洞察、DNB数据集成、iBOSS出海、商机订单、订单明细、合同管理、合同明细、CMI海外分支、Wildcards通用集合、数据治理日志、埋点统计、智能翻译及Swagger文档；
+- **更新 README.md 文档**:
+  - 在 `README.md` 的 `## API Documentation` 章节下，以清晰规范的 Markdown 表格形式全面补充了每个模块的 HTTP 请求方法、接口路径、功能说明以及权限要求；
+- **代码与运行状态确认**:
+  - 遵循项目规则，未修改正在运行的业务代码，仅完善了文档。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:14:34
+**提示词**:
+```text
+http://localhost:3000/v1/docs/
+为什么这个文档URL看到的API文档不全
+```
+
+**执行总结**:
+- **深入排查 Swagger UI 文档不全的根本原因**:
+  - 分析了 `src/routes/v1/docs.route.js` 中 `swagger-jsdoc` 的扫描配置（扫描 `src/docs/*.yml` 与 `src/routes/v1/*.js`）；
+  - 全局检索发现：当前仅 `auth.route.js`、`user.route.js`、`wildcards.route.js` 这 3 个路由文件中编写了 `@swagger` JSDoc 注释块；
+  - 业务后续新增的 11 个路由模块（`order`、`contract`、`keyCustomerOverview`、`dnb`、`iboss`、`pageView`、`cmiBranch`、`translate` 等）均未编写 `@swagger` 注释，导致 `swagger-jsdoc` 无法自动采集并呈现到页面中；
+- **提出解决方案**:
+  - 向用户清晰解释成因，并提供补全各模块 `@swagger` 注释的方案（若需要可随时批量补齐）。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:15:19
+**提示词**:
+```text
+立即补齐
+```
+
+**执行总结**:
+- **全量补齐后端 12 个路由文件的 `@swagger` JSDoc 注释**:
+  - 为 `auth.route.js` 补齐 `POST /auth/change-password` 注释；
+  - 为 `user.route.js` 补齐 `POST /users/{userId}/reset-password` 和 `POST /users/{userId}/force-logout` 注释；
+  - 为 `cmiBranch.route.js`、`contract.route.js`、`contractDetail.route.js`、`dataGovernanceLog.route.js`、`dnb.route.js`、`iboss.route.js`、`ibossCustomer.route.js`、`keyCustomerOverview.route.js`、`order.route.js`、`orderDetail.route.js`、`pageView.route.js`、`translate.route.js` 补齐对应全部接口的 Tag、Summary、Parameters、RequestBody 和 Responses 规范定义；
+- **Swagger JSDoc 编译验证**:
+  - 本地验证 `swagger-jsdoc` 编译，51 个路由路径、15 个业务分组 Tag（共计 71 个端点方法绑定）全部解析成功，零错误；
+- **业务代码零破坏**:
+  - 仅在路由文件末尾追加标准 JSDoc 注释，未改动任何业务逻辑代码。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:24:14
+**提示词**:
+```text
+将下列数据库中的表结构导出，并且每个字段给出中文的名字和解释（或依据你知道的关联关系），以MD文件格式输出到项目的README.md中：
+- 排除DNB，dnb开头的表
+- 排除表名称以数字结尾的所有表（备份表）
+- 排除test开头的表
+```
+
+**执行总结**:
+- **数据库集合全量扫描与条件过滤**:
+  - 连接 MongoDB 生产/开发库，全面扫描数据库中所有集合；
+  - 严格按照过滤规则排除了全部 `DNB`/`dnb` 开头集合、以纯数字结尾的备份集合（如 `xxx.20260609`、`xxx20260609`）以及 `test` 开头测试集合与系统集合（`system.`）；
+  - 筛选并导出全部 **32 个核心业务集合**；
+- **构建数据库字典并输出至 README.md**:
+  - 将 32 张表系统划分为 9 大业务领域（系统与认证、要客总览、经营财务与签约流水、商机订单与合同、iBOSS能力出海协同、组织与通讯录、线下参会支撑、数据治理与动态列、埋点监控分析）；
+  - 每张表均输出中文表名、数据量规模、核心业务职能、跨表关联关系，并以标准 Markdown 表格输出全部字段（字段名、数据类型、中文名称、业务解释与关联关系说明）；
+  - 在 `README.md` 的 Table of Contents 中同步增加 `[Database Schema](#database-schema)` 导航；
+- **清理临时产物与状态安全**:
+  - 临时采样元数据脚本已自动清理，业务代码保持零修改。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:32:23
+**提示词**:
+```text
+README.md文件段落 “Database Schema (核心数据库表结构字典)”，为什么用md的预览模式看不到这部分的内容？
+```
+
+**执行总结**:
+- **定位 MD 预览模式无法正常查看/跳转的根因**:
+  - **根因一（锚点失配造成点击无响应）**: 顶部 Table of Contents 中的链接为 `#database-schema`，但原标题写为 `## Database Schema (核心数据库表结构字典)`，Markdown 引擎生成带中文和括号的实际锚点 ID 为 `#database-schema-核心数据库表结构字典`，导致点击目录无法定位跳转；
+  - **根因二（裸 HTML 标签破坏块级解析）**: 原文本在各表上方插入了大量的 `<a id="collection-..."></a>`，在严格模式的 Markdown Preview 解析器中容易破坏标题及大表格的块级解析或被过滤；
+  - **根因三（编辑器与预览 Webview 缓存未刷新）**: 外部脚本写入大文件后，VS Code/IDE 的预览窗口通常需要重新激活或手动刷新；
+- **针对性修复与优化**:
+  - 将主标题精简统一为 `## Database Schema`，副标题另起引用行，与目录 `[Database Schema](#database-schema)` 完美匹配，点击可瞬间跳转；
+  - 移除所有裸露的 `<a id="..."></a>` 标签，改为符合 GitHub/VS Code 原生规范的标准 Markdown Slug 锚点；
+  - 给出在 IDE 中刷新 Markdown 预览的操作指引（`Cmd+Shift+P` -> `Markdown: Refresh Preview` 或重新打开侧边预览）。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:41:15
+**提示词**:
+```text
+项目目录中：react-admin-frontend/node_modules/.cache/mfsu-deps/MFSU-development/*.pack都是什么文件，是否可以删除
+```
+
+**执行总结**:
+- **文件性质剖析**:
+  - 明确解释了 `*.pack` 文件是 Ant Design Pro (Umi Max) 的 **MFSU (Module Federation Speed Up)** 模块联邦编译加速方案在本地开发时生成的第三方依赖预编译缓存；
+  - 检查发现当前缓存占用了约 800MB+ 磁盘空间（整个 `.cache` 目录约 1.8GB）；
+- **删除影响与操作建议**:
+  - 确认该目录完全可以、且随时可以安全删除，不包含任何源码或业务数据，不影响生产构建（`npm run build`）；
+  - 删除后下次启动本地开发环境（`npm run start`）会自动重新生成最新依赖缓存。
+
+## Prompt 最新
+**时间**: 2026-09-02 09:47:50
+**提示词**:
+```text
+如果把整个项目的工程文件导出给别人，哪些目录和文件可以删除？
+```
+
+**执行总结**:
+- **项目工程全景依赖与体积深度排查**:
+  - 统计了项目 3.9GB 的总容量分布，其中 99% 的空间被 `node_modules` 依赖和 `.cache` 占据；
+- **分门别类梳理导出清理清单**:
+  - **严重敏感文件（安全红线）**: `.env`（含各类商业密钥）、`mongodata/`、`nohup.out`、`PROMPT.md`（包含敏感提示词与历史报文）；
+  - **极占体积的依赖与构建产物**: 根目录及前端的 `node_modules/`（~3.9GB）、`.cache/`、`dist/`；
+  - **临时脚本与备份文件**: 根目录下的 `*.bak*`、`temp*.js`、`scratch/`、`tmp/`、`unitbakcup.csv` 等；
+  - **操作系统与版本控制**: `.git/`、`.DS_Store`；
+- **提供规范的一键清理打包命令指南**:
+  - 给出标准 `tar` / `rsync` 排除参数，指导用户安全、轻量、专业地完成代码工程导出。
+
+## Prompt 最新
+**时间**: 2026-09-02 10:16:41
+**提示词**:
+```text
+最新代码提交到github
+```
+
+**执行总结**:
+- **完善 Git 忽略规则**:
+  - 在 `.gitignore` 中补充了操作系统生成的 `.DS_Store`，以及 `scratch/` 目录下的大体积临时数据文件与 dump 目录（如 `scratch/*.json`、`scratch/dump_*`），防止不必要的非代码数据进入版本控制；
+- **全量暂存与版本提交**:
+  - 暂存近期修改的前端路由配置、页面性能优化（`KeyCustomerOverview.tsx`、`key-customers.tsx`、`key-global-family-tree.tsx`）、后端 API 路由与 Swagger 文档注解、维护工具脚本（`scripts/export_3tables.js` 等）以及完整的项目接口与数据字典文档；
+- **推送到 GitHub 远程仓库**:
+  - 将所有本地最新提交安全推送到远程分支 `origin/main`。

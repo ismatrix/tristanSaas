@@ -29,3 +29,189 @@ router.get('/family-tree-distinct-options', auth(), overviewController.getFamily
 router.get('/branches', auth(), overviewController.getKeyFamilyTreeBranches);
 
 module.exports = router;
+
+/**
+ * @swagger
+ * tags:
+ *   name: KeyCustomerOverview
+ *   description: Key Customer Overview, Tree Penetration & Dashboard Analytics
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/stats:
+ *   get:
+ *     summary: Get overview dashboard stats
+ *     description: Retrieve global overview statistics including TCV, BR, and trend charts.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/country-branches:
+ *   get:
+ *     summary: Get country branches breakdown
+ *     description: Retrieve all branches located in a specific country with group Chinese name mapping.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: country
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Country name
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/tcv-detail:
+ *   get:
+ *     summary: Get TCV contract signing details
+ *     description: Retrieve TCV line details by customer and year.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: customerName
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/br-detail:
+ *   get:
+ *     summary: Get BR billing details
+ *     description: Retrieve BR billing details by customer and year.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: customerName
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/family-tree-dashboard-stats:
+ *   get:
+ *     summary: Get overseas family tree dashboard stats
+ *     description: Retrieve overseas family tree hierarchy and stats for a specific customer.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: keycustomerId
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/penetrated-gids:
+ *   get:
+ *     summary: Get penetrated GIDs
+ *     description: Retrieve list of GIDs where CMI business penetration has occurred.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/family-tree-distinct-options:
+ *   get:
+ *     summary: Get distinct options for family tree filters
+ *     description: Retrieve unique countries, regions, and cities from keyGlobalFamilyTree for select dropdowns.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /key-customer-overview/branches:
+ *   get:
+ *     summary: Get family tree branch penetration list
+ *     description: Retrieve all family tree branches with TCV penetration stats, search, and pagination.
+ *     tags: [KeyCustomerOverview]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: country
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         default: 10
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         default: 1
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */

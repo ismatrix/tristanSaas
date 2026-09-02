@@ -189,3 +189,53 @@ router.post(
 );
 
 module.exports = router;
+
+/**
+ * @swagger
+ * tags:
+ *   name: Translate
+ *   description: Corporate Multilingual Smart Translation Service
+ */
+
+/**
+ * @swagger
+ * /translate:
+ *   post:
+ *     summary: Translate company names and commercial terms
+ *     description: Intelligent enterprise translation with Google online translation proxy and automatic offline enterprise dictionary fallback.
+ *     tags: [Translate]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - text
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 description: Text to translate
+ *               targetLang:
+ *                 type: string
+ *                 enum: [zh-CN, en]
+ *                 default: en
+ *                 description: Target language
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 translatedText:
+ *                   type: string
+ *                   example: Speed Telecom
+ *                 source:
+ *                   type: string
+ *                   example: google_online
+ */

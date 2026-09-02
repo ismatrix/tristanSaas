@@ -10,3 +10,11 @@ yarn-error.log
 
 # Code coverage
 coverage
+
+# OS generated files
+.DS_Store
+**/.DS_Store
+
+# Scratch temporary dumps and large data files
+scratch/*.json
+scratch/dump_*

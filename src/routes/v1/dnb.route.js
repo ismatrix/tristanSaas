@@ -39,3 +39,155 @@ router.post('/company-detail/check-exist', auth(), dnbController.checkCompanyDet
 router.get('/company-detail/:duns', auth(), dnbController.getCompanyDetail);
 
 module.exports = router;
+
+/**
+ * @swagger
+ * tags:
+ *   name: DNB
+ *   description: Dun & Bradstreet Data Integration
+ */
+
+/**
+ * @swagger
+ * /dnb/family-tree:
+ *   post:
+ *     summary: Sync DNB family tree
+ *     description: Synchronize DNB family tree data directly into MongoDB.
+ *     tags: [DNB]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - globalUltimateDuns
+ *               - collectionName
+ *             properties:
+ *               globalUltimateDuns:
+ *                 type: string
+ *               collectionName:
+ *                 type: string
+ *               keycustomerId:
+ *                 type: string
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /dnb/family-tree/sync-stream:
+ *   get:
+ *     summary: Sync DNB family tree stream
+ *     description: Synchronize DNB family tree with Server-Sent Events (SSE) streaming real-time progress.
+ *     tags: [DNB]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: globalUltimateDuns
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: collectionName
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: keycustomerId
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: SSE stream initiated
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /dnb/company-detail/sync:
+ *   post:
+ *     summary: Batch sync company details
+ *     description: Batch sync DNB enterprise profile details into the database.
+ *     tags: [DNB]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - dunsList
+ *             properties:
+ *               dunsList:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /dnb/company-detail/check-exist:
+ *   post:
+ *     summary: Batch check company detail existence
+ *     description: Check which DUNS numbers already exist in MongoDB company details.
+ *     tags: [DNB]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - dunsList
+ *             properties:
+ *               dunsList:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /dnb/company-detail/{duns}:
+ *   get:
+ *     summary: Get single company detail
+ *     description: Fetch detailed DNB company profile by DUNS number.
+ *     tags: [DNB]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: duns
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: OK
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */

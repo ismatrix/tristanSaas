@@ -291,3 +291,38 @@ module.exports = router;
  *               code: 401
  *               message: verify email failed
  */
+
+/**
+ * @swagger
+ * /auth/change-password:
+ *   post:
+ *     summary: Change password
+ *     description: Change currently logged-in user password.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 format: password
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *     responses:
+ *       "200":
+ *         description: Password updated successfully
+ *       "400":
+ *         description: Invalid old password or bad request
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
